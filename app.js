@@ -25,7 +25,7 @@ ask:"Maccabi separated through possession control rather than superior raw shoot
 pnr:true
 }};
 const menu=["▦ Dashboard","◉ Games","◉ Teams","♟ Players","▣ Video Room","? Ask CourtIQ","▤ Reports","♜ Competitions","⚙ Settings"];
-let active="g1";
+let active="g2";
 function pnrModule(){return `<section class="pgrid"><div class="card box audit"><h3>PnR Intelligence — scoring sample</h3><div class="coverage"><div class="card cov"><b>23</b><small>PnR points</small></div><div class="card cov"><b>10</b><small>scoring clips</small></div><div class="card cov"><b>78.3%</b><small>points ≤12 sec</small></div><div class="card cov"><b>10</b><small>points final 6 sec</small></div></div><div class="insight">18 of 23 supplied PnR scoring points came with 12 seconds or fewer on the shot clock.</div><div class="insight">Switch: 8 pts · Hedge / Show: 8 · Under / Contain: 5 · Other late-clock: 2.</div><div class="insight warning">SCORING-SAMPLE LIMITATION: this does not establish coverage frequency, PPP or defensive efficiency. Full PnR outcomes are required.</div></div><div class="card box audit"><h3>PnR Coverage × Shot Clock — points</h3><table class="stats matrix"><tr><th>Coverage</th><th>18–12</th><th>12–6</th><th>6–0</th><th>Total</th></tr><tr><td>Hedge / Show</td><td>2</td><td>6</td><td>0</td><td>8</td></tr><tr><td>Switch</td><td>0</td><td>0</td><td>8</td><td>8</td></tr><tr><td>Under / Contain</td><td>3</td><td>0</td><td>2</td><td>5</td></tr><tr><td>Other late-clock</td><td>0</td><td>2</td><td>0</td><td>2</td></tr></table><div class="insight">Film read: switch scoring included two corner threes and a rim finish; Hedge / Show scoring continued the advantage into paint/rim finishes.</div></div></section>`}
 function render(){
 const G=games[active];
