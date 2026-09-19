@@ -15,3 +15,23 @@ jobs:
       - run: python -m pytest -q
         env:
           PYTHONPATH: .
+  ibba-live-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-api.txt
+      - name: Parse a real official IBBA women's game
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from api.ibba import import_ibba_url
+          g=import_ibba_url("https://ibasketball.co.il/match/778678/")
+          assert g["validation"]["status"]=="verified"
+          assert g["home"]["raw"]["team"]
+          assert g["away"]["raw"]["team"]
+          print(g["home"]["raw"]["team"], g["home"]["raw"]["points"], "-", g["away"]["raw"]["points"], g["away"]["raw"]["team"])
+          PY
