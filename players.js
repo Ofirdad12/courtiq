@@ -108,6 +108,34 @@
         "Late-clock decision-making — compare shot creation and passing decisions when the first action is stopped.",
         "National-team role — verify whether the strong assist-to-turnover sample reflects a different usage or lineup context."
       ]
+    },
+    {
+      id: "tal-lev",
+      name: "Tal Lev",
+      team: "Elitzur Holon",
+      position: "Forward",
+      season: "2025–26",
+      source: "Israel Basketball Association · Women's Premier League 2025–26",
+      sourceUrl: "https://ibasketball.co.il/league/2025-51/",
+      competitions: [
+        {
+          name: "Israel Women's Premier League", club: "Hapoel Rishon LeZion", games: 16,
+          summaryOnly: true, mpg: 28.5, ppg: 11.2, rpg: 5.0, apg: 4.4,
+          twoPct: 45.5, threePct: 35.6, ftPct: 66.7, spg: 1.0, tovpg: 3.3
+        }
+      ],
+      read: [
+        "Lev's verified 2025–26 league sample shows 11.2 points, 5.0 rebounds and 4.4 assists in 28.5 minutes across 16 games.",
+        "Her 4.4 assists against 3.3 turnovers produce a 1.33 AST/TO ratio. That combination points to meaningful creation volume with ball security as a clear investigation area.",
+        "She shot 35.6% from three and 45.5% on two-point attempts in the published league sample. Shot-attempt totals are not exposed in the verified season table used here, so CourtIQ does not manufacture eFG% or TS%."
+      ],
+      video: [
+        "Turnover taxonomy — classify the 3.3 turnovers per game by passing read, handle, offensive foul and pressure.",
+        "Creation profile — separate pick-and-roll, drive-and-kick, transition and secondary-side assists.",
+        "Three-point profile — identify catch-and-shoot versus pull-up volume behind the 35.6% season mark.",
+        "Two-point attempts — determine how much of the 45.5% comes at the rim, from cuts or from mid-range creation.",
+        "Role translation to Holon — verify how her creation fits next to Eden Rotberg and Ashley Owusu rather than assuming the same Rishon LeZion role."
+      ]
     }
   ];
 
@@ -116,6 +144,13 @@
   const safe = (a,b) => b ? a / b : 0;
 
   function metrics(s) {
+    if (s.summaryOnly) {
+      return {
+        ppg: s.ppg, rpg: s.rpg, apg: s.apg, twoPct: s.twoPct, threePct: s.threePct, ftPct: s.ftPct,
+        efg: null, ts: null, astTo: r2(safe(s.apg, s.tovpg)), threeRate: null, ftRate: null,
+        pts40: r1(safe(s.ppg * 40, s.mpg)), ast40: r1(safe(s.apg * 40, s.mpg)), tov40: r1(safe(s.tovpg * 40, s.mpg))
+      };
+    }
     const fgm = s.two_pm + s.three_pm;
     const fga = s.two_pa + s.three_pa;
     return {
@@ -138,16 +173,21 @@
 
   function competitionCard(s) {
     const m = metrics(s);
+    const pct = v => v == null ? "—" : v + "%";
+    const minutesLabel = s.summaryOnly ? s.mpg : r1(s.minutes/s.games);
+    const sourceTotals = s.summaryOnly
+      ? `Published season averages · MPG ${s.mpg} · PPG ${s.ppg} · RPG ${s.rpg} · APG ${s.apg} · 2P% ${s.twoPct} · 3P% ${s.threePct} · FT% ${s.ftPct} · STL ${s.spg} · TO ${s.tovpg}`
+      : `MIN ${s.minutes} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}`;
     return `<div class="piComp card">
-      <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games} G · ${r1(s.minutes/s.games)} MPG</span></div>
+      <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games} G · ${minutesLabel} MPG</span></div>
       <div class="piMetricGrid">
         <div><small>PPG</small><b>${m.ppg}</b></div><div><small>RPG</small><b>${m.rpg}</b></div><div><small>APG</small><b>${m.apg}</b></div>
-        <div><small>eFG%</small><b>${m.efg}%</b></div><div><small>TS%</small><b>${m.ts}%</b></div><div><small>AST/TO</small><b>${m.astTo}</b></div>
-        <div><small>2P%</small><b>${m.twoPct}%</b></div><div><small>3P%</small><b>${m.threePct}%</b></div><div><small>FT%</small><b>${m.ftPct}%</b></div>
-        <div><small>3P Rate</small><b>${m.threeRate}%</b></div><div><small>FT Rate</small><b>${m.ftRate}%</b></div><div><small>PTS / 40</small><b>${m.pts40}</b></div>
+        <div><small>eFG%</small><b>${pct(m.efg)}</b></div><div><small>TS%</small><b>${pct(m.ts)}</b></div><div><small>AST/TO</small><b>${m.astTo}</b></div>
+        <div><small>2P%</small><b>${pct(m.twoPct)}</b></div><div><small>3P%</small><b>${pct(m.threePct)}</b></div><div><small>FT%</small><b>${pct(m.ftPct)}</b></div>
+        <div><small>3P Rate</small><b>${pct(m.threeRate)}</b></div><div><small>FT Rate</small><b>${pct(m.ftRate)}</b></div><div><small>PTS / 40</small><b>${m.pts40}</b></div>
       </div>
-      <details><summary>Verified source totals</summary>
-        <div class="piRaw">MIN ${s.minutes} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}</div>
+      <details><summary>${s.summaryOnly ? "Verified published averages" : "Verified source totals"}</summary>
+        <div class="piRaw">${sourceTotals}</div>
       </details>
     </div>`;
   }
@@ -155,10 +195,10 @@
   function playerDetail(p) {
     const signalRows = [
       ["PPG", x=>metrics(x).ppg],
-      ["TS%", x=>metrics(x).ts+"%"],
-      ["eFG%", x=>metrics(x).efg+"%"],
+      ["TS%", x=>metrics(x).ts==null?"—":metrics(x).ts+"%"],
+      ["eFG%", x=>metrics(x).efg==null?"—":metrics(x).efg+"%"],
       ["AST/TO", x=>metrics(x).astTo],
-      ["FT Rate", x=>metrics(x).ftRate+"%"]
+      ["FT Rate", x=>metrics(x).ftRate==null?"—":metrics(x).ftRate+"%"]
     ];
     return `<div class="piHero">
       <div><small>PLAYER INTELLIGENCE · ${p.season}</small><h2>${p.name}</h2><p>${p.position} · ${p.team}</p></div>
