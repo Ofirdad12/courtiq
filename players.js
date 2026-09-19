@@ -121,7 +121,10 @@
         {
           name: "Israel Women's Premier League", club: "Hapoel Rishon LeZion", games: 16,
           summaryOnly: true, mpg: 28.5, ppg: 11.2, rpg: 5.0, apg: 4.4,
-          twoPct: 45.5, threePct: 35.6, ftPct: 66.7, spg: 1.0, tovpg: 3.3
+          twoPct: 45.5, threePct: 35.6, ftPct: 66.7,
+          drebpg: 4.4, orebpg: 0.6, foulsDrawnPg: 1.3, foulsPg: 2.3,
+          spg: 1.0, tovpg: 3.3, blocksForPg: 0.4, blocksAgainstPg: 0.2,
+          pir: 10.8, plusMinus: 218
         }
       ],
       read: [
@@ -176,7 +179,7 @@
     const pct = v => v == null ? "—" : v + "%";
     const minutesLabel = s.summaryOnly ? s.mpg : r1(s.minutes/s.games);
     const sourceTotals = s.summaryOnly
-      ? `Published season averages · MPG ${s.mpg} · PPG ${s.ppg} · RPG ${s.rpg} · APG ${s.apg} · 2P% ${s.twoPct} · 3P% ${s.threePct} · FT% ${s.ftPct} · STL ${s.spg} · TO ${s.tovpg}`
+      ? `Published season averages · MPG ${s.mpg} · PPG ${s.ppg} · DREB ${s.drebpg ?? "—"} · OREB ${s.orebpg ?? "—"} · RPG ${s.rpg} · APG ${s.apg} · 2P% ${s.twoPct} · 3P% ${s.threePct} · FT% ${s.ftPct} · STL ${s.spg} · TO ${s.tovpg} · PF ${s.foulsPg ?? "—"} · BLK ${s.blocksForPg ?? "—"} · PIR ${s.pir ?? "—"} · +/- ${s.plusMinus ?? "—"}`
       : `MIN ${s.minutes} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}`;
     return `<div class="piComp card">
       <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games} G · ${minutesLabel} MPG</span></div>
