@@ -40,32 +40,36 @@
       name: "Tanaya Atkinson",
       team: "Elitzur Holon",
       position: "Forward",
-      season: "2025–26 · EuroLeague sample + prior-season baseline",
-      source: "FIBA official competition data; Eurobasket profile link supplied by user",
-      comparisonLabel: "2024–25 Zaragoza → 2025–26 Valencia",
+      season: "2025–26",
+      source: "User-supplied Eurobasket screenshot",
       competitions: [
         {
-          name: "EuroLeague Women 2024–25", club: "Casademont Zaragoza", games: 13, minutes: 308, points: 97,
-          two_pm: 24, two_pa: 71, three_pm: 7, three_pa: 17, ftm: 28, fta: 35,
-          oreb: 16, dreb: 45, rebounds: 61, assists: 29, steals: 8, blocks: 2, turnovers: 31
+          name: "Spain LF Endesa · Estepona", club: "Estepona", games: 15, minutes: 222, points: 56,
+          two_pm: 12, two_pa: 39, three_pm: 4, three_pa: 16, ftm: 20, fta: 28,
+          oreb: 3, dreb: 35, rebounds: 38, assists: 19, steals: 7, blocks: 0, turnovers: 10
         },
         {
-          name: "EuroLeague Women 2025–26", club: "Valencia Basket", games: 3, minutes: 46, points: 12,
+          name: "Spain LF Endesa · Valencia", club: "Valencia", games: 4, minutes: 76, points: 28,
+          two_pm: 6, two_pa: 12, three_pm: 2, three_pa: 7, ftm: 10, fta: 15,
+          oreb: 6, dreb: 12, rebounds: 18, assists: 8, steals: 6, blocks: 0, turnovers: 7
+        },
+        {
+          name: "EuroLeague Women · Valencia", club: "Valencia", games: 3, minutes: 47, points: 12,
           two_pm: 4, two_pa: 9, three_pm: 1, three_pa: 4, ftm: 1, fta: 2,
           oreb: 4, dreb: 5, rebounds: 9, assists: 1, steals: 1, blocks: 0, turnovers: 5
         }
       ],
       read: [
-        "Atkinson's 2024–25 EuroLeague profile was low-volume but multi-category: 7.5 points, 4.7 rebounds and 2.2 assists per game across 13 appearances.",
-        "The 2025–26 Valencia EuroLeague sample is only three games, so its lower scoring and playmaking output should be treated as a small-sample signal rather than a stable performance level.",
-        "Across the verified European samples, her shot mix is weighted toward two-point attempts. The next scouting question is where those attempts originate and how much creation comes on-ball versus off-ball."
+        "Atkinson's 2025–26 domestic profile changed after the move from Estepona to Valencia: scoring rose from 3.7 to 7.0 points per game while minutes increased from 14.8 to 19.0.",
+        "Her Valencia domestic sample shows stronger shooting efficiency than the Estepona sample, alongside a very high free-throw attempt rate. The four-game sample is small, so this should be treated as a signal rather than a stable level.",
+        "The three-game EuroLeague sample is smaller again and shows lower efficiency and playmaking output. CourtIQ should not use it alone to characterize her current level."
       ],
       video: [
-        "Two-point shot creation — separate transition, cuts, post touches, drives and pick-and-roll possessions.",
-        "Secondary playmaking — identify where her assists are created and whether she functions as a connector or primary initiator.",
-        "Turnover context — classify the 2025–26 EuroLeague turnovers before drawing conclusions from the small sample.",
-        "Defensive versatility — verify matchups, switching responsibility and help rotations on film.",
-        "Rebounding impact — determine whether her defensive rebounds trigger transition or primarily finish possessions."
+        "Shot creation — identify why the Valencia domestic two-point conversion improved relative to the Estepona sample.",
+        "Free-throw generation — review the actions behind 15 FTA on 19 FGA in the four Valencia league games.",
+        "Secondary playmaking — compare her role as a passer at Estepona and Valencia.",
+        "Turnover context — classify the seven domestic Valencia turnovers and five EuroLeague turnovers before assigning a tactical cause.",
+        "Rebounding and defensive role — verify matchup responsibility, switching and whether rebounds trigger transition."
       ]
     }
   ];
@@ -112,19 +116,23 @@
   }
 
   function playerDetail(p) {
-    const a = metrics(p.competitions[0]), b = metrics(p.competitions[1]);
+    const signalRows = [
+      ["PPG", x=>metrics(x).ppg],
+      ["TS%", x=>metrics(x).ts+"%"],
+      ["eFG%", x=>metrics(x).efg+"%"],
+      ["AST/TO", x=>metrics(x).astTo],
+      ["FT Rate", x=>metrics(x).ftRate+"%"]
+    ];
     return `<div class="piHero">
       <div><small>PLAYER INTELLIGENCE · ${p.season}</small><h2>${p.name}</h2><p>${p.position} · ${p.team}</p></div>
       <span class="piStatus">● DATA CONFIRMED</span>
     </div>
     <div class="piSource">SOURCE · ${p.source} · Advanced metrics calculated by CourtIQ from displayed totals.</div>
     <div class="piCompare">${p.competitions.map(competitionCard).join("")}</div>
-    <div class="piDelta card">
+    <div class="piDelta card piSignal">
       <h3>Competition Signal</h3>
-      <div><b>AST/TO</b><span>${a.astTo} → ${b.astTo}</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
-      <div><b>TS%</b><span>${a.ts}% → ${b.ts}%</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
-      <div><b>FT Rate</b><span>${a.ftRate}% → ${b.ftRate}%</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
-      <div><b>PPG</b><span>${a.ppg} → ${b.ppg}</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
+      <table class="stats"><tr><th>Metric</th>${p.competitions.map(x=>`<th>${x.name}</th>`).join("")}</tr>
+      ${signalRows.map(([label,fn])=>`<tr><td>${label}</td>${p.competitions.map(x=>`<td>${fn(x)}</td>`).join("")}</tr>`).join("")}</table>
     </div>
     <div class="piSections">
       <section class="card"><h3>COURTIQ READ</h3>${p.read.map(x=>`<p>${x}</p>`).join("")}<div class="piCaution">Descriptive statistical interpretation only. Tactical causation requires video.</div></section>
