@@ -187,7 +187,9 @@
     const sourceTotals = s.summaryOnly
       ? `Published season averages · MPG ${s.mpg} · PPG ${s.ppg} · DREB ${s.drebpg ?? "—"} · OREB ${s.orebpg ?? "—"} · RPG ${s.rpg} · APG ${s.apg} · 2P% ${s.twoPct} · 3P% ${s.threePct} · FT% ${s.ftPct} · STL ${s.spg} · TO ${s.tovpg} · PF ${s.foulsPg ?? "—"} · BLK ${s.blocksForPg ?? "—"} · PIR ${s.pir ?? "—"} · +/- ${s.plusMinus ?? "—"}`
       : `MIN ${s.minutes} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}`;
+    const phase = /regular season/i.test(s.name) ? "REGULAR SEASON" : (/playoffs/i.test(s.name) ? "PLAYOFFS" : s.name);
     return `<div class="piComp card">
+      <div class="piPhase">${phase}</div>
       <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games} G · ${minutesLabel} MPG</span></div>
       <div class="piMetricGrid">
         <div><small>PPG</small><b>${m.ppg}</b></div><div><small>RPG</small><b>${m.rpg}</b></div><div><small>APG</small><b>${m.apg}</b></div>
@@ -218,6 +220,7 @@
       <span class="piStatus">● DATA CONFIRMED</span>
     </div>
     <div class="piSource">SOURCE · ${p.source} · Advanced metrics calculated by CourtIQ from displayed totals.</div>
+    ${p.id==="tal-lev"?'<div class="piSampleNotice"><b>2025–26 DATA SPLIT</b><span>Regular Season and Playoffs are shown as separate verified samples below.</span></div>':""}
     <div class="piCompare">${p.competitions.map(competitionCard).join("")}</div>
     <div class="piDelta card piSignal">
       <h3>Competition Signal</h3>
