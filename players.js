@@ -34,6 +34,39 @@
         "Three-point profile — separate catch-and-shoot from pull-up attempts and study how defenses guard her behind ball screens.",
         "Rebounding to transition — check whether she initiates offense immediately after defensive rebounds."
       ]
+    },
+    {
+      id: "tanaya-atkinson",
+      name: "Tanaya Atkinson",
+      team: "Elitzur Holon",
+      position: "Forward",
+      season: "2025–26 · EuroLeague sample + prior-season baseline",
+      source: "FIBA official competition data; Eurobasket profile link supplied by user",
+      comparisonLabel: "2024–25 Zaragoza → 2025–26 Valencia",
+      competitions: [
+        {
+          name: "EuroLeague Women 2024–25", club: "Casademont Zaragoza", games: 13, minutes: 308, points: 97,
+          two_pm: 24, two_pa: 71, three_pm: 7, three_pa: 17, ftm: 28, fta: 35,
+          oreb: 16, dreb: 45, rebounds: 61, assists: 29, steals: 8, blocks: 2, turnovers: 31
+        },
+        {
+          name: "EuroLeague Women 2025–26", club: "Valencia Basket", games: 3, minutes: 46, points: 12,
+          two_pm: 4, two_pa: 9, three_pm: 1, three_pa: 4, ftm: 1, fta: 2,
+          oreb: 4, dreb: 5, rebounds: 9, assists: 1, steals: 1, blocks: 0, turnovers: 5
+        }
+      ],
+      read: [
+        "Atkinson's 2024–25 EuroLeague profile was low-volume but multi-category: 7.5 points, 4.7 rebounds and 2.2 assists per game across 13 appearances.",
+        "The 2025–26 Valencia EuroLeague sample is only three games, so its lower scoring and playmaking output should be treated as a small-sample signal rather than a stable performance level.",
+        "Across the verified European samples, her shot mix is weighted toward two-point attempts. The next scouting question is where those attempts originate and how much creation comes on-ball versus off-ball."
+      ],
+      video: [
+        "Two-point shot creation — separate transition, cuts, post touches, drives and pick-and-roll possessions.",
+        "Secondary playmaking — identify where her assists are created and whether she functions as a connector or primary initiator.",
+        "Turnover context — classify the 2025–26 EuroLeague turnovers before drawing conclusions from the small sample.",
+        "Defensive versatility — verify matchups, switching responsibility and help rotations on film.",
+        "Rebounding impact — determine whether her defensive rebounds trigger transition or primarily finish possessions."
+      ]
     }
   ];
 
@@ -88,10 +121,10 @@
     <div class="piCompare">${p.competitions.map(competitionCard).join("")}</div>
     <div class="piDelta card">
       <h3>Competition Signal</h3>
-      <div><b>AST/TO</b><span>${a.astTo} → ${b.astTo}</span><small>Poland → EuroCup</small></div>
-      <div><b>TS%</b><span>${a.ts}% → ${b.ts}%</span><small>Poland → EuroCup</small></div>
-      <div><b>FT Rate</b><span>${a.ftRate}% → ${b.ftRate}%</span><small>Poland → EuroCup</small></div>
-      <div><b>PPG</b><span>${a.ppg} → ${b.ppg}</span><small>Poland → EuroCup</small></div>
+      <div><b>AST/TO</b><span>${a.astTo} → ${b.astTo}</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
+      <div><b>TS%</b><span>${a.ts}% → ${b.ts}%</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
+      <div><b>FT Rate</b><span>${a.ftRate}% → ${b.ftRate}%</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
+      <div><b>PPG</b><span>${a.ppg} → ${b.ppg}</span><small>${p.comparisonLabel||"Competition A → Competition B"}</small></div>
     </div>
     <div class="piSections">
       <section class="card"><h3>COURTIQ READ</h3>${p.read.map(x=>`<p>${x}</p>`).join("")}<div class="piCaution">Descriptive statistical interpretation only. Tactical causation requires video.</div></section>
