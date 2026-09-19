@@ -136,7 +136,7 @@
     const modal = document.createElement("div");
     modal.className = "modal piModal";
     modal.innerHTML = `<div class="modalCard piShell"><button class="modalX">×</button>
-      <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER INTELLIGENCE</small><h2>Elitzur Holon</h2><p>2025–26 preseason scouting workspace</p></div>
+      <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER INTELLIGENCE</small><h2>Elitzur Holon</h2><p>2026–27 preseason scouting workspace</p></div>
       <div class="piRoster">${players.map((p,i)=>`<button data-player="${p.id}" class="${i===0?"sel":""}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
       <div id="piDetail">${playerDetail(players[0])}</div>
     </div>`;
