@@ -1,0 +1,79 @@
+name: Import EuroLeague Game
+
+on:
+  workflow_dispatch:
+    inputs:
+      competition:
+        description: Competition
+        required: true
+        default: E
+        type: choice
+        options:
+          - E
+          - U
+      season:
+        description: Season start year (example 2025)
+        required: true
+        default: "2025"
+        type: string
+      game_code:
+        description: EuroLeague/EuroCup game code
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  import-game:
+    runs-on: ubuntu-latest
+    env:
+      COMPETITION: ${{ inputs.competition }}
+      SEASON: ${{ inputs.season }}
+      GAME_CODE: ${{ inputs.game_code }}
+
+    steps:
+      - name: Checkout CourtIQ
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CourtIQ ingestion dependency
+        run: pip install -r requirements.txt
+
+      - name: Validate inputs
+        run: |
+          python - <<'PY'
+          import os
+          competition = os.environ["COMPETITION"]
+          season = os.environ["SEASON"]
+          game = os.environ["GAME_CODE"]
+          assert competition in {"E", "U"}
+          assert season.isdigit() and 2000 <= int(season) <= 2100
+          assert game.isdigit() and int(game) > 0
+          PY
+
+      - name: Fetch, validate and calculate game
+        run: |
+          mkdir -p data
+          python -m data_engine.pipeline \
+            --competition "$COMPETITION" \
+            --season "$SEASON" \
+            --game "$GAME_CODE" \
+            --out "data/game_${COMPETITION}${SEASON}_${GAME_CODE}.json"
+
+      - name: Commit verified game JSON
+        run: |
+          git config user.name "courtiq-bot"
+          git config user.email "courtiq-bot@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            exit 0
+          fi
+          git commit -m "Import verified ${COMPETITION}${SEASON} game ${GAME_CODE}"
+          git push
