@@ -113,7 +113,7 @@
       id: "tal-lev",
       name: "Tal Lev",
       team: "Elitzur Holon",
-      position: "Forward",
+      position: "Small Forward",
       season: "2025–26",
       source: "Israel Basketball Association · Women's Premier League 2025–26",
       sourceUrl: "https://ibasketball.co.il/league/2025-51/",
