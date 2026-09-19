@@ -71,6 +71,43 @@
         "Turnover context — classify the seven domestic Valencia turnovers and five EuroLeague turnovers before assigning a tactical cause.",
         "Rebounding and defensive role — verify matchup responsibility, switching and whether rebounds trigger transition."
       ]
+    },
+    {
+      id: "eden-rotberg",
+      name: "Eden Rotberg",
+      team: "Elitzur Holon",
+      position: "Guard",
+      season: "2025–26",
+      source: "User-supplied Eurobasket screenshot",
+      competitions: [
+        {
+          name: "Israel Division A", club: "E. Ramla", games: 26, minutes: 865, points: 376,
+          two_pm: 78, two_pa: 156, three_pm: 57, three_pa: 133, ftm: 49, fta: 60,
+          oreb: 35, dreb: 76, rebounds: 111, assists: 55, steals: 28, blocks: 1, turnovers: 33
+        },
+        {
+          name: "EuroCup", club: "E. Ramla", games: 8, minutes: 245, points: 109,
+          two_pm: 21, two_pa: 41, three_pm: 16, three_pa: 43, ftm: 19, fta: 24,
+          oreb: 9, dreb: 19, rebounds: 28, assists: 19, steals: 9, blocks: 2, turnovers: 19
+        },
+        {
+          name: "European Championships", club: "Israel", games: 4, minutes: 77, points: 29,
+          two_pm: 5, two_pa: 12, three_pm: 3, three_pa: 10, ftm: 10, fta: 12,
+          oreb: 1, dreb: 2, rebounds: 3, assists: 11, steals: 3, blocks: 0, turnovers: 3
+        }
+      ],
+      read: [
+        "Rotberg's 2025–26 domestic profile combines efficient perimeter shooting with low turnover volume: 42.9% from three on 133 attempts and 55 assists against 33 turnovers across 26 games.",
+        "Her EuroCup three-point percentage fell to 37.2% while turnover volume increased to 19 in eight games. The competition split is descriptive; the box-score data alone cannot establish why the change occurred.",
+        "The four-game Israel sample shows a different playmaking profile, with 11 assists against three turnovers, but the sample is too small to treat as a stable baseline."
+      ],
+      video: [
+        "Three-point profile — separate catch-and-shoot, movement and pull-up attempts behind ball screens.",
+        "Pick-and-roll creation — identify how often she creates her own shot versus a teammate advantage.",
+        "EuroCup turnovers — classify the 19 turnovers by pressure, passing read, handle and offensive foul.",
+        "Late-clock decision-making — compare shot creation and passing decisions when the first action is stopped.",
+        "National-team role — verify whether the strong assist-to-turnover sample reflects a different usage or lineup context."
+      ]
     }
   ];
 
