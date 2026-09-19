@@ -30,7 +30,12 @@ function pnrModule(){return `<section class="pgrid"><div class="card box audit">
 function render(){
 const G=games[active];
 document.querySelector("#app").innerHTML=`<div class="app"><aside class="side"><div class="logo">Court<span>IQ</span><small class="tagline">TURN DATA INTO WINS</small></div><div class="menu">${menu.map((x,i)=>`<div class="${i===0?"on":""}">${x[0]} <span>${x.slice(2)}</span></div>`).join("")}</div><div class="quote">“Better Analysis.<br>Better Basketball.”</div></aside><main class="main"><header class="top"><div class="search">⌕ &nbsp; Search games, teams, players...</div><div class="user">CourtIQ Analyst</div></header><div class="content"><div class="v2bar"><div><b>COURTIQ V0.2</b> <span>— Multi-game basketball intelligence</span></div><div class="pills"><i class="pill">DATA CONFIRMED</i><i class="pill">TACTICAL EVIDENCE</i><i class="pill">VIDEO VERIFICATION</i><button id="importGame" class="importBtn">+ IMPORT GAME</button></div></div><div class="game-switch"><button data-game="g1" class="${active==="g1"?"sel":""}">Game #001 · Jerusalem 90–66 Karmiel</button><button data-game="g2" class="${active==="g2"?"sel":""}">Game #002 · Maccabi 101–83 Hapoel</button></div><div class="crumb">Games › ${G.comp} › ${G.home} vs ${G.away} · ${G.date}</div><section class="gamehead"><div class="team"><div class="badge">${active==="g1"?"JLM":"MTA"}</div><h2>${G.home}</h2></div><div class="score">${G.hs} - ${G.as}<small>FINAL</small></div><div class="team right"><h2>${G.away}</h2><div class="badge">${active==="g1"?"KAR":"HTA"}</div></div></section><div class="tabs">${["Overview","Team Stats","Player Stats","Lineups","Shot Chart","Play-by-Play","Video","AI Insights","Report"].map((x,i)=>`<span class="${i===0?"active":""}">${x}</span>`).join("")}</div><section class="kpis">${G.metrics.map(x=>`<div class="card kpi"><label>${x[0]}</label><b>${x[1]}</b><small>vs ${x[2]}</small></div>`).join("")}</section><section class="card takeaways"><div class="sectionhead"><h3><span>◆</span> KEY TAKEAWAYS</h3><small>Why ${G.home} won</small></div><div class="findings">${G.findings.map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]}</p><em>→ ${x[2]}</em></div>`).join("")}</div></section><section class="grid"><div class="card box"><h3>Score by Quarter</h3><div class="bars">${G.quarters.map((q,i)=>`<div class="q"><div class="bar" style="height:${Math.min(q[0]*4,140)}px"><i>${q[0]}</i></div><div class="bar away" style="height:${Math.min(q[1]*4,140)}px"><i>${q[1]}</i></div><span class="qname">Q${i+1}</span></div>`).join("")}</div></div><div class="card box"><h3>Four Factors Analysis</h3><div class="factors">${G.factors.map(x=>`<div class="factor"><label>${x[0]} · ${G.home.split(" ")[0]} ${x[1]}% / ${G.away.split(" ")[0]} ${x[2]}%</label><div class="track"><div class="homefill" style="width:${x[1]}%"></div><div class="awayfill" style="width:${x[2]}%"></div></div></div>`).join("")}</div></div><div class="card box last"><h3>Key Team Stats</h3><table class="stats"><thead><tr><th>Metric</th><th>Home</th><th>Away</th></tr></thead><tbody>${G.stats.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</tbody></table></div><div class="card box"><h3>Leaders — ${G.home}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.leaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box"><h3>Leaders — ${G.away}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.awayLeaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box last"><h3>Next Steps: Video Investigation</h3><div class="videoList">${G.videos.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div></div></section>${G.pnr?pnrModule():""}<section class="card ask"><div><h3>Ask CourtIQ</h3><p>Ask a basketball question about Game #${G.id}.</p><div id="answer" class="answer"></div></div><input id="q" placeholder="What decided this game?"><button id="ask">Analyze</button></section><div class="footer">CourtIQ V0.2 · Game #${G.id} · Basketball Intelligence for a Smarter Game</div></div></main></div>`;
-document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.dataset.game;function csvRows(text){
+document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.dataset.game;render();window.scrollTo(0,0)});
+document.querySelector("#ask").onclick=()=>{document.querySelector("#answer").textContent=G.ask};
+document.querySelector("#importGame").onclick=openImport;
+}
+
+function csvRows(text){
   const lines=text.trim().split(/\r?\n/).filter(Boolean);
   if(lines.length<3) throw new Error("CSV must contain a header and exactly two team rows.");
   const headers=lines[0].split(",").map(x=>x.trim());
@@ -40,13 +45,17 @@ document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.data
   });
 }
 function n(row,...keys){
-  for(const k of keys) if(row[k]!==undefined && row[k]!=="") return Number(row[k]);
+  for(const k of keys) if(row[k]!==undefined && row[k]!=="") {
+    const value=Number(row[k]);
+    if(!Number.isFinite(value)) throw new Error("Invalid number in "+k);
+    return value;
+  }
   throw new Error("Missing field: "+keys.join("/"));
 }
 function teamFromRow(row){
   const three=n(row,"3PM","three_pm"), threeA=n(row,"3PA","three_pa");
-  const fgm=row.FGM!==undefined&&row.FGM!==""?Number(row.FGM):n(row,"2PM","two_pm")+three;
-  const fga=row.FGA!==undefined&&row.FGA!==""?Number(row.FGA):n(row,"2PA","two_pa")+threeA;
+  const fgm=row.FGM!==undefined&&row.FGM!==""?n(row,"FGM"):n(row,"2PM","two_pm")+three;
+  const fga=row.FGA!==undefined&&row.FGA!==""?n(row,"FGA"):n(row,"2PA","two_pa")+threeA;
   return {team:row.team||row.Team||"Team",pts:n(row,"PTS","points"),fgm,fga,three,threeA,ftm:n(row,"FTM","ftm"),fta:n(row,"FTA","fta"),oreb:n(row,"OREB","oreb"),dreb:n(row,"DREB","dreb"),tov:n(row,"TOV","tov")};
 }
 function pct(a,b){return b?Math.round(a/b*1000)/10:0}
@@ -72,16 +81,16 @@ function openImport(){
     const status=modal.querySelector("#impStatus"), file=modal.querySelector("#impFile").files[0];
     try{
       if(!file) throw new Error("Choose a CSV file first.");
-      const rows=csvRows(await file.text()); if(rows.length!==2) throw new Error("CourtIQ expects exactly two team-total rows.");
+      const rows=csvRows(await file.text());
+      if(rows.length!==2) throw new Error("CourtIQ expects exactly two team-total rows.");
       const home=teamFromRow(rows[0]),away=teamFromRow(rows[1]);
-      for(const t of [home,away]){if(t.fgm>t.fga||t.three>t.fgm||t.ftm>t.fta)throw new Error("Box score failed basketball validation.");}
+      for(const t of [home,away]){
+        if(t.fgm<0||t.fga<0||t.three<0||t.ftm<0||t.fta<0||t.oreb<0||t.dreb<0||t.tov<0) throw new Error("Stats cannot be negative.");
+        if(t.fgm>t.fga||t.three>t.fgm||t.ftm>t.fta) throw new Error("Box score failed basketball validation.");
+      }
       games.pilot=importedGame(home,away,{competition:modal.querySelector("#impComp").value,date:modal.querySelector("#impDate").value});
       active="pilot"; modal.remove(); render(); window.scrollTo(0,0);
     }catch(err){status.textContent=err.message;}
   };
-}
-render();window.scrollTo(0,0)});
-document.querySelector("#ask").onclick=()=>{document.querySelector("#answer").textContent=G.ask};
-document.querySelector("#importGame").onclick=openImport;
 }
 render();
