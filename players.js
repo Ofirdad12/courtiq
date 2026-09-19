@@ -198,7 +198,7 @@
 
   document.addEventListener("click", e => {
     const item = e.target.closest(".menu div");
-    if (item && item.textContent.includes("Players")) openPlayers();
+    if ((item && item.textContent.includes("Players")) || e.target.closest("#playersHub")) openPlayers();
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers };
