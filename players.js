@@ -177,6 +177,52 @@
     </div>`;
   }
 
+  function openTeams() {
+    const modal = document.createElement("div");
+    modal.className = "modal piModal";
+    modal.innerHTML = `<div class="modalCard piShell teamShell"><button class="modalX">×</button>
+      <div class="teamBreadcrumb"><button data-team-home>Teams</button><span>›</span><span id="teamCrumb">Countries</span></div>
+      <div id="teamWorkspace"></div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector(".modalX").onclick = () => modal.remove();
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+    const workspace = modal.querySelector("#teamWorkspace");
+    const crumb = modal.querySelector("#teamCrumb");
+
+    function countries() {
+      crumb.textContent = "Countries";
+      workspace.innerHTML = `<div class="teamPageHead"><small class="eyebrow">COURTIQ · TEAMS</small><h2>Teams</h2><p>Select a country to open the club intelligence workspace.</p></div>
+        <div class="teamDirectory"><button class="teamTile" data-country-israel><span class="teamFlag">IL</span><div><b>Israel</b><small>1 club in workspace</small></div><span>→</span></button></div>`;
+      workspace.querySelector("[data-country-israel]").onclick = israel;
+    }
+
+    function israel() {
+      crumb.textContent = "Israel";
+      workspace.innerHTML = `<div class="teamPageHead"><small class="eyebrow">TEAMS · ISRAEL</small><h2>Israel</h2><p>Women's basketball club intelligence.</p></div>
+        <div class="teamDirectory"><button class="teamTile clubTile" data-club-holon><span class="teamMonogram">EH</span><div><b>Elitzur Holon</b><small>2026–27 · Preseason Intelligence · ${players.length} players loaded</small></div><span>→</span></button></div>`;
+      workspace.querySelector("[data-club-holon]").onclick = holon;
+    }
+
+    function holon() {
+      crumb.textContent = "Israel › Elitzur Holon";
+      workspace.innerHTML = `<div class="teamPageHead clubProfileHead"><div><small class="eyebrow">ISRAEL · WOMEN</small><h2>Elitzur Holon</h2><p>2026–27 preseason scouting workspace</p></div><span class="piStatus">● DATA CONFIRMED</span></div>
+        <div class="teamSummary card"><div><small>PLAYERS LOADED</small><b>${players.length}</b></div><div><small>DATA MODEL</small><b>Verified source totals</b></div><div><small>ANALYSIS</small><b>Deterministic advanced metrics</b></div><div><small>TACTICAL CLAIMS</small><b>Video verification required</b></div></div>
+        <div class="piRoster teamRoster">${players.map((p,i)=>`<button data-team-player="${p.id}" class="${i===0?"sel":""}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
+        <div id="teamPlayerDetail">${playerDetail(players[0])}</div>`;
+      workspace.querySelectorAll("[data-team-player]").forEach(btn => btn.onclick = () => {
+        workspace.querySelectorAll("[data-team-player]").forEach(x=>x.classList.remove("sel"));
+        btn.classList.add("sel");
+        const p = players.find(x=>x.id===btn.dataset.teamPlayer);
+        workspace.querySelector("#teamPlayerDetail").innerHTML = playerDetail(p);
+      });
+    }
+
+    modal.querySelector("[data-team-home]").onclick = countries;
+    countries();
+  }
+
   function openPlayers() {
     const modal = document.createElement("div");
     modal.className = "modal piModal";
@@ -198,8 +244,9 @@
 
   document.addEventListener("click", e => {
     const item = e.target.closest(".menu div");
+    if (item && item.textContent.includes("Teams")) openTeams();
     if ((item && item.textContent.includes("Players")) || e.target.closest("#playersHub")) openPlayers();
   });
 
-  window.CourtIQPlayers = { players, metrics, openPlayers };
+  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
 })();
