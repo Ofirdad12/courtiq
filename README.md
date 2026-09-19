@@ -1,23 +1,49 @@
-# CourtIQ V0.1
+# CourtIQ V0.2
 
-Basketball intelligence dashboard prototype.
+Basketball Intelligence Platform prototype.
 
-## Game #001
-Hapoel Lev Jerusalem 90–66 Maccabi Karmiel — Athena Winner Cup, Round 1 — September 17, 2026.
+## Current product
+- Multi-game dashboard
+- Verified basketball metrics
+- Evidence-based findings
+- Video investigation workflow
+- Tactical PnR analysis
+- Responsive web UI
 
-## Current features
-- Game Intelligence dashboard
-- Advanced metrics
-- Five evidence-based game findings
-- Video investigation prompts
-- Local prototype of Ask CourtIQ
-- Responsive mobile layout
+## V0.2 Data Engine
+CourtIQ now includes a Python ingestion/calculation pipeline under `data_engine/`.
 
-## Run locally
-Open `index.html` in a browser. No build step is required.
+Pipeline:
 
-## GitHub Pages
-Repository Settings → Pages → Deploy from a branch → `main` / root.
+`EuroLeague API -> raw boxscore -> normalization -> validation -> deterministic metrics -> CourtIQ JSON`
 
-## Roadmap
-Next: structured game upload, Python calculation engine, database, real LLM-backed Ask CourtIQ, possession/video linkage.
+Run:
+
+```bash
+pip install -r requirements.txt
+python -m data_engine.pipeline --competition E --season 2025 --game 1
+```
+
+Write a frontend-ready JSON file:
+
+```bash
+python -m data_engine.pipeline --competition E --season 2025 --game 1 --out data/game_E2025_1.json
+```
+
+`E` = EuroLeague, `U` = EuroCup.
+
+## Calculation policy
+The LLM does not calculate statistics. Python computes and validates the metrics; AI interpretation is a later layer.
+
+Current deterministic outputs:
+- estimated possessions
+- eFG%
+- TOV%
+- ORB%
+- FTr
+
+## Frontend
+The existing GitHub Pages dashboard remains available from the repository root. The new data engine is intentionally separated from the live UI until ingestion is validated against real games.
+
+## Next
+Schedule/game discovery -> team metadata -> player stats -> play-by-play -> generated game JSON -> frontend ingestion -> AI Analyst.
