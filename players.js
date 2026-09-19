@@ -115,29 +115,35 @@
       team: "Elitzur Holon",
       position: "Small Forward",
       season: "2025–26",
-      source: "Israel Basketball Association · Women's Premier League 2025–26",
-      sourceUrl: "https://ibasketball.co.il/league/2025-51/",
+      source: "Israel Basketball Association · official player table + official playoff box scores",
+      sourceUrl: "https://ibasketball.co.il/league/wbl/player.asp?PlayerId=22090",
       competitions: [
         {
-          name: "Israel Women's Premier League", club: "Hapoel Rishon LeZion", games: 16,
-          summaryOnly: true, mpg: 28.5, ppg: 11.2, rpg: 5.0, apg: 4.4,
-          twoPct: 45.5, threePct: 35.6, ftPct: 66.7,
-          drebpg: 4.4, orebpg: 0.6, foulsDrawnPg: 1.3, foulsPg: 2.3,
-          spg: 1.0, tovpg: 3.3, blocksForPg: 0.4, blocksAgainstPg: 0.2,
-          pir: 10.8, plusMinus: 218
+          name: "Israel WBL · Regular Season", club: "Hapoel Rishon LeZion", games: 11,
+          summaryOnly: true, mpg: 25.8, ppg: 10.1, rpg: 4.5, apg: 3.6,
+          twoPct: 51.2, threePct: 34.5, ftPct: 70.0,
+          drebpg: 3.7, orebpg: 0.7, foulsDrawnPg: 2.2, foulsPg: 1.5,
+          spg: 0.7, tovpg: 3.5, blocksForPg: 0.5, blocksAgainstPg: 0.3,
+          pir: 9.1, plusMinus: 122
+        },
+        {
+          name: "Israel WBL · Playoffs", club: "Hapoel Rishon LeZion", games: 5, minutes: 166.1667, points: 61,
+          two_pm: 7, two_pa: 19, three_pm: 14, three_pa: 42, ftm: 5, fta: 6,
+          oreb: 4, dreb: 30, rebounds: 34, assists: 31, steals: 5, blocks: 1, turnovers: 16
         }
       ],
       read: [
-        "Lev's verified 2025–26 league sample shows 11.2 points, 5.0 rebounds and 4.4 assists in 28.5 minutes across 16 games.",
-        "Her 4.4 assists against 3.3 turnovers produce a 1.33 AST/TO ratio. That combination points to meaningful creation volume with ball security as a clear investigation area.",
-        "She shot 35.6% from three and 45.5% on two-point attempts in the published league sample. Shot-attempt totals are not exposed in the verified season table used here, so CourtIQ does not manufacture eFG% or TS%."
+        "The official IBBA regular-season table lists 11 games at 10.1 points, 4.5 rebounds and 3.6 assists in 25.8 minutes per game, with 34.5% three-point shooting.",
+        "CourtIQ separately aggregated five official playoff box scores: 61 points, 34 rebounds and 31 assists in 166.2 minutes. The playoff sample produces a 1.94 AST/TO ratio.",
+        "Her playoff shot mix was perimeter-heavy: 42 three-point attempts versus 19 two-point attempts. CourtIQ calculates 45.9% eFG and 47.9% TS from those verified playoff totals.",
+        "A later signing report describes her full 16-game run at 11.2 points, 5.0 rebounds and 4.4 assists per game. CourtIQ keeps that report separate from the official regular-season table instead of blending incompatible samples."
       ],
       video: [
-        "Turnover taxonomy — classify the 3.3 turnovers per game by passing read, handle, offensive foul and pressure.",
-        "Creation profile — separate pick-and-roll, drive-and-kick, transition and secondary-side assists.",
-        "Three-point profile — identify catch-and-shoot versus pull-up volume behind the 35.6% season mark.",
-        "Two-point attempts — determine how much of the 45.5% comes at the rim, from cuts or from mid-range creation.",
-        "Role translation to Holon — verify how her creation fits next to Eden Rotberg and Ashley Owusu rather than assuming the same Rishon LeZion role."
+        "Turnover taxonomy — classify regular-season and playoff turnovers by passing read, handle, offensive foul and pressure.",
+        "Creation profile — investigate the playoff playmaking load behind 31 assists in five games.",
+        "Three-point profile — the playoff sample contains 42 three-point attempts versus 19 two-point attempts; separate catch-and-shoot from pull-up volume.",
+        "Rim pressure — identify why the five-game playoff sample generated only six free-throw attempts.",
+        "Role translation to Holon — verify how her creation and perimeter volume fit next to Eden Rotberg and Ashley Owusu."
       ]
     }
   ];
@@ -185,10 +191,14 @@
       <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games} G · ${minutesLabel} MPG</span></div>
       <div class="piMetricGrid">
         <div><small>PPG</small><b>${m.ppg}</b></div><div><small>RPG</small><b>${m.rpg}</b></div><div><small>APG</small><b>${m.apg}</b></div>
-        <div><small>eFG%</small><b>${pct(m.efg)}</b></div><div><small>TS%</small><b>${pct(m.ts)}</b></div><div><small>AST/TO</small><b>${m.astTo}</b></div>
+        ${m.efg==null?"":`<div><small>eFG%</small><b>${pct(m.efg)}</b></div><div><small>TS%</small><b>${pct(m.ts)}</b></div>`}
+        <div><small>AST/TO</small><b>${m.astTo}</b></div>
         <div><small>2P%</small><b>${pct(m.twoPct)}</b></div><div><small>3P%</small><b>${pct(m.threePct)}</b></div><div><small>FT%</small><b>${pct(m.ftPct)}</b></div>
-        <div><small>3P Rate</small><b>${pct(m.threeRate)}</b></div><div><small>FT Rate</small><b>${pct(m.ftRate)}</b></div><div><small>PTS / 40</small><b>${m.pts40}</b></div>
+        ${m.threeRate==null?"":`<div><small>3P Rate</small><b>${pct(m.threeRate)}</b></div><div><small>FT Rate</small><b>${pct(m.ftRate)}</b></div>`}
+        <div><small>PTS / 40</small><b>${m.pts40}</b></div>
+        ${s.summaryOnly?`<div><small>STL</small><b>${s.spg}</b></div><div><small>TO</small><b>${s.tovpg}</b></div><div><small>PIR</small><b>${s.pir}</b></div>`:""}
       </div>
+      ${s.summaryOnly?'<div class="piCaution">Attempt totals are not published in this source table, so CourtIQ does not display eFG%, TS%, 3P Rate or FT Rate for this sample.</div>':""}
       <details><summary>${s.summaryOnly ? "Verified published averages" : "Verified source totals"}</summary>
         <div class="piRaw">${sourceTotals}</div>
       </details>
