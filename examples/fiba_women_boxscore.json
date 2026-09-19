@@ -1,0 +1,36 @@
+{
+  "teams": [
+    {
+      "teamName": "Example Home",
+      "isHomeCompetitor": 1,
+      "statistics": {
+        "sPoints": 80,
+        "sFieldGoalsMade": 30,
+        "sFieldGoalsAttempted": 65,
+        "sThreePointersMade": 8,
+        "sThreePointersAttempted": 22,
+        "sFreeThrowsMade": 12,
+        "sFreeThrowsAttempted": 16,
+        "sReboundsOffensive": 10,
+        "sReboundsDefensive": 25,
+        "sTurnovers": 12
+      }
+    },
+    {
+      "teamName": "Example Away",
+      "isHomeCompetitor": 0,
+      "statistics": {
+        "sPoints": 74,
+        "sFieldGoalsMade": 27,
+        "sFieldGoalsAttempted": 62,
+        "sThreePointersMade": 7,
+        "sThreePointersAttempted": 21,
+        "sFreeThrowsMade": 13,
+        "sFreeThrowsAttempted": 18,
+        "sReboundsOffensive": 9,
+        "sReboundsDefensive": 24,
+        "sTurnovers": 15
+      }
+    }
+  ]
+}
