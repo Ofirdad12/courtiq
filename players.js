@@ -254,8 +254,8 @@
     if (s.summaryOnly) {
       return {
         ppg: s.ppg, rpg: s.rpg, apg: s.apg, twoPct: s.twoPct, threePct: s.threePct, ftPct: s.ftPct,
-        efg: null, ts: null, astTo: r2(safe(s.apg, s.tovpg)), threeRate: null, ftRate: null,
-        pts40: r1(safe(s.ppg * 40, s.mpg)), ast40: r1(safe(s.apg * 40, s.mpg)), tov40: r1(safe(s.tovpg * 40, s.mpg))
+        efg: null, ts: null, astTo: s.tovpg == null ? null : r2(safe(s.apg, s.tovpg)), threeRate: null, ftRate: null,
+        pts40: s.mpg == null ? null : r1(safe(s.ppg * 40, s.mpg)), ast40: s.mpg == null ? null : r1(safe(s.apg * 40, s.mpg)), tov40: (s.tovpg == null || s.mpg == null) ? null : r1(safe(s.tovpg * 40, s.mpg))
       };
     }
     const fgm = s.two_pm + s.three_pm;
@@ -283,20 +283,20 @@
     const pct = v => v == null ? "—" : v + "%";
     const minutesLabel = s.summaryOnly ? s.mpg : r1(s.minutes/s.games);
     const sourceTotals = s.summaryOnly
-      ? `Published season averages · MPG ${s.mpg} · PPG ${s.ppg} · DREB ${s.drebpg ?? "—"} · OREB ${s.orebpg ?? "—"} · RPG ${s.rpg} · APG ${s.apg} · 2P% ${s.twoPct} · 3P% ${s.threePct} · FT% ${s.ftPct} · STL ${s.spg} · TO ${s.tovpg} · PF ${s.foulsPg ?? "—"} · BLK ${s.blocksForPg ?? "—"} · PIR ${s.pir ?? "—"} · +/- ${s.plusMinus ?? "—"}`
+      ? `Published season averages · PPG ${s.ppg} · RPG ${s.rpg} · APG ${s.apg}${s.mpg == null ? "" : " · MPG " + s.mpg}${s.twoPct == null ? "" : " · 2P% " + s.twoPct}${s.threePct == null ? "" : " · 3P% " + s.threePct}${s.ftPct == null ? "" : " · FT% " + s.ftPct}${s.spg == null ? "" : " · STL " + s.spg}${s.tovpg == null ? "" : " · TO " + s.tovpg}` 
       : `MIN ${r1(s.minutes)} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}`;
     const phase = /regular season/i.test(s.name) ? "REGULAR SEASON" : (/playoffs/i.test(s.name) ? "PLAYOFFS" : s.name);
     return `<div class="piComp card">
       <div class="piPhase">${phase}</div>
-      <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games} G · ${minutesLabel} MPG</span></div>
+      <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>${s.games == null ? "SEASON SUMMARY" : s.games + " G"}${minutesLabel == null ? "" : " · " + minutesLabel + " MPG"}</span></div>
       <div class="piMetricGrid">
         <div><small>PPG</small><b>${m.ppg}</b></div><div><small>RPG</small><b>${m.rpg}</b></div><div><small>APG</small><b>${m.apg}</b></div>
         ${m.efg==null?"":`<div><small>eFG%</small><b>${pct(m.efg)}</b></div><div><small>TS%</small><b>${pct(m.ts)}</b></div>`}
-        <div><small>AST/TO</small><b>${m.astTo}</b></div>
-        <div><small>2P%</small><b>${pct(m.twoPct)}</b></div><div><small>3P%</small><b>${pct(m.threePct)}</b></div><div><small>FT%</small><b>${pct(m.ftPct)}</b></div>
+        ${m.astTo==null?"":`<div><small>AST/TO</small><b>${m.astTo}</b></div>`}
+        ${m.twoPct==null?"":`<div><small>2P%</small><b>${pct(m.twoPct)}</b></div>`}${m.threePct==null?"":`<div><small>3P%</small><b>${pct(m.threePct)}</b></div>`}${m.ftPct==null?"":`<div><small>FT%</small><b>${pct(m.ftPct)}</b></div>`}
         ${m.threeRate==null?"":`<div><small>3P Rate</small><b>${pct(m.threeRate)}</b></div><div><small>FT Rate</small><b>${pct(m.ftRate)}</b></div>`}
-        <div><small>PTS / 40</small><b>${m.pts40}</b></div>
-        ${s.summaryOnly?`<div><small>STL</small><b>${s.spg}</b></div><div><small>TO</small><b>${s.tovpg}</b></div><div><small>PIR</small><b>${s.pir}</b></div>`:""}
+        ${m.pts40==null?"":`<div><small>PTS / 40</small><b>${m.pts40}</b></div>`}
+        ${s.summaryOnly?`${s.spg==null?"":`<div><small>STL</small><b>${s.spg}</b></div>`}${s.tovpg==null?"":`<div><small>TO</small><b>${s.tovpg}</b></div>`}${s.pir==null?"":`<div><small>PIR</small><b>${s.pir}</b></div>`}`:""}
       </div>
       ${s.summaryOnly?'<div class="piCaution">Attempt totals are not published in this source table, so CourtIQ does not display eFG%, TS%, 3P Rate or FT Rate for this sample.</div>':""}
       <details><summary>${s.summaryOnly ? "Verified published averages" : "Verified source totals"}</summary>
@@ -403,5 +403,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "076";
+  window.COURTIQ_BUILD = "077";
 })();
