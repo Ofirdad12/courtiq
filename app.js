@@ -24,7 +24,7 @@ videos:["Review the 7–17 turnover gap","Audit Hapoel's 16 second-chance points
 ask:"Maccabi separated through possession control rather than superior raw shooting: only 7 turnovers versus Hapoel's 17, 25 points off turnovers, and a 10-point free-throw scoring advantage.",
 pnr:true
 }};
-const menu=["▦ Dashboard","◉ Games","◉ Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
+const menu=["▦ Dashboard","◉ Games","◉ Teams","◆ Israel Men's League D1 Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
 try{
   const savedPilot=localStorage.getItem("courtiq_pilot_game");
   if(savedPilot) games.pilot=JSON.parse(savedPilot); const savedUrl=localStorage.getItem("courtiq_url_game"); if(savedUrl) games.url=JSON.parse(savedUrl);
@@ -352,11 +352,13 @@ async function openFullReport(){
   <h3>Key Findings</h3><div class="findings">${R.findings.map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]}</p><em>→ ${x[2]}</em></div>`).join("")}</div><h3>What Should I Watch?</h3><div class="videoList">${R.video_investigation.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div>${reportError?`<div class="insight warning">REPORT DATABASE · ${reportError}</div>`:""}<div class="insight">DATA → FINDING → INTERPRETATION → VIDEO VERIFICATION</div></div>`;
   document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();
 }
+function openMensD1Teams(){const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modalCard compareModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ · ISRAEL MENS BASKETBALL</small><h2>Israel Men&#39;s League D1 Teams</h2><p>Dedicated Division 1 workspace for CourtIQ validation. Men&#39;s data stays separate from the Maccabi Bnot Ashdod women&#39;s pilot.</p><div class="productEmpty"><b>MENS D1 DATASET</b><span>Winner League / Winner Cup games will appear here after verified import.</span></div><div class="insight"><b>QA WORKSPACE</b> · Import → Verify → Analyze → Report → Opponent Scouting</div></div>`;document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};}
 document.addEventListener("click",e=>{
   const item=e.target.closest(".menu div");
   if(!item) return;
   if(item.textContent.includes("Dashboard")) openPilotDashboard();
   if(item.textContent.includes("Games")) openGameLibrary();
+  if(item.textContent.includes("Israel Men")) openMensD1Teams();
   if(item.textContent.includes("Opponent Scouting")) openOpponentScout();
   if(item.textContent.includes("Reports")) openFullReport();
 });
