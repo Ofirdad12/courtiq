@@ -247,28 +247,26 @@ function openPilotDashboard(){
 
 async function openGameLibrary(){
   let syncError="";if(window.CourtIQData?.isSignedIn()){try{await syncProductData();}catch(e){syncError=e.message;}}
-  const modal=document.createElement("div"); modal.className="modal";
+  const modal=document.createElement("div");modal.className="modal";
   const items=productGameEntries();
+  const cards=items.length?items.map(([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
+    <div><span class="libraryStatus">${g.sourceLabel?.includes("CONFIRMED")?"● DATA CONFIRMED":"● COURTIQ DATA"}</span><small>${g.comp||"Competition"} · ${g.date||""}</small></div>
+    <h3>${g.home} <b>${g.hs}–${g.as}</b> ${g.away}</h3>
+    <footer><span>OPEN ANALYSIS</span><b>→</b></footer>
+  </button>`).join(""):`<div class="productEmpty"><b>NO VERIFIED CLUB GAMES YET</b><span>Import the first official IBBA game to start the persistent club library.</span></div>`;
   modal.innerHTML=`<div class="modalCard compareModal gameLibrary"><button class="modalX">×</button>
     <small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Game Library</h2>
-    <p>One place for imported and verified games. Open a game to continue into analysis, scouting and reports.</p>
+    <p>Persistent club games only. Demo and local browser data are excluded after sign-in.</p>
     <div class="libraryTop"><div><small>GAMES AVAILABLE</small><b>${items.length}</b></div><div><small>WORKFLOW</small><b>Import → Verify → Analyze → Report</b></div><button id="libraryImport" class="runImport">IMPORT GAME</button></div>
-    <div class="gameLibraryGrid">${items.length?items.map(([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
-      <div><span class="libraryStatus">${g.sourceLabel?.includes("CONFIRMED")?"● DATA CONFIRMED":"● COURTIQ DATA"}</span><small>${g.comp||"Competition"} · ${g.date||""}</small></div>
-      <h3>${g.home} <b>${g.hs}–${g.as}</b> ${g.away}</h3>
-      <footer><span>OPEN ANALYSIS</span><b>→</b></footer>
-    </button>`).join("")}</div>
+    <div class="gameLibraryGrid">${cards}</div>
     ${syncError?`<div class="insight warning">DATABASE · ${syncError}</div>`:""}<div class="insight">PILOT RULE · Tactical conclusions remain separate from verified box-score findings until video evidence is available.</div>
   </div>`;
   document.body.appendChild(modal);
   modal.querySelector(".modalX").onclick=()=>modal.remove();
   modal.onclick=e=>{if(e.target===modal)modal.remove()};
   modal.querySelector("#libraryImport").onclick=()=>{modal.remove();openAutoImport();};
-  modal.querySelectorAll("[data-library-game]").forEach(btn=>btn.onclick=()=>{
-    active=btn.dataset.libraryGame; modal.remove(); render(); window.scrollTo(0,0);
-  });
+  modal.querySelectorAll("[data-library-game]").forEach(btn=>btn.onclick=()=>{active=btn.dataset.libraryGame;modal.remove();render();window.scrollTo(0,0);});
 }
-
 function openAutoImport(){
   const modal=document.createElement("div"); modal.className="modal";
   modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · AUTOMATIC GAME IMPORT</small><h2>Automatic Import Center</h2><p>Import an official game once and CourtIQ runs the verified pipeline: source validation → deterministic metrics → game library → scouting/report outputs.</p><div class="workflowSteps"><b>1 · OFFICIAL SOURCE</b><span>IBBA box-score URL</span><b>2 · VERIFY</b><span>Basketball totals validation</span><b>3 · CALCULATE</b><span>eFG%, TS%, TOV%, ORB%, FTr, possessions</span><b>4 · SAVE</b><span>Reusable team/game intelligence</span></div><div class="insight warning">CURRENT V1: automatic after an official URL is supplied. Schedule-wide discovery/sync is not enabled yet.</div><button id="autoGo" class="runImport">IMPORT OFFICIAL GAME</button></div>`;
