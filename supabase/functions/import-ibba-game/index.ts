@@ -94,47 +94,111 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
 Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS") return new Response(null,{headers:cors});
   if(req.method!=="POST") return j({error:"Method not allowed"},405);
+
+  let auditClubId:number|null=null;
+  let auditUrl="";
+  let auditExternalId:string|null=null;
+
   try{
     const auth=req.headers.get("Authorization");
     if(!auth) return j({error:"Sign in is required."},401);
-    const supabaseUrl=Deno.env.get("SUPABASE_URL")!, anon=Deno.env.get("SUPABASE_ANON_KEY")!, serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabaseUrl=Deno.env.get("SUPABASE_URL")!;
+    const anon=Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const userDb=createClient(supabaseUrl,anon,{global:{headers:{Authorization:auth}}});
     const {data:clubs,error:clubErr}=await userDb.from("clubs").select("id,name,season").eq("slug","maccabi-bnot-ashdod").limit(1);
     if(clubErr) throw clubErr;
     if(!clubs?.length) return j({error:"This account does not have access to the Ashdod pilot."},403);
+
     const club=clubs[0];
-    const body=await req.json(), u=validateUrl(String(body.url||""));
+    auditClubId=club.id;
+    const body=await req.json();
+    const u=validateUrl(String(body.url||""));
+    auditUrl=u.toString();
+
     const res=await fetch(u.toString(),{headers:{"User-Agent":"CourtIQ/1.0 basketball analytics pilot"}});
     if(!res.ok) throw new Error("Official source returned HTTP "+res.status);
-    const html=await res.text(), $=cheerio.load(html);
+    const html=await res.text();
+    const $=cheerio.load(html);
+
     let quarter:any=null;
-    $("table").each((_:number,t:any)=>{if(quarter)return;const h=tableRows($,t)[0]?.join(" | ")||"";if(h.includes("רבע 1")&&h.includes("רבע 4"))quarter=t;});
+    $("table").each((_:number,t:any)=>{
+      if(quarter) return;
+      const h=tableRows($,t)[0]?.join(" | ")||"";
+      if(h.includes("רבע 1")&&h.includes("רבע 4")) quarter=t;
+    });
     if(!quarter) throw new Error("Could not locate the IBBA quarter table.");
+
     const qrows=tableRows($,quarter).slice(1).filter((r:string[])=>r.length>=6&&r[0]);
     if(qrows.length<2) throw new Error("Could not read both teams.");
-    const homeName=qrows[0][0], awayName=qrows[1][0];
+    const homeName=qrows[0][0],awayName=qrows[1][0];
+    if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
     const quarters=[0,1,2,3].map(i=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
+
     const playerTables:any[]=[];
-    $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
+    $("table").each((_:number,t:any)=>{
+      const h=(tableRows($,t)[0]||[]).join(" | ");
+      if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס")) playerTables.push(t);
+    });
     if(playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
-    const home=teamTotal($,playerTables[0]), away=teamTotal($,playerTables[1]);
-    const validation={home:validateTeam(home,homeName),away:validateTeam(away,awayName),parser:"ibba-v2",validated_at:new Date().toISOString()};
-    const allText=clean($.root().text()), dm=allText.match(/\b(\d{2})-(\d{2})-(\d{4})\b/);
-    const gameDate=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null, dateDisplay=dm?dm[1]+"/"+dm[2]+"/"+dm[3]:"Imported game";
-    const id=u.pathname.match(/\/match\/(\d+)/)![1]; auditExternalId=id;
+
+    const home=teamTotal($,playerTables[0]),away=teamTotal($,playerTables[1]);
+    const validation={
+      home:validateTeam(home,homeName),
+      away:validateTeam(away,awayName),
+      parser:"ibba-v2",
+      validated_at:new Date().toISOString()
+    };
+
+    const allText=clean($.root().text());
+    const dm=allText.match(/\b(\d{2})-(\d{2})-(\d{4})\b/);
+    const gameDate=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null;
+    const dateDisplay=dm?dm[1]+"/"+dm[2]+"/"+dm[3]:"Imported game";
+    const id=u.pathname.match(/\/match\/(\d+)/)![1];
+    auditExternalId=id;
     const title=clean($("title").text())||"IBBA";
+
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay};
     const ui=uiGame(meta,home,away,quarters);
     const payload={provider:"IBBA",source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},calculated:ui.calculated};
+
     const admin=createClient(supabaseUrl,serviceKey);
     const {data:game,error:gameErr}=await admin.from("games").upsert({
       external_id:id,provider:"IBBA",source_url:u.toString(),competition:title,game_date:gameDate,
       home_team:homeName,away_team:awayName,payload,club_id:club.id
     },{onConflict:"provider,external_id"}).select("id").single();
     if(gameErr) throw gameErr;
-    const report={version:"v1",game_id:game.id,generated_at:new Date().toISOString(),summary:{score:home.points+"-"+away.points,home:homeName,away:awayName},metrics:ui.metrics,four_factors:ui.factors,findings:ui.findings,team_stats:ui.stats,video_investigation:ui.videos,confidence:"DATA CONFIRMED"};
-    const {error:reportErr}=await admin.from("game_reports").upsert({game_id:game.id,report_version:"v1",payload:report,updated_at:new Date().toISOString()},{onConflict:"game_id,report_version"});
+
+    const report={
+      version:"v1",game_id:game.id,generated_at:new Date().toISOString(),
+      summary:{score:home.points+"-"+away.points,home:homeName,away:awayName},
+      metrics:ui.metrics,four_factors:ui.factors,findings:ui.findings,team_stats:ui.stats,
+      video_investigation:ui.videos,confidence:"DATA CONFIRMED",validation
+    };
+    const {error:reportErr}=await admin.from("game_reports").upsert({
+      game_id:game.id,report_version:"v1",payload:report,updated_at:new Date().toISOString()
+    },{onConflict:"game_id,report_version"});
     if(reportErr) throw reportErr;
-    return j({game_id:game.id,ui,report,saved:true});
-  }catch(e){return j({error:e instanceof Error?e.message:String(e)},422);}
+
+    const {error:auditErr}=await admin.from("import_runs").insert({
+      club_id:club.id,provider:"IBBA",source_url:u.toString(),external_id:id,status:"success",
+      validation,game_id:game.id
+    });
+    if(auditErr) throw auditErr;
+
+    return j({game_id:game.id,ui,report,validation,saved:true});
+  }catch(e){
+    const message=e instanceof Error?e.message:String(e);
+    if(auditClubId&&auditUrl){
+      try{
+        const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        await admin.from("import_runs").insert({
+          club_id:auditClubId,provider:"IBBA",source_url:auditUrl,external_id:auditExternalId,
+          status:"failed",error_message:message,validation:{parser:"ibba-v2"}
+        });
+      }catch(_){}
+    }
+    return j({error:message},422);
+  }
 });
