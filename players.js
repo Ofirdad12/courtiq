@@ -143,6 +143,40 @@
         "Rim pressure — identify why the five-game playoff sample generated only six free-throw attempts.",
         "Role translation to Holon — verify how her creation and perimeter volume fit next to Eden Rotberg and Ashley Owusu."
       ]
+    },
+    {
+      id: "adi-levy",
+      name: "Adi Levy",
+      team: "Elitzur Holon",
+      position: "Center / Power Forward",
+      season: "2025–26",
+      source: "Israel Basketball Association · official player statistics",
+      sourceUrl: "https://ibasketball.co.il/player/2669d2cdc6541fd3-17063670/",
+      competitions: [
+        {
+          name: "Israel WBL", club: "Elitzur Holon", games: 9, minutes: 163.2, points: 54,
+          two_pm: 26, two_pa: 49, three_pm: 0, three_pa: 0, ftm: 2, fta: 5,
+          oreb: 4, dreb: 13, rebounds: 17, assists: 9, steals: 2, blocks: 2, turnovers: 3
+        },
+        {
+          name: "Girls A Premier", club: "Elitzur Holon", games: 18, minutes: 594.7, points: 203,
+          two_pm: 76, two_pa: 206, three_pm: 0, three_pa: 1, ftm: 51, fta: 93,
+          oreb: 102, dreb: 138, rebounds: 240, assists: 28, steals: 24, blocks: 25, turnovers: 42
+        }
+      ],
+      read: [
+        "Levy's senior WBL sample is 9 games and 163.2 minutes: 54 points, 17 rebounds and 9 assists with only 3 turnovers.",
+        "In the senior sample she made 26 of 49 two-point attempts and did not attempt a three. CourtIQ calculates 53.1% eFG, 52.7% TS and a 10.2% FT Rate from the verified totals.",
+        "Her youth workload is materially different: 18 games, 203 points and 240 rebounds. CourtIQ keeps the youth competition separate from the senior WBL sample rather than blending levels.",
+        "The youth totals show 102 offensive rebounds and 25 blocks across 18 games, while the senior sample is much smaller. Role translation to senior basketball therefore requires video verification."
+      ],
+      video: [
+        "Senior finishing profile — classify the 49 two-point attempts by rim finish, post-up, cut, roll and put-back.",
+        "Rebounding translation — compare her youth offensive-rebounding impact with her positioning and physical matchups in senior WBL minutes.",
+        "Decision-making — investigate the senior 9 assists against 3 turnovers and identify whether possessions come from short-roll, post or perimeter reads.",
+        "Free-throw generation — determine why the senior sample produced only five free-throw attempts despite an interior shot profile.",
+        "Defensive role — verify screen coverage, rim protection, mobility and foul discipline against senior lineups."
+      ]
     }
   ];
 
