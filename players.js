@@ -528,5 +528,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
-  window.COURTIQ_BUILD = "088";
+  window.COURTIQ_BUILD = "089";
 })();
