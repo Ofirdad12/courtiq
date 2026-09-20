@@ -502,7 +502,8 @@
       return {
         id: "db-" + p.id,
         name: p.name,
-        team: row.roster_status === "roster" ? "Maccabi Bnot Ashdod" : (row.roster_status === "opponent" ? "Opponent Database" : "Scouting Database"),\n        rosterStatus: row.roster_status,
+        team: row.roster_status === "roster" ? "Maccabi Bnot Ashdod" : (row.roster_status === "opponent" ? "Opponent Database" : "Scouting Database"),
+        rosterStatus: row.roster_status,
         position: p.position || "—",
         season: row.season,
         source: analysis.source || competitions[0]?.source_label || "CourtIQ database",
