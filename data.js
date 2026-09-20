@@ -64,7 +64,7 @@
     if (!club) throw new Error("This account does not have access to the Maccabi Bnot Ashdod pilot.");
     const [games, clubPlayers] = await Promise.all([
       jsonFetch("/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at&club_id=eq." + club.id + "&order=game_date.desc.nullslast"),
-      jsonFetch("/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url)&club_id=eq." + club.id + "&season=eq." + encodeURIComponent(club.season))
+      jsonFetch("/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url,analysis)&club_id=eq." + club.id + "&season=eq." + encodeURIComponent(club.season))
     ]);
     return {club, games, clubPlayers};
   }
