@@ -56,6 +56,18 @@ function calc(t:any, opp:any){
     ftr:pct(t.fta,fga), ast_to:t.tov?Math.round(t.ast/t.tov*100)/100:null
   };
 }
+function validateTeam(t:any,label:string){
+  const numeric=["points","two_pm","two_pa","three_pm","three_pa","ftm","fta","oreb","dreb","tov","ast"];
+  for(const key of numeric){
+    if(!Number.isFinite(t[key])||t[key]<0) throw new Error(label+" has invalid "+key+".");
+  }
+  if(t.two_pm>t.two_pa||t.three_pm>t.three_pa||t.ftm>t.fta) throw new Error(label+" has makes greater than attempts.");
+  const expectedPoints=2*t.two_pm+3*t.three_pm+t.ftm;
+  if(expectedPoints!==t.points) throw new Error(label+" scoring totals do not reconcile: box score "+t.points+", shots "+expectedPoints+".");
+  const fga=t.two_pa+t.three_pa;
+  if(fga===0) throw new Error(label+" has zero field-goal attempts.");
+  return {status:"passed",expected_points:expectedPoints,box_score_points:t.points,fga,checks:["non_negative","makes_lte_attempts","points_reconcile","fga_positive"]};
+}
 function uiGame(meta:any,home:any,away:any,quarters:any[]){
   const hm=calc(home,away), am=calc(away,home);
   const metrics=[["Offensive Rating",hm.ortg.toFixed(1),am.ortg.toFixed(1)],["eFG%",hm.efg+"%",am.efg+"%"],["TS%",hm.ts+"%",am.ts+"%"],["TOV%",hm.tov+"%",am.tov+"%"],["AST/TO",hm.ast_to??"—",am.ast_to??"—"]];
@@ -106,13 +118,14 @@ Deno.serve(async(req:Request)=>{
     $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
     if(playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
     const home=teamTotal($,playerTables[0]), away=teamTotal($,playerTables[1]);
+    const validation={home:validateTeam(home,homeName),away:validateTeam(away,awayName),parser:"ibba-v2",validated_at:new Date().toISOString()};
     const allText=clean($.root().text()), dm=allText.match(/\b(\d{2})-(\d{2})-(\d{4})\b/);
     const gameDate=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null, dateDisplay=dm?dm[1]+"/"+dm[2]+"/"+dm[3]:"Imported game";
-    const id=u.pathname.match(/\/match\/(\d+)/)![1];
+    const id=u.pathname.match(/\/match\/(\d+)/)![1]; auditExternalId=id;
     const title=clean($("title").text())||"IBBA";
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay};
     const ui=uiGame(meta,home,away,quarters);
-    const payload={provider:"IBBA",source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),ui,raw:{home,away},calculated:ui.calculated};
+    const payload={provider:"IBBA",source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},calculated:ui.calculated};
     const admin=createClient(supabaseUrl,serviceKey);
     const {data:game,error:gameErr}=await admin.from("games").upsert({
       external_id:id,provider:"IBBA",source_url:u.toString(),competition:title,game_date:gameDate,
