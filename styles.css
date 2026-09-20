@@ -64,3 +64,11 @@
 .productModules button{display:grid;grid-template-columns:34px 1fr 20px;gap:10px;align-items:center;text-align:left;padding:14px;background:#0b1524;border:1px solid var(--line);border-radius:10px;color:#fff;cursor:pointer}.productModules button:hover{border-color:#8e79ff;background:#111b31}.productModules button>span{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:#27205b;color:#d8ceff;font-size:9px;font-weight:900}.productModules b,.productModules small{display:block}.productModules b{font-size:12px}.productModules small{font-size:8px;color:var(--muted);margin-top:4px}.productModules i{font-style:normal;color:#b9a8ff;font-weight:900}
 .productTrust{display:grid;grid-template-columns:180px 1fr;gap:5px 14px;margin-top:16px;padding:13px;border-left:3px solid #8e79ff;background:#0c1625}.productTrust b{font-size:8px;color:#b9a8ff;letter-spacing:1px}.productTrust span{font-size:10px;font-weight:900}.productTrust small{grid-column:2;font-size:8px;color:var(--muted)}
 @media(max-width:760px){.productHero{display:block}.pilotBadge{display:inline-block;text-align:left;margin-top:12px}.productStats{grid-template-columns:1fr 1fr}.productModules{grid-template-columns:1fr}.productTrust{grid-template-columns:1fr}.productTrust small{grid-column:1}}
+
+
+/* Build 086: secure pilot access + live data status */
+.accountBtn{border:1px solid #27314a;background:#0d1422;color:#fff;border-radius:9px;padding:8px 11px;cursor:pointer;text-align:left;font:inherit}
+.accountBtn:hover{border-color:#8e79ff}.accountModal{max-width:560px}.accountModal p{color:#aeb9ca;line-height:1.6}
+.accountSecondary,.dashboardAccount{border:1px solid #4a5570;background:transparent;color:#d8e0eb;border-radius:8px;padding:11px 14px;font-size:9px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.accountSecondary{width:100%;margin-top:8px}.dashboardAccount{margin-top:16px;border-color:#5d4bb0;color:#d8ceff}.dashboardAccount:hover,.accountSecondary:hover{background:#151432}
+#dashboardDataStatus{margin-top:8px}
