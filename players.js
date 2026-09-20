@@ -220,21 +220,21 @@
       team: "Elitzur Holon",
       position: "Power Forward",
       season: "2025–26",
-      source: "Published 2025–26 Maccabi Ashdod season summary · FIBA identity cross-check",
-      sourceUrl: "https://www.fiba.basketball/en/players/272992-stasha-carey",
+      source: "Israel Basketball Association · official 2025–26 WBL player table",
+      sourceUrl: "https://ibasketball.co.il/league/2025-51/",
       competitions: [
         {
           name: "Israel WBL · 2025–26", club: "Maccabi Bnot Ashdod",
-          summaryOnly: true, games: null, mpg: null, ppg: 11.1, rpg: 7.5, apg: 2.0,
-          tovpg: null, drebpg: null, orebpg: null, twoPct: null, threePct: null, ftPct: null,
-          spg: null, foulsPg: null, blocksForPg: null, pir: null, plusMinus: null
+          summaryOnly: true, games: 12, mpg: 30.6, ppg: 11.1, rpg: 7.4, apg: 3.2,
+          tovpg: null, drebpg: 5.3, orebpg: 2.1, twoPct: 50.7, threePct: 40.9, ftPct: 70.8,
+          spg: null, foulsPg: 2.9, blocksForPg: null, pir: 16.4, plusMinus: 73
         }
       ],
       read: [
-        "A published 2025–26 Maccabi Ashdod season summary lists Carey at 11.1 points, 7.5 rebounds and 2.0 assists per game.",
-        "FIBA lists Carey as a 188 cm American forward, providing an identity cross-check for the player record.",
-        "The available 2025–26 summary does not expose verified shooting attempts, turnovers or minutes. CourtIQ therefore does not calculate eFG%, TS%, AST/TO, 3P Rate, FT Rate or per-40 metrics from this sample.",
-        "Carey's box-score profile supports describing her as a productive rebounder in the Ashdod sample; tactical role and action type remain video-verification questions."
+        "The official IBBA 2025–26 WBL table lists Carey at 12 games, 30.6 minutes, 11.1 points, 7.4 rebounds and 3.2 assists per game for Maccabi Ashdod.",
+        "IBBA lists 50.7% from two, 40.9% from three and 70.8% from the free-throw line in this sample.",
+        "The same official table lists 5.3 defensive and 2.1 offensive rebounds per game, plus a 16.4 PIR.",
+        "CourtIQ keeps eFG%, TS%, 3P Rate and FT Rate unavailable until verified shot-attempt totals are collected; tactical role and action type remain video-verification questions."
       ],
       video: [
         "Interior usage — classify touches by post-up, roll, cut, seal and offensive-rebound possession.",
@@ -319,7 +319,7 @@
     </div>
     <div class="piSource">SOURCE · ${p.source} · Advanced metrics calculated by CourtIQ from displayed totals.</div>
     ${p.id==="tal-lev"?'<div class="piSampleNotice"><b>2025–26 DATA SPLIT</b><span>Regular Season and Playoffs are shown as separate verified samples below.</span></div>':""}
-    ${p.id==="stasha-carey"?'<div class="reportKpis"><div><small>2025–26 PPG</small><b>11.1</b><span>Maccabi Bnot Ashdod</span></div><div><small>RPG</small><b>7.5</b><span>Published season average</span></div><div><small>APG</small><b>2.0</b><span>Published season average</span></div></div>':""}
+    ${p.id==="stasha-carey"?'<div class="reportKpis"><div><small>2025–26 PPG</small><b>11.1</b><span>12 games · IBBA</span></div><div><small>RPG</small><b>7.4</b><span>Official IBBA</span></div><div><small>APG</small><b>3.2</b><span>Official IBBA</span></div><div><small>MPG</small><b>30.6</b><span>Official IBBA</span></div></div>':""}
     <div class="piCompare">${p.competitions.map(competitionCard).join("")}</div>
     <div class="piDelta card piSignal">
       <h3>Competition Signal</h3>
@@ -404,5 +404,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "078";
+  window.COURTIQ_BUILD = "079";
 })();
