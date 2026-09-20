@@ -25,11 +25,15 @@ jobs:
           node --check data.js
           node --check app.js
           node --check players.js
+          node --check mens.js
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
           grep -q 'import_runs' supabase/functions/import-ibba-game/index.ts
           grep -q 'validation' supabase/functions/import-ibba-game/index.ts
+          grep -q 'basket.co.il' supabase/functions/import-ibba-game/index.ts
+          grep -q 'WINNER_LEAGUE' supabase/functions/import-ibba-game/index.ts
+          grep -q 'game-zone.asp' supabase/functions/import-ibba-game/index.ts
 
       - name: Check pilot activation contract
         run: |
