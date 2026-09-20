@@ -14,6 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - name: Install Python test dependencies
         run: pip install -r requirements-api.txt pytest
       - name: Run Python tests
@@ -25,3 +28,5 @@ jobs:
           node --check data.js
           node --check app.js
           node --check players.js
+      - name: Check Supabase Edge Function
+        run: deno check supabase/functions/import-ibba-game/index.ts
