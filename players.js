@@ -384,6 +384,64 @@
     countries();
   }
 
+  function openPlayerCompare() {
+    const modal = document.createElement("div");
+    modal.className = "modal piModal";
+    const defaultIndex = players.length > 1 ? 1 : 0;
+    modal.innerHTML = `<div class="modalCard piShell comparePlayersShell"><button class="modalX">×</button>
+      <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER COMPARISON</small><h2>Compare Players</h2><p>Side-by-side verified performance signals. CourtIQ does not create an overall player score.</p></div>
+      <div class="playerCompareControls">
+        <div><label>PLAYER A</label><select id="pcPlayerA">${players.map((p,i)=>`<option value="${p.id}" ${i===0?"selected":""}>${p.name}</option>`).join("")}</select><select id="pcSampleA"></select></div>
+        <div class="pcVs">VS</div>
+        <div><label>PLAYER B</label><select id="pcPlayerB">${players.map((p,i)=>`<option value="${p.id}" ${i===defaultIndex?"selected":""}>${p.name}</option>`).join("")}</select><select id="pcSampleB"></select></div>
+      </div>
+      <div id="pcOutput"></div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector(".modalX").onclick = () => modal.remove();
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+    const playerFor = side => players.find(p => p.id === modal.querySelector("#pcPlayer"+side).value);
+    const bestSampleIndex = p => {
+      const i = p.competitions.findIndex(x => !x.summaryOnly);
+      return i >= 0 ? i : 0;
+    };
+    function fillSamples(side) {
+      const p = playerFor(side), sel = modal.querySelector("#pcSample"+side);
+      const preferred = bestSampleIndex(p);
+      sel.innerHTML = p.competitions.map((x,i)=>`<option value="${i}" ${i===preferred?"selected":""}>${x.name} · ${x.games == null ? "season summary" : x.games+" G"}</option>`).join("");
+    }
+    const fmt = (v,suffix="") => v == null ? "—" : v + suffix;
+    function draw() {
+      const pa=playerFor("A"), pb=playerFor("B");
+      const sa=pa.competitions[Number(modal.querySelector("#pcSampleA").value)||0];
+      const sb=pb.competitions[Number(modal.querySelector("#pcSampleB").value)||0];
+      const a=metrics(sa), b=metrics(sb);
+      const rows=[
+        ["PPG",a.ppg,b.ppg,""],["RPG",a.rpg,b.rpg,""],["APG",a.apg,b.apg,""],
+        ["eFG%",a.efg,b.efg,"%"],["TS%",a.ts,b.ts,"%"],["AST/TO",a.astTo,b.astTo,""],
+        ["3P Rate",a.threeRate,b.threeRate,"%"],["FT Rate",a.ftRate,b.ftRate,"%"],
+        ["PTS / 40",a.pts40,b.pts40,""],["AST / 40",a.ast40,b.ast40,""],["TOV / 40",a.tov40,b.tov40,""]
+      ];
+      const comparable=rows.filter(r=>r[1]!=null && r[2]!=null).length;
+      modal.querySelector("#pcOutput").innerHTML=`<div class="pcIdentity">
+        <div><b>${pa.name}</b><span>${pa.position}</span><small>${sa.name} · ${sa.games == null ? "season summary" : sa.games+" games"}</small></div>
+        <div class="pcConfidence"><b>${comparable}</b><span>comparable metrics</span></div>
+        <div class="right"><b>${pb.name}</b><span>${pb.position}</span><small>${sb.name} · ${sb.games == null ? "season summary" : sb.games+" games"}</small></div>
+      </div>
+      <div class="card pcTableWrap"><table class="stats pcTable"><thead><tr><th>Metric</th><th>${pa.name}</th><th>${pb.name}</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}</td><td>${fmt(r[2],r[3])}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="pcNotes"><div class="insight"><b>DATA CONFIRMED</b> · Values are calculated from the selected source sample only. Missing metrics are shown as — rather than estimated.</div><div class="insight warning"><b>VIDEO VERIFICATION REQUIRED</b> · Statistical differences do not establish role, defensive quality, tactical fit or causation.</div></div>`;
+    }
+    for (const side of ["A","B"]) {
+      modal.querySelector("#pcPlayer"+side).onchange=()=>{fillSamples(side);draw();};
+      modal.querySelector("#pcSample"+side).onchange=draw;
+      fillSamples(side);
+    }
+    draw();
+  }
+
   function openPlayers() {
     const modal = document.createElement("div");
     modal.className = "modal piModal";
@@ -406,9 +464,11 @@
   document.addEventListener("click", e => {
     const item = e.target.closest(".menu div");
     if (item && item.textContent.includes("Teams")) openTeams();
-    if ((item && item.textContent.includes("Players")) || e.target.closest("#playersHub")) openPlayers();
+    if (item && item.textContent.includes("Compare Players")) openPlayerCompare();
+    else if ((item && item.textContent.includes("Players")) || e.target.closest("#playersHub")) openPlayers();
+    if (e.target.closest("#comparePlayers")) openPlayerCompare();
   });
 
-  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "080";
+  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare };
+  window.COURTIQ_BUILD = "081";
 })();
