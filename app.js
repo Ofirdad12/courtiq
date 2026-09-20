@@ -64,6 +64,8 @@ document.querySelector("#autoImport").onclick=openAutoImport;
 document.querySelector("#opponentScout").onclick=openOpponentScout;
 document.querySelector("#fullReport").onclick=openFullReport;
 document.querySelector("#accountBtn").onclick=openAccount;
+document.querySelector("#playersHub").onclick=()=>window.CourtIQPlayers?.openPlayers();
+document.querySelector("#comparePlayers").onclick=()=>window.CourtIQPlayers?.openPlayerCompare();
 }
 
 function csvRows(text){
