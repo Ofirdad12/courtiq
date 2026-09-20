@@ -30,3 +30,9 @@ jobs:
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
           grep -q 'import_runs' supabase/functions/import-ibba-game/index.ts
           grep -q 'validation' supabase/functions/import-ibba-game/index.ts
+
+      - name: Check pilot activation contract
+        run: |
+          grep -q 'createUser' supabase/functions/create-pilot-account/index.ts
+          grep -q 'pilot_invites' supabase/functions/create-pilot-account/index.ts
+          grep -q 'club_members' supabase/functions/create-pilot-account/index.ts
