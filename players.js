@@ -224,17 +224,23 @@
       sourceUrl: "https://ibasketball.co.il/league/2025-51/",
       competitions: [
         {
-          name: "Israel WBL · 2025–26", club: "Maccabi Bnot Ashdod",
+          name: "Israel WBL · 2025–26 Season Summary", club: "Maccabi Bnot Ashdod",
           summaryOnly: true, games: 12, mpg: 30.6, ppg: 11.1, rpg: 7.4, apg: 3.2,
           tovpg: null, drebpg: 5.3, orebpg: 2.1, twoPct: 50.7, threePct: 40.9, ftPct: 70.8,
           spg: null, foulsPg: 2.9, blocksForPg: null, pir: 16.4, plusMinus: 73
+        },
+        {
+          name: "Israel WBL · Verified Box-Score Sample (8 G)", club: "Maccabi Bnot Ashdod",
+          games: 8, minutes: 219.3, points: 73, rebounds: 58, assists: 15, turnovers: 15,
+          two_pm: 23, two_pa: 46, three_pm: 4, three_pa: 12, ftm: 15, fta: 24,
+          sourceNote: "Raw shooting totals aggregated from eight official IBBA 2025–26 game box scores: Oct 9, Oct 23, Nov 3, Nov 24, Dec 8, Dec 11, Dec 21 and Dec 29. Advanced metrics apply to this verified 8-game sample only."
         }
       ],
       read: [
         "The official IBBA 2025–26 WBL table lists Carey at 12 games, 30.6 minutes, 11.1 points, 7.4 rebounds and 3.2 assists per game for Maccabi Ashdod.",
         "IBBA lists 50.7% from two, 40.9% from three and 70.8% from the free-throw line in this sample.",
         "The same official table lists 5.3 defensive and 2.1 offensive rebounds per game, plus a 16.4 PIR.",
-        "CourtIQ keeps eFG%, TS%, 3P Rate and FT Rate unavailable until verified shot-attempt totals are collected; tactical role and action type remain video-verification questions."
+        "CourtIQ has aggregated raw shooting totals from eight official IBBA box scores. In that verified sample she recorded 23/46 on twos, 4/12 on threes and 15/24 at the line; eFG% and TS% are calculated deterministically from those totals. The 12-game season summary remains separate until all 12 raw box scores are verified."
       ],
       video: [
         "Interior usage — classify touches by post-up, roll, cut, seal and offensive-rebound possession.",
@@ -404,5 +410,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "079";
+  window.COURTIQ_BUILD = "080";
 })();
