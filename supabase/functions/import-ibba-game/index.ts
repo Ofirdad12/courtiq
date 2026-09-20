@@ -8,7 +8,7 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json"
 };
-const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il"]);
+const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il"]);
 const j = (body: unknown, status=200) => new Response(JSON.stringify(body), {status, headers:cors});
 const clean=(s:string)=>s.replace(/\s+/g," ").trim();
 const num=(s:string)=>{const m=clean(s).replaceAll(",","").match(/-?\d+/); if(!m) throw new Error("Expected numeric value: "+s); return Number(m[0]);};
@@ -18,9 +18,12 @@ const r1=(n:number)=>Math.round(n*10)/10;
 
 function validateUrl(raw:string){
   const u=new URL(raw);
-  if(u.protocol!=="https:" || !allowed.has(u.hostname) || !/^\/match\/\d+(?:-[^/]*)?\/?$/.test(u.pathname))
-    throw new Error("Only official https://ibasketball.co.il/match/... URLs are supported.");
-  return u;
+  if(u.protocol!=="https:" || !allowed.has(u.hostname)) throw new Error("Use an official ibasketball.co.il or basket.co.il game URL.");
+  const isIbba=/^(www\.)?ibasketball\.co\.il$/.test(u.hostname);
+  const isBasket=/^(www\.)?basket\.co\.il$/.test(u.hostname);
+  if(isIbba && !/^\/match\/\d+(?:-[^/]*)?\/?$/.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
+  if(isBasket && !(u.pathname.toLowerCase().endsWith("/game-zone.asp") || u.pathname.toLowerCase()==="/game-zone.asp") || !u.searchParams.get("GameId")) throw new Error("Unsupported Winner League URL. Use basket.co.il/game-zone.asp?GameId=...");
+  return {u, provider:isBasket?"WINNER_LEAGUE":"IBBA"};
 }
 function tableRows($:cheerio.CheerioAPI, table:any){
   return $(table).find("tr").map((_:number,tr:any)=>$(tr).find("th,td").map((__:number,c:any)=>clean($(c).text())).get()).get();
@@ -45,6 +48,35 @@ function teamTotal($:cheerio.CheerioAPI, table:any){
     tov:num(total[idx(headers,["איב'","איב׳","איב"])]),
     ast:num(total[idx(headers,["אס'","אס׳","אס"])])
   };
+}
+
+function idxAny(headers:string[], needles:string[]){
+  const norm=(s:string)=>clean(s).toLowerCase();
+  const i=headers.findIndex(h=>needles.some(n=>norm(h)===norm(n)||norm(h).includes(norm(n))));
+  if(i<0) throw new Error("Missing expected box-score column: "+needles.join("/"));
+  return i;
+}
+function basketTeamTotal($:cheerio.CheerioAPI, table:any){
+  const rows=tableRows($,table).filter((r:string[])=>r.length);
+  let hi=rows.findIndex((r:string[])=>r.some(h=>/2pt|2 נק/i.test(h))&&r.some(h=>/3pt|3 נק/i.test(h)));
+  if(hi<0) hi=0;
+  const headers=rows[hi];
+  let total=rows.slice(hi+1).find((r:string[])=>r.some(c=>/^(total|totals|סה.?כ|סך הכל)$/i.test(clean(c))));
+  if(!total) total=rows.slice(hi+1).reverse().find((r:string[])=>r.length>=headers.length-2 && r.some(c=>/\d/.test(c)));
+  if(!total) throw new Error("Winner League box score has no readable team total row.");
+  const [two_pm,two_pa]=ma(total[idxAny(headers,["2PT","2 נק"])]);
+  const [three_pm,three_pa]=ma(total[idxAny(headers,["3PT","3 נק"])]);
+  const [ftm,fta]=ma(total[idxAny(headers,["1PT","FT","עונשין","מהקו"])]);
+  return {points:num(total[idxAny(headers,["Pts","Points","נק"])]),two_pm,two_pa,three_pm,three_pa,ftm,fta,
+    dreb:num(total[idxAny(headers,["DR","DREB","הגנה"])]),oreb:num(total[idxAny(headers,["OR","OREB","התק"])]),
+    tov:num(total[idxAny(headers,["TO","TOV","אב","איב"])]),ast:num(total[idxAny(headers,["AS","AST","אס"])])};
+}
+function basketNames($:cheerio.CheerioAPI){
+  const title=clean($("title").text());
+  const m=title.match(/:\s*([^:]+?)\s+(?:Vs\.?|vs\.?|נגד)\s+([^|]+)/i);
+  if(m) return [clean(m[1]),clean(m[2])];
+  const h=$("h1,h2,h3,h4,h5,h6").map((_:number,e:any)=>clean($(e).text())).get().filter(Boolean);
+  return [h.find((x:string)=>!/cup|league|מנהלת|ליגת/i.test(x))||"Home", h.slice().reverse().find((x:string)=>!/cup|league|מנהלת|ליגת/i.test(x))||"Away"];
 }
 function calc(t:any, opp:any){
   const fgm=t.two_pm+t.three_pm, fga=t.two_pa+t.three_pa;
@@ -87,7 +119,7 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
     "Review the possessions that produced the largest efficiency gap before assigning tactical causation."
   ];
   return {id:meta.id,comp:meta.competition,date:meta.date_display,home:meta.home,away:meta.away,hs:home.points,as:away.points,quarters,metrics,factors,stats,findings,videos,
-    leaders:[],awayLeaders:[],sourceLabel:"IBBA OFFICIAL BOX SCORE · DATA CONFIRMED",confidence:"DATA CONFIRMED",
+    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
     ask:meta.home+" and "+meta.away+" are compared here using verified box-score totals. Tactical causation requires video verification.",
     raw:{home,away},calculated:{home:hm,away:am}};
 }
@@ -114,40 +146,38 @@ Deno.serve(async(req:Request)=>{
     const club=clubs[0];
     auditClubId=club.id;
     const body=await req.json();
-    const u=validateUrl(String(body.url||""));
+    const parsed=validateUrl(String(body.url||""));
+    const u=parsed.u, provider=parsed.provider;
     auditUrl=u.toString();
+    const fetchUrl=new URL(u.toString()); if(provider==="WINNER_LEAGUE") fetchUrl.searchParams.set("lang","en");
 
-    const res=await fetch(u.toString(),{headers:{"User-Agent":"CourtIQ/1.0 basketball analytics pilot"}});
+    const res=await fetch(fetchUrl.toString(),{headers:{"User-Agent":"CourtIQ/1.0 basketball analytics pilot"}});
     if(!res.ok) throw new Error("Official source returned HTTP "+res.status);
     const html=await res.text();
     const $=cheerio.load(html);
 
-    let quarter:any=null;
-    $("table").each((_:number,t:any)=>{
-      if(quarter) return;
-      const h=tableRows($,t)[0]?.join(" | ")||"";
-      if(h.includes("רבע 1")&&h.includes("רבע 4")) quarter=t;
-    });
-    if(!quarter) throw new Error("Could not locate the IBBA quarter table.");
-
-    const qrows=tableRows($,quarter).slice(1).filter((r:string[])=>r.length>=6&&r[0]);
-    if(qrows.length<2) throw new Error("Could not read both teams.");
-    const homeName=qrows[0][0],awayName=qrows[1][0];
-    if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
-    const quarters=[0,1,2,3].map(i=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
-
+    let homeName="",awayName="",quarters:any[]=[];
     const playerTables:any[]=[];
-    $("table").each((_:number,t:any)=>{
-      const h=(tableRows($,t)[0]||[]).join(" | ");
-      if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס")) playerTables.push(t);
-    });
-    if(playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
-
-    const home=teamTotal($,playerTables[0]),away=teamTotal($,playerTables[1]);
+    if(provider==="IBBA"){
+      let quarter:any=null;
+      $("table").each((_:number,t:any)=>{ if(quarter)return; const h=tableRows($,t)[0]?.join(" | ")||""; if(h.includes("רבע 1")&&h.includes("רבע 4")) quarter=t; });
+      if(!quarter) throw new Error("Could not locate the IBBA quarter table.");
+      const qrows=tableRows($,quarter).slice(1).filter((r:string[])=>r.length>=6&&r[0]);
+      if(qrows.length<2) throw new Error("Could not read both teams.");
+      homeName=qrows[0][0]; awayName=qrows[1][0]; quarters=[0,1,2,3].map(i=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
+      $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
+    }else{
+      [homeName,awayName]=basketNames($);
+      $("table").each((_:number,t:any)=>{const h=tableRows($,t).slice(0,3).flat().join(" | ");if(/2PT|2 נק/i.test(h)&&/3PT|3 נק/i.test(h)&&/(TO|TOV|אב|איב)/i.test(h)&&/(AS|AST|אס)/i.test(h))playerTables.push(t);});
+    }
+    if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
+    if(playerTables.length<2) throw new Error(provider==="WINNER_LEAGUE"?"Could not locate both Winner League box-score tables. The game may not have a published box score yet.":"Could not locate both IBBA box-score tables.");
+    const home=provider==="WINNER_LEAGUE"?basketTeamTotal($,playerTables[0]):teamTotal($,playerTables[0]);
+    const away=provider==="WINNER_LEAGUE"?basketTeamTotal($,playerTables[1]):teamTotal($,playerTables[1]);
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:"ibba-v2",
+      parser:provider==="WINNER_LEAGUE"?"basket-v1":"ibba-v2",
       validated_at:new Date().toISOString()
     };
 
@@ -155,17 +185,17 @@ Deno.serve(async(req:Request)=>{
     const dm=allText.match(/\b(\d{2})-(\d{2})-(\d{4})\b/);
     const gameDate=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null;
     const dateDisplay=dm?dm[1]+"/"+dm[2]+"/"+dm[3]:"Imported game";
-    const id=u.pathname.match(/\/match\/(\d+)/)![1];
+    const id=provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/(\d+)/)![1];
     auditExternalId=id;
     const title=clean($("title").text())||"IBBA";
 
-    const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay};
+    const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
-    const payload={provider:"IBBA",source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},calculated:ui.calculated};
+    const payload={provider,source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},calculated:ui.calculated};
 
     const admin=createClient(supabaseUrl,serviceKey);
     const {data:game,error:gameErr}=await admin.from("games").upsert({
-      external_id:id,provider:"IBBA",source_url:u.toString(),competition:title,game_date:gameDate,
+      external_id:id,provider,source_url:u.toString(),competition:title,game_date:gameDate,
       home_team:homeName,away_team:awayName,payload,club_id:club.id
     },{onConflict:"provider,external_id"}).select("id").single();
     if(gameErr) throw gameErr;
@@ -182,7 +212,7 @@ Deno.serve(async(req:Request)=>{
     if(reportErr) throw reportErr;
 
     const {error:auditErr}=await admin.from("import_runs").insert({
-      club_id:club.id,provider:"IBBA",source_url:u.toString(),external_id:id,status:"success",
+      club_id:club.id,provider,source_url:u.toString(),external_id:id,status:"success",
       validation,game_id:game.id
     });
     if(auditErr) throw auditErr;
@@ -195,7 +225,7 @@ Deno.serve(async(req:Request)=>{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
           club_id:auditClubId,provider:"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:"ibba-v2"}
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v1":"ibba-v2"}
         });
       }catch(_){}
     }
