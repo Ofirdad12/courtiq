@@ -166,12 +166,12 @@ function openPilotDashboard(){
   const verified=stored.filter(g=>String(g.sourceLabel||"").includes("CONFIRMED")).length;
   const playerCount=window.CourtIQPlayers?.players?.length||0;
   modal.innerHTML=`<div class="modalCard productHome"><button class="modalX">×</button>
-    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 084</b></div></div>
+    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 085</b></div></div>
     <div class="productStats">
       <div><small>GAME LIBRARY</small><b>${stored.length}</b><span>${verified} verified imports</span></div>
       <div><small>SCOUTING PLAYERS</small><b>${playerCount}</b><span>verified source samples</span></div>
       <div><small>REPORT ENGINE</small><b>ACTIVE</b><span>game → report workflow</span></div>
-      <div><small>DATA POLICY</small><b>VERIFIED</b><span>no invented metrics</span></div>
+      <div><small>DATA MODEL</small><b>READY</b><span>Supabase club-scoped schema</span></div>
     </div>
     <h3 class="productSectionTitle">Club Workflow</h3>
     <div class="productModules">
