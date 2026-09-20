@@ -72,3 +72,10 @@
 .accountSecondary,.dashboardAccount{border:1px solid #4a5570;background:transparent;color:#d8e0eb;border-radius:8px;padding:11px 14px;font-size:9px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 .accountSecondary{width:100%;margin-top:8px}.dashboardAccount{margin-top:16px;border-color:#5d4bb0;color:#d8ceff}.dashboardAccount:hover,.accountSecondary:hover{background:#151432}
 #dashboardDataStatus{margin-top:8px}
+
+
+/* Build 087: product reliability states */
+button:disabled{opacity:.48;cursor:not-allowed}.impStatus{min-height:18px;margin:9px 0;font-size:9px;color:#c8d2e2}
+.reportModal h3{margin-top:22px}.reportModal .insight{line-height:1.55}
+.gameLibraryCard .libraryStatus{white-space:nowrap}
+@media(max-width:620px){.reportKpis{grid-template-columns:1fr 1fr}.modalCard{max-height:92vh;overflow:auto}.importFields{grid-template-columns:1fr}}
