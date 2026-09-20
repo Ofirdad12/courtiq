@@ -461,6 +461,38 @@
     });
   }
 
+  function replacePlayers(databaseRows) {
+    if (!Array.isArray(databaseRows) || !databaseRows.length) return;
+    const mapped = databaseRows.map(row => {
+      const p = row.players || {};
+      const analysis = p.analysis || {};
+      const competitions = (row.samples || []).map(sample => {
+        const published = sample.published_summary || {};
+        const raw = sample.raw_stats || {};
+        if (Object.keys(published).length) {
+          return {...published, name: sample.competition, club: sample.club_name, games: sample.games ?? published.games, minutes: sample.minutes ?? published.minutes, summaryOnly: true, sourceNote: sample.source_note};
+        }
+        return {...raw, name: sample.competition, club: sample.club_name, games: sample.games ?? raw.games, minutes: sample.minutes ?? raw.minutes, sourceNote: sample.source_note};
+      });
+      return {
+        id: "db-" + p.id,
+        name: p.name,
+        team: row.roster_status === "roster" ? "Maccabi Bnot Ashdod" : "Scouting Database",
+        position: p.position || "—",
+        season: row.season,
+        source: analysis.source || competitions[0]?.source_label || "CourtIQ database",
+        sourceUrl: p.source_url || null,
+        competitions,
+        read: analysis.read || [],
+        video: analysis.video || []
+      };
+    }).filter(p => p.name && p.competitions.length);
+    if (mapped.length) {
+      players.splice(0, players.length, ...mapped);
+      window.dispatchEvent(new CustomEvent("courtiq:players-loaded",{detail:{count:mapped.length}}));
+    }
+  }
+
   document.addEventListener("click", e => {
     const item = e.target.closest(".menu div");
     if (item && item.textContent.includes("Teams")) openTeams();
@@ -469,6 +501,6 @@
     if (e.target.closest("#comparePlayers")) openPlayerCompare();
   });
 
-  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare };
-  window.COURTIQ_BUILD = "086";
+  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
+  window.COURTIQ_BUILD = "087";
 })();
