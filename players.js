@@ -177,7 +177,42 @@
         "Free-throw generation — determine why the senior sample produced only five free-throw attempts despite an interior shot profile.",
         "Defensive role — verify screen coverage, rim protection, mobility and foul discipline against senior lineups."
       ]
-    }
+    },
+    {
+      id: "maya-elmalich",
+      name: "Maya Elmalich",
+      team: "Elitzur Holon",
+      position: "Guard",
+      season: "2025–26",
+      source: "Israel Basketball Association · official league statistics",
+      sourceUrl: "https://ibasketball.co.il/league/2025-451/",
+      competitions: [
+        {
+          name: "Girls A Premier · Regular Season", club: "A.S. Ramat Hasharon", games: 18,
+          summaryOnly: true, mpg: 27.0, ppg: 21.3, rpg: 4.3, apg: 2.9, tovpg: 3.0,
+          drebpg: 2.8, orebpg: 1.5, twoPct: 49.1, threePct: 32.0, ftPct: 72.7,
+          spg: 3.7, foulsPg: 2.6, blocksForPg: 0.5, pir: 17.9, plusMinus: 0
+        },
+        {
+          name: "Women's National League", club: "A.S. Ramat Hasharon Gal", games: 19,
+          summaryOnly: true, mpg: 28.2, ppg: 14.2, rpg: 2.5, apg: 2.5, tovpg: 2.4,
+          drebpg: 1.4, orebpg: 1.1, twoPct: 42.8, threePct: 33.6, ftPct: 68.1,
+          spg: 2.1, foulsPg: 2.2, blocksForPg: 0.4, pir: 10.2, plusMinus: 0
+        }
+      ],
+      read: [
+        "The official IBBA regular-season youth sample lists 18 games at 21.3 points, 4.3 rebounds, 2.9 assists and 3.7 steals per game in 27.0 minutes.",
+        "In the Women's National League, the official IBBA table lists 19 games at 14.2 points, 2.5 rebounds and 2.5 assists per game in 28.2 minutes.",
+        "Her published shooting percentages were 49.1% from two, 32.0% from three and 72.7% from the line in Girls A Premier; the National League table lists 42.8%, 33.6% and 68.1% respectively.",
+        "CourtIQ keeps the youth and senior National League samples separate. Raw attempt totals are not present in these league-table records, so eFG%, TS%, 3P Rate and FT Rate are not estimated from rounded percentages."
+      ],
+      video: [
+        "Scoring translation — identify which actions generated the 21.3 PPG youth sample and how those actions translate against senior size and physicality.",
+        "Turnover profile — classify the 3.0 turnovers per game in Girls A Premier and 2.4 in the National League by pressure, passing read, handle and offensive foul.",
+        "Perimeter creation — separate catch-and-shoot, pull-up and off-screen three-point attempts rather than judging the 32–34% range without shot context.",
+        "Point-of-attack defense — verify how the 3.7 steals per game youth sample was created and whether it reflects pressure, passing-lane activity or scheme.",
+        "Role translation to Holon — evaluate on-ball versus off-ball usage next to the club's established creators."
+      ]
   ];
 
   const r1 = n => Math.round(n * 10) / 10;
