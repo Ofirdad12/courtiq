@@ -297,7 +297,7 @@
       crumb.textContent = "Israel › Elitzur Holon";
       workspace.innerHTML = `<div class="teamPageHead clubProfileHead"><div><small class="eyebrow">ISRAEL · WOMEN</small><h2>Elitzur Holon</h2><p>2026–27 preseason scouting workspace</p></div><span class="piStatus">● DATA CONFIRMED</span></div>
         <div class="teamSummary card"><div><small>PLAYERS LOADED</small><b>${players.length}</b></div><div><small>DATA MODEL</small><b>Verified source totals</b></div><div><small>ANALYSIS</small><b>Deterministic advanced metrics</b></div><div><small>TACTICAL CLAIMS</small><b>Video verification required</b></div></div>
-        <div class="piRoster teamRoster">${players.map((p,i)=>`<button data-team-player="${p.id}" class="${i===0?"sel":""}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
+        <div class="piRoster teamRoster">${players.map((p,i)=>`<button data-team-player="${p.id}" class="${i===0?"sel":""}" id="team-player-${p.id}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
         <div id="teamPlayerDetail">${playerDetail(players[0])}</div>`;
       workspace.querySelectorAll("[data-team-player]").forEach(btn => btn.onclick = () => {
         workspace.querySelectorAll("[data-team-player]").forEach(x=>x.classList.remove("sel"));
@@ -316,7 +316,7 @@
     modal.className = "modal piModal";
     modal.innerHTML = `<div class="modalCard piShell"><button class="modalX">×</button>
       <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER INTELLIGENCE</small><h2>Elitzur Holon</h2><p>2026–27 preseason scouting workspace</p></div>
-      <div class="piRoster">${players.map((p,i)=>`<button data-player="${p.id}" class="${i===0?"sel":""}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
+      <div class="piRoster">${players.map((p,i)=>`<button data-player="${p.id}" class="${i===0?"sel":""}" id="player-${p.id}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
       <div id="piDetail">${playerDetail(players[0])}</div>
     </div>`;
     document.body.appendChild(modal);
@@ -337,4 +337,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
+  window.COURTIQ_BUILD = "072";
 })();
