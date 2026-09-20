@@ -308,13 +308,14 @@ async function openGameLibrary(){
     <small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Game Library</h2>
     <p>Persistent club games only. Demo and local browser data are excluded after sign-in.</p>
     <div class="libraryTop"><div><small>GAMES AVAILABLE</small><b>${items.length}</b></div><div><small>WORKFLOW</small><b>Import → Verify → Analyze → Report</b></div><button id="libraryImport" class="runImport">IMPORT GAME</button></div>
-    <div class="gameLibraryGrid">${cards}</div>
+    <div class="gameLibraryGrid">${cards}</div><h3 class="productSectionTitle">Men\'s Competitions</h3><button id="winnerCupTab" class="runImport">WINNER CUP</button>
     ${syncError?`<div class="insight warning">DATABASE · ${syncError}</div>`:""}<div class="insight">PILOT RULE · Tactical conclusions remain separate from verified box-score findings until video evidence is available.</div>
   </div>`;
   document.body.appendChild(modal);
   modal.querySelector(".modalX").onclick=()=>modal.remove();
   modal.onclick=e=>{if(e.target===modal)modal.remove()};
   modal.querySelector("#libraryImport").onclick=()=>{modal.remove();openAutoImport();};
+  modal.querySelector("#winnerCupTab").onclick=()=>{modal.remove();window.CourtIQMens?.openWinnerCup?.();};
   modal.querySelectorAll("[data-library-game]").forEach(btn=>btn.onclick=()=>{active=btn.dataset.libraryGame;modal.remove();render();window.scrollTo(0,0);});
 }
 function openAutoImport(){
@@ -352,7 +353,7 @@ async function openFullReport(){
   <h3>Key Findings</h3><div class="findings">${R.findings.map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]}</p><em>→ ${x[2]}</em></div>`).join("")}</div><h3>What Should I Watch?</h3><div class="videoList">${R.video_investigation.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div>${reportError?`<div class="insight warning">REPORT DATABASE · ${reportError}</div>`:""}<div class="insight">DATA → FINDING → INTERPRETATION → VIDEO VERIFICATION</div></div>`;
   document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();
 }
-function openMensD1Teams(){const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modalCard compareModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ · ISRAEL MENS BASKETBALL</small><h2>Israel Men&#39;s League D1 Teams</h2><p>Dedicated Division 1 workspace for CourtIQ validation. Men&#39;s data stays separate from the Maccabi Bnot Ashdod women&#39;s pilot.</p><div class="productEmpty"><b>MENS D1 DATASET</b><span>Winner League / Winner Cup games will appear here after verified import.</span></div><div class="insight"><b>QA WORKSPACE</b> · Import → Verify → Analyze → Report → Opponent Scouting</div></div>`;document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};}
+function openMensD1Teams(){if(window.CourtIQMens?.openTeams)return window.CourtIQMens.openTeams();}
 document.addEventListener("click",e=>{
   const item=e.target.closest(".menu div");
   if(!item) return;
