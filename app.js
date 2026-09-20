@@ -160,6 +160,44 @@ async function openCompare(){
   };
 }
 
+function openPilotDashboard(){
+  const modal=document.createElement("div"); modal.className="modal";
+  const stored=Object.values(games).filter(g=>g&&g.home&&g.away);
+  const verified=stored.filter(g=>String(g.sourceLabel||"").includes("CONFIRMED")).length;
+  const playerCount=window.CourtIQPlayers?.players?.length||0;
+  modal.innerHTML=`<div class="modalCard productHome"><button class="modalX">×</button>
+    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 084</b></div></div>
+    <div class="productStats">
+      <div><small>GAME LIBRARY</small><b>${stored.length}</b><span>${verified} verified imports</span></div>
+      <div><small>SCOUTING PLAYERS</small><b>${playerCount}</b><span>verified source samples</span></div>
+      <div><small>REPORT ENGINE</small><b>ACTIVE</b><span>game → report workflow</span></div>
+      <div><small>DATA POLICY</small><b>VERIFIED</b><span>no invented metrics</span></div>
+    </div>
+    <h3 class="productSectionTitle">Club Workflow</h3>
+    <div class="productModules">
+      <button data-product-action="games"><span>01</span><div><b>Games</b><small>Game library, verified imports and analysis</small></div><i>→</i></button>
+      <button data-product-action="import"><span>02</span><div><b>Import Game</b><small>Official source → validate → calculate → save</small></div><i>→</i></button>
+      <button data-product-action="players"><span>03</span><div><b>Player Intelligence</b><small>Scouting profiles with deterministic metrics</small></div><i>→</i></button>
+      <button data-product-action="compare"><span>04</span><div><b>Compare Players</b><small>Side-by-side samples without arbitrary scoring</small></div><i>→</i></button>
+      <button data-product-action="opponent"><span>05</span><div><b>Opponent Scouting</b><small>Stored-game signals and video questions</small></div><i>→</i></button>
+      <button data-product-action="report"><span>06</span><div><b>Game Report</b><small>Consistent evidence-first report for the active game</small></div><i>→</i></button>
+    </div>
+    <div class="productTrust"><b>COURTIQ ANALYSIS STANDARD</b><span>DATA → FINDING → INTERPRETATION → VIDEO VERIFICATION</span><small>Box-score evidence never becomes tactical causation without supporting video.</small></div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".modalX").onclick=()=>modal.remove();
+  modal.onclick=e=>{if(e.target===modal)modal.remove()};
+  modal.querySelectorAll("[data-product-action]").forEach(btn=>btn.onclick=()=>{
+    const action=btn.dataset.productAction; modal.remove();
+    if(action==="games") openGameLibrary();
+    if(action==="import") openAutoImport();
+    if(action==="players") window.CourtIQPlayers?.openPlayers();
+    if(action==="compare") window.CourtIQPlayers?.openPlayerCompare();
+    if(action==="opponent") openOpponentScout();
+    if(action==="report") openFullReport();
+  });
+}
+
 function openGameLibrary(){
   const modal=document.createElement("div"); modal.className="modal";
   const items=Object.entries(games).filter(([,g])=>g&&g.home&&g.away);
@@ -208,6 +246,7 @@ function openFullReport(){
 document.addEventListener("click",e=>{
   const item=e.target.closest(".menu div");
   if(!item) return;
+  if(item.textContent.includes("Dashboard")) openPilotDashboard();
   if(item.textContent.includes("Games")) openGameLibrary();
   if(item.textContent.includes("Opponent Scouting")) openOpponentScout();
   if(item.textContent.includes("Reports")) openFullReport();
