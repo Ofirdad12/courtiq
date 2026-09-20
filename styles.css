@@ -79,3 +79,14 @@ button:disabled{opacity:.48;cursor:not-allowed}.impStatus{min-height:18px;margin
 .reportModal h3{margin-top:22px}.reportModal .insight{line-height:1.55}
 .gameLibraryCard .libraryStatus{white-space:nowrap}
 @media(max-width:620px){.reportKpis{grid-template-columns:1fr 1fr}.modalCard{max-height:92vh;overflow:auto}.importFields{grid-template-columns:1fr}}
+
+/* Build 088: club roster separation, product-only empty states, readiness */
+.piFilters{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.piFilters button{border:1px solid #28324a;background:#101522;color:#aeb8ca;border-radius:999px;padding:8px 11px;font-size:9px;font-weight:800;letter-spacing:.06em;cursor:pointer}
+.piFilters button.sel{background:#20183a;color:#fff;border-color:#6f55b8}
+.piEmpty,.productEmpty{border:1px dashed #34405a;border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:7px;color:#9aa7bb;background:#0d121d}
+.piEmpty b,.productEmpty b{color:#e8edf7;font-size:11px;letter-spacing:.08em}
+.piEmpty span,.productEmpty span{font-size:10px;line-height:1.5}
+#dashboardDataStatus{line-height:1.65}
+#dashboardDataStatus b{color:#fff}
+@media(max-width:620px){.piFilters{display:grid;grid-template-columns:1fr 1fr}.piFilters button{width:100%}}
