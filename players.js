@@ -120,11 +120,9 @@
       competitions: [
         {
           name: "Israel WBL · Regular Season", club: "Hapoel Rishon LeZion", games: 11,
-          summaryOnly: true, mpg: 25.8, ppg: 10.1, rpg: 4.5, apg: 3.6,
-          twoPct: 51.2, threePct: 34.5, ftPct: 70.0,
-          drebpg: 3.7, orebpg: 0.7, foulsDrawnPg: 2.2, foulsPg: 1.5,
-          spg: 0.7, tovpg: 3.5, blocksForPg: 0.5, blocksAgainstPg: 0.3,
-          pir: 9.1, plusMinus: 122
+          minutes: 283.8, points: 111, rebounds: 50, assists: 40, turnovers: 39,
+          two_pm: 21, two_pa: 41, three_pm: 19, three_pa: 55, ftm: 13, fta: 19,
+          sourceNote: "Raw shooting totals reconstructed from official IBBA game box scores; season summary remains the cross-check."
         },
         {
           name: "Israel WBL · Playoffs", club: "Hapoel Rishon LeZion", games: 5, minutes: 166.1667, points: 61,
@@ -133,7 +131,7 @@
         }
       ],
       read: [
-        "The official IBBA regular-season table lists 11 games at 10.1 points, 4.5 rebounds and 3.6 assists in 25.8 minutes per game, with 34.5% three-point shooting.",
+        "The official IBBA regular-season sample is now stored with raw shooting totals from the game box scores. CourtIQ calculates 51.6% eFG, 53.3% TS and a 19.8% FT Rate from 96 field-goal attempts and 19 free-throw attempts.",
         "CourtIQ separately aggregated five official playoff box scores: 61 points, 34 rebounds and 31 assists in 166.2 minutes. The playoff sample produces a 1.94 AST/TO ratio.",
         "Her playoff shot mix was perimeter-heavy: 42 three-point attempts versus 19 two-point attempts. CourtIQ calculates 45.9% eFG and 47.9% TS from those verified playoff totals.",
         "A later signing report describes her full 16-game run at 11.2 points, 5.0 rebounds and 4.4 assists per game. CourtIQ keeps that report separate from the official regular-season table instead of blending incompatible samples."
@@ -186,7 +184,7 @@
     const minutesLabel = s.summaryOnly ? s.mpg : r1(s.minutes/s.games);
     const sourceTotals = s.summaryOnly
       ? `Published season averages · MPG ${s.mpg} · PPG ${s.ppg} · DREB ${s.drebpg ?? "—"} · OREB ${s.orebpg ?? "—"} · RPG ${s.rpg} · APG ${s.apg} · 2P% ${s.twoPct} · 3P% ${s.threePct} · FT% ${s.ftPct} · STL ${s.spg} · TO ${s.tovpg} · PF ${s.foulsPg ?? "—"} · BLK ${s.blocksForPg ?? "—"} · PIR ${s.pir ?? "—"} · +/- ${s.plusMinus ?? "—"}`
-      : `MIN ${s.minutes} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}`;
+      : `MIN ${r1(s.minutes)} · PTS ${s.points} · 2P ${s.two_pm}/${s.two_pa} · 3P ${s.three_pm}/${s.three_pa} · FT ${s.ftm}/${s.fta} · REB ${s.rebounds} · AST ${s.assists} · TO ${s.turnovers}`;
     const phase = /regular season/i.test(s.name) ? "REGULAR SEASON" : (/playoffs/i.test(s.name) ? "PLAYOFFS" : s.name);
     return `<div class="piComp card">
       <div class="piPhase">${phase}</div>
