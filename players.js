@@ -442,23 +442,48 @@
     draw();
   }
 
-  function openPlayers() {
+  function openPlayers(initialFilter = "all") {
     const modal = document.createElement("div");
     modal.className = "modal piModal";
+    const statusOf = p => p.rosterStatus || "scouting";
+    const counts = {
+      roster: players.filter(p=>statusOf(p)==="roster").length,
+      scouting: players.filter(p=>statusOf(p)==="scouting").length,
+      opponent: players.filter(p=>statusOf(p)==="opponent").length
+    };
     modal.innerHTML = `<div class="modalCard piShell"><button class="modalX">×</button>
-      <div class="piTop"><small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Player Intelligence</h2><p>2026–27 scouting board · verified player samples</p></div>
-      <div class="piRoster">${players.map((p,i)=>`<button data-player="${p.id}" class="${i===0?"sel":""}" id="player-${p.id}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
-      <div id="piDetail">${playerDetail(players[0])}</div>
+      <div class="piTop"><small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Player Intelligence</h2><p>Club roster and scouting database are kept as separate product records.</p></div>
+      <div class="piFilters">
+        <button data-pfilter="all">ALL · ${players.length}</button>
+        <button data-pfilter="roster">ASHDOD ROSTER · ${counts.roster}</button>
+        <button data-pfilter="scouting">SCOUTING · ${counts.scouting}</button>
+        <button data-pfilter="opponent">OPPONENT · ${counts.opponent}</button>
+      </div>
+      <div class="piRoster" id="piRoster"></div>
+      <div id="piDetail"></div>
     </div>`;
     document.body.appendChild(modal);
     modal.querySelector(".modalX").onclick = () => modal.remove();
     modal.onclick = e => { if (e.target === modal) modal.remove(); };
-    modal.querySelectorAll("[data-player]").forEach(btn => btn.onclick = () => {
-      modal.querySelectorAll("[data-player]").forEach(x=>x.classList.remove("sel"));
-      btn.classList.add("sel");
-      const p = players.find(x=>x.id===btn.dataset.player);
-      modal.querySelector("#piDetail").innerHTML = playerDetail(p);
-    });
+
+    function draw(filter){
+      modal.querySelectorAll("[data-pfilter]").forEach(x=>x.classList.toggle("sel",x.dataset.pfilter===filter));
+      const list=players.filter(p=>filter==="all"||statusOf(p)===filter);
+      const roster=modal.querySelector("#piRoster"),detail=modal.querySelector("#piDetail");
+      if(!list.length){
+        roster.innerHTML="";
+        detail.innerHTML=`<div class="piEmpty"><b>${filter==="roster"?"ASHDOD ROSTER NOT LOADED YET":"NO PLAYER RECORDS"}</b><span>CourtIQ will not move scouting players into the club roster without verified roster data.</span></div>`;
+        return;
+      }
+      roster.innerHTML=list.map((p,i)=>`<button data-player="${p.id}" class="${i===0?"sel":""}">${p.name}<small>${p.position} · ${statusOf(p).toUpperCase()}</small></button>`).join("");
+      detail.innerHTML=playerDetail(list[0]);
+      roster.querySelectorAll("[data-player]").forEach(btn=>btn.onclick=()=>{
+        roster.querySelectorAll("[data-player]").forEach(x=>x.classList.remove("sel"));btn.classList.add("sel");
+        const p=list.find(x=>x.id===btn.dataset.player);detail.innerHTML=playerDetail(p);
+      });
+    }
+    modal.querySelectorAll("[data-pfilter]").forEach(btn=>btn.onclick=()=>draw(btn.dataset.pfilter));
+    draw(initialFilter);
   }
 
   function replacePlayers(databaseRows) {
@@ -477,7 +502,7 @@
       return {
         id: "db-" + p.id,
         name: p.name,
-        team: row.roster_status === "roster" ? "Maccabi Bnot Ashdod" : "Scouting Database",
+        team: row.roster_status === "roster" ? "Maccabi Bnot Ashdod" : (row.roster_status === "opponent" ? "Opponent Database" : "Scouting Database"),\n        rosterStatus: row.roster_status,
         position: p.position || "—",
         season: row.season,
         source: analysis.source || competitions[0]?.source_label || "CourtIQ database",
@@ -502,5 +527,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
-  window.COURTIQ_BUILD = "087";
+  window.COURTIQ_BUILD = "088";
 })();
