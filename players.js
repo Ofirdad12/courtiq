@@ -319,6 +319,7 @@
     </div>
     <div class="piSource">SOURCE · ${p.source} · Advanced metrics calculated by CourtIQ from displayed totals.</div>
     ${p.id==="tal-lev"?'<div class="piSampleNotice"><b>2025–26 DATA SPLIT</b><span>Regular Season and Playoffs are shown as separate verified samples below.</span></div>':""}
+    ${p.id==="stasha-carey"?'<div class="reportKpis"><div><small>2025–26 PPG</small><b>11.1</b><span>Maccabi Bnot Ashdod</span></div><div><small>RPG</small><b>7.5</b><span>Published season average</span></div><div><small>APG</small><b>2.0</b><span>Published season average</span></div></div>':""}
     <div class="piCompare">${p.competitions.map(competitionCard).join("")}</div>
     <div class="piDelta card piSignal">
       <h3>Competition Signal</h3>
@@ -403,5 +404,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "077";
+  window.COURTIQ_BUILD = "078";
 })();
