@@ -87,6 +87,35 @@
     return jsonFetch("/rest/v1/game_reports?select=id,game_id,report_version,payload,updated_at&game_id=eq." + Number(gameId) + "&order=updated_at.desc");
   }
 
+  async function importRuns(clubId) {
+    return jsonFetch("/rest/v1/import_runs?select=id,provider,source_url,external_id,status,validation,error_message,game_id,created_at&club_id=eq." + Number(clubId) + "&order=created_at.desc&limit=20");
+  }
+
+  async function productHealth() {
+    const w = await workspace();
+    const roster = (w.clubPlayers || []).filter(r => r.roster_status === "roster");
+    const scouting = (w.clubPlayers || []).filter(r => r.roster_status === "scouting");
+    const opponent = (w.clubPlayers || []).filter(r => r.roster_status === "opponent");
+    const gameIds = (w.games || []).map(g => g.id);
+    const [runs, reports] = await Promise.all([
+      importRuns(w.club.id),
+      gameIds.length ? jsonFetch("/rest/v1/game_reports?select=id,game_id,report_version,updated_at&game_id=in.(" + gameIds.join(",") + ")") : Promise.resolve([])
+    ]);
+    return {
+      club: w.club,
+      counts: {games:w.games.length,reports:reports.length,roster:roster.length,scouting:scouting.length,opponent:opponent.length},
+      latestImport: runs[0] || null,
+      importRuns: runs,
+      checks: {
+        secureWorkspace: true,
+        rosterLoaded: roster.length > 0,
+        realGameImported: w.games.length > 0,
+        reportPersisted: reports.length > 0,
+        importValidated: runs.some(r => r.status === "success" && r.validation?.home?.status === "passed" && r.validation?.away?.status === "passed")
+      }
+    };
+  }
+
   async function importOfficialGame(url) {
     const session = readSession();
     if (!session?.access_token) throw new Error("Sign in before importing a game.");
@@ -112,7 +141,7 @@
   }
 
   window.CourtIQData = {
-    signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importOfficialGame,
+    signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
