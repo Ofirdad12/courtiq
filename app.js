@@ -42,7 +42,6 @@ document.querySelector("#compareTeams").onclick=openCompare;
 document.querySelector("#autoImport").onclick=openAutoImport;
 document.querySelector("#opponentScout").onclick=openOpponentScout;
 document.querySelector("#fullReport").onclick=openFullReport;
-const comparePlayersBtn=document.querySelector("#comparePlayers"); if(comparePlayersBtn) comparePlayersBtn.onclick=()=>window.CourtIQPlayers?.openPlayerCompare();
 }
 
 function csvRows(text){
