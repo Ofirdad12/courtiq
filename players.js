@@ -213,6 +213,7 @@
         "Point-of-attack defense — verify how the 3.7 steals per game youth sample was created and whether it reflects pressure, passing-lane activity or scheme.",
         "Role translation to Holon — evaluate on-ball versus off-ball usage next to the club's established creators."
       ]
+    }
   ];
 
   const r1 = n => Math.round(n * 10) / 10;
@@ -372,5 +373,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "072";
+  window.COURTIQ_BUILD = "075";
 })();
