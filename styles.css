@@ -43,3 +43,13 @@
 .pcTableWrap{padding:0;overflow:auto}.pcTable{min-width:620px}.pcTable th,.pcTable td{text-align:center}.pcTable th:first-child,.pcTable td:first-child{text-align:left}
 .pcNotes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 @media(max-width:700px){.playerCompareControls{grid-template-columns:1fr}.pcVs{height:auto}.pcIdentity{grid-template-columns:1fr}.pcIdentity .right{text-align:left}.pcNotes{grid-template-columns:1fr}}
+
+
+/* Build 083: product game library */
+.gameLibrary{max-width:1000px}.libraryTop{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;margin:16px 0}
+.libraryTop>div{padding:12px;border:1px solid #27314a;border-radius:9px;background:#0d1422}.libraryTop small,.libraryTop b{display:block}.libraryTop small{font-size:8px;color:var(--muted);letter-spacing:.8px}.libraryTop b{font-size:12px;margin-top:4px}
+.gameLibraryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;margin:14px 0}
+.gameLibraryCard{text-align:left;background:#0b1524;border:1px solid var(--line);border-radius:11px;color:#fff;padding:15px;cursor:pointer}
+.gameLibraryCard:hover{border-color:#8e79ff;background:#111b31}.gameLibraryCard>div{display:flex;justify-content:space-between;gap:8px}.gameLibraryCard small{color:var(--muted);font-size:8px}.libraryStatus{font-size:8px;font-weight:900;color:#b9a8ff;letter-spacing:.5px}
+.gameLibraryCard h3{font-size:13px;margin:16px 0}.gameLibraryCard h3 b{color:#d8ceff;margin:0 5px}.gameLibraryCard footer{display:flex;justify-content:space-between;border-top:1px solid #1d2a3d;padding-top:10px;font-size:8px;font-weight:900;color:#aeb9ca}
+@media(max-width:700px){.libraryTop{grid-template-columns:1fr}.gameLibraryGrid{grid-template-columns:1fr}}
