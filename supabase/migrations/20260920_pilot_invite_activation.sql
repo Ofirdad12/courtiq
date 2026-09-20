@@ -15,10 +15,10 @@ revoke all on public.pilot_invites from anon, authenticated;
 create index if not exists pilot_invites_club_idx on public.pilot_invites(club_id);
 
 insert into public.pilot_invites (club_id,invitee_name,role)
-select id,'Odelia Madmon Rival','coach'
+select id,'אודליה מדמון ריב״ל','coach'
 from public.clubs
 where slug='maccabi-bnot-ashdod'
 and not exists (
   select 1 from public.pilot_invites
-  where invitee_name='Odelia Madmon Rival' and status='pending'
+  where invitee_name='אודליה מדמון ריב״ל' and status='pending'
 );
