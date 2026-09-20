@@ -61,7 +61,7 @@ function basketTeamTotal($:cheerio.CheerioAPI, table:any){
   let hi=rows.findIndex((r:string[])=>r.some(h=>/2pt|2 נק/i.test(h))&&r.some(h=>/3pt|3 נק/i.test(h)));
   if(hi<0) hi=0;
   const headers=rows[hi];
-  let total=rows.slice(hi+1).find((r:string[])=>r.some(c=>/^(total|totals|סה.?כ|סך הכל)$/i.test(clean(c))));
+  let total=rows.slice(hi+1).find((r:string[])=>r.some(c=>/^(total|totals|team|סה.?כ|סך הכל)$/i.test(clean(c))));
   if(!total) total=rows.slice(hi+1).reverse().find((r:string[])=>r.length>=headers.length-2 && r.some(c=>/\d/.test(c)));
   if(!total) throw new Error("Winner League box score has no readable team total row.");
   const [two_pm,two_pa]=ma(total[idxAny(headers,["2PT","2 נק"])]);
@@ -149,7 +149,7 @@ Deno.serve(async(req:Request)=>{
     const parsed=validateUrl(String(body.url||""));
     const u=parsed.u, provider=parsed.provider;
     auditUrl=u.toString();
-    const fetchUrl=new URL(u.toString()); if(provider==="WINNER_LEAGUE") fetchUrl.searchParams.set("lang","en");
+    const fetchUrl=new URL(u.toString());
 
     const res=await fetch(fetchUrl.toString(),{headers:{"User-Agent":"CourtIQ/1.0 basketball analytics pilot"}});
     if(!res.ok) throw new Error("Official source returned HTTP "+res.status);
@@ -168,7 +168,15 @@ Deno.serve(async(req:Request)=>{
       $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
     }else{
       [homeName,awayName]=basketNames($);
-      $("table").each((_:number,t:any)=>{const h=tableRows($,t).slice(0,3).flat().join(" | ");if(/2PT|2 נק/i.test(h)&&/3PT|3 נק/i.test(h)&&/(TO|TOV|אב|איב)/i.test(h)&&/(AS|AST|אס)/i.test(h))playerTables.push(t);});
+      $("table").each((_:number,t:any)=>{
+        const h=tableRows($,t).slice(0,6).flat().join(" | ");
+        if(/(2PT|2P|2 נק|2\s*נק)/i.test(h)&&/(3PT|3P|3 נק|3\s*נק)/i.test(h)&&/(TO|TOV|אב|איב)/i.test(h)&&/(AS|AST|אס)/i.test(h)) playerTables.push(t);
+      });
+      if(playerTables.length<2){
+        const scripts=$("script").map((_:number,s:any)=>$(s).html()||"").get().join("\n");
+        const apiUrls=[...scripts.matchAll(/["']([^"']*(?:stat|box|game)[^"']*(?:asp|json|api)[^"']*)["']/ig)].map((m:any)=>m[1]).filter((x:string)=>/game|stat|box/i.test(x));
+        throw new Error("Winner League page loaded but box-score data is not in server-rendered tables. Dynamic endpoints detected: "+apiUrls.slice(0,3).join(", "));
+      }
     }
     if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
     if(playerTables.length<2) throw new Error(provider==="WINNER_LEAGUE"?"Could not locate both Winner League box-score tables. The game may not have a published box score yet.":"Could not locate both IBBA box-score tables.");
@@ -224,7 +232,7 @@ Deno.serve(async(req:Request)=>{
       try{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
-          club_id:auditClubId,provider:"IBBA",source_url:auditUrl,external_id:auditExternalId,
+          club_id:auditClubId,provider:auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
           status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v1":"ibba-v2"}
         });
       }catch(_){}
