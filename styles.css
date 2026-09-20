@@ -24,3 +24,22 @@
 
 /* Build 073: productized import, opponent scouting and full reports */
 .workflowSteps{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;margin:18px 0;padding:14px;border:1px solid #27314a;border-radius:10px;background:#0d1422}.workflowSteps b{font-size:10px;letter-spacing:.7px;color:#b9a8ff}.workflowSteps span{font-size:11px;color:#d8e0eb}.reportKpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:14px 0}.reportKpis>div{padding:12px;border:1px solid #27314a;border-radius:9px;background:#0d1422}.reportKpis small,.reportKpis span{display:block;color:#8491a7;font-size:9px}.reportKpis b{display:block;margin:4px 0;font-size:16px}.reportModal{max-width:980px}.reportModal h3{margin-top:22px}@media(max-width:680px){.workflowSteps{grid-template-columns:1fr}.reportModal{max-width:96vw}}
+
+
+/* Build 081: Product V1 shell + player comparison */
+.user small{display:block;font-size:7px;letter-spacing:1px;color:var(--muted);margin-bottom:2px}
+.comparePlayersShell{max-width:1050px}
+.playerCompareControls{display:grid;grid-template-columns:1fr 54px 1fr;gap:14px;align-items:end;margin:18px 0}
+.playerCompareControls>div:not(.pcVs){display:grid;grid-template-columns:1fr;gap:7px}
+.playerCompareControls label{font-size:8px;letter-spacing:1px;color:#9aa7bb;font-weight:900}
+.playerCompareControls select{width:100%;background:#0b1524;border:1px solid #27314a;border-radius:8px;color:#eef2f8;padding:11px;font:inherit;font-size:11px}
+.pcVs{display:grid;place-items:center;height:42px;font-size:10px;font-weight:900;color:#b9a8ff}
+.pcIdentity{display:grid;grid-template-columns:1fr 150px 1fr;gap:12px;align-items:center;padding:14px 0}
+.pcIdentity>div:not(.pcConfidence){display:grid;gap:3px}
+.pcIdentity b{font-size:17px}.pcIdentity span,.pcIdentity small{font-size:9px;color:var(--muted)}
+.pcIdentity .right{text-align:right}
+.pcConfidence{text-align:center;padding:10px;border:1px solid #5d4bb0;border-radius:10px;background:#151432}
+.pcConfidence b,.pcConfidence span{display:block}.pcConfidence b{font-size:22px;color:#d8ceff}.pcConfidence span{font-size:8px;text-transform:uppercase;letter-spacing:.7px}
+.pcTableWrap{padding:0;overflow:auto}.pcTable{min-width:620px}.pcTable th,.pcTable td{text-align:center}.pcTable th:first-child,.pcTable td:first-child{text-align:left}
+.pcNotes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media(max-width:700px){.playerCompareControls{grid-template-columns:1fr}.pcVs{height:auto}.pcIdentity{grid-template-columns:1fr}.pcIdentity .right{text-align:left}.pcNotes{grid-template-columns:1fr}}
