@@ -362,6 +362,7 @@ document.addEventListener("click",e=>{
   if(!item) return;
   if(item.textContent.includes("Dashboard")) openPilotDashboard();
   if(item.textContent.includes("Games")) openGameLibrary();
+  if(item.textContent.trim()==="◉ Teams" || item.textContent.trim()==="Teams") openMensD1Teams();
   if(item.textContent.includes("Israel Men")) openMensD1Teams();
   if(item.textContent.includes("Opponent Scouting")) openOpponentScout();
   if(item.textContent.includes("Reports")) openFullReport();
