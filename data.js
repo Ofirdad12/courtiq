@@ -25,6 +25,13 @@
     if (!res.ok) throw new Error(body?.msg || body?.message || body?.error_description || body?.hint || "CourtIQ data request failed");
     return body;
   }
+  async function createPilotAccount(email, password, inviteCode) {
+    return jsonFetch("/functions/v1/create-pilot-account", {
+      method: "POST",
+      body: JSON.stringify({email, password, invite_code: inviteCode})
+    }, false);
+  }
+
   async function signIn(email, password) {
     const session = await jsonFetch("/auth/v1/token?grant_type=password", {
       method: "POST", body: JSON.stringify({email, password})
@@ -141,7 +148,7 @@
   }
 
   window.CourtIQData = {
-    signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
