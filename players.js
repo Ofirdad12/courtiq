@@ -389,7 +389,7 @@
     modal.className = "modal piModal";
     const defaultIndex = players.length > 1 ? 1 : 0;
     modal.innerHTML = `<div class="modalCard piShell comparePlayersShell"><button class="modalX">×</button>
-      <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER COMPARISON</small><h2>Compare Players</h2><p>Side-by-side verified performance signals. CourtIQ does not create an overall player score.</p></div>
+      <div class="piTop"><small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Compare Players</h2><p>Scouting comparison using verified performance samples. CourtIQ does not create an overall player score.</p></div>
       <div class="playerCompareControls">
         <div><label>PLAYER A</label><select id="pcPlayerA">${players.map((p,i)=>`<option value="${p.id}" ${i===0?"selected":""}>${p.name}</option>`).join("")}</select><select id="pcSampleA"></select></div>
         <div class="pcVs">VS</div>
@@ -446,7 +446,7 @@
     const modal = document.createElement("div");
     modal.className = "modal piModal";
     modal.innerHTML = `<div class="modalCard piShell"><button class="modalX">×</button>
-      <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER INTELLIGENCE</small><h2>Elitzur Holon</h2><p>2026–27 preseason scouting workspace</p></div>
+      <div class="piTop"><small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Player Intelligence</h2><p>2026–27 scouting board · verified player samples</p></div>
       <div class="piRoster">${players.map((p,i)=>`<button data-player="${p.id}" class="${i===0?"sel":""}" id="player-${p.id}">${p.name}<small>${p.position}</small></button>`).join("")}</div>
       <div id="piDetail">${playerDetail(players[0])}</div>
     </div>`;
@@ -470,5 +470,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare };
-  window.COURTIQ_BUILD = "081";
+  window.COURTIQ_BUILD = "082";
 })();
