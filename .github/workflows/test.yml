@@ -22,5 +22,6 @@ jobs:
           PYTHONPATH: .
       - name: Check browser JavaScript syntax
         run: |
+          node --check data.js
           node --check app.js
           node --check players.js
