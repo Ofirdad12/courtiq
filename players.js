@@ -213,6 +213,36 @@
         "Point-of-attack defense — verify how the 3.7 steals per game youth sample was created and whether it reflects pressure, passing-lane activity or scheme.",
         "Role translation to Holon — evaluate on-ball versus off-ball usage next to the club's established creators."
       ]
+    },
+    {
+      id: "stasha-carey",
+      name: "Stasha Carey",
+      team: "Elitzur Holon",
+      position: "Power Forward",
+      season: "2025–26",
+      source: "Published 2025–26 Maccabi Ashdod season summary · FIBA identity cross-check",
+      sourceUrl: "https://www.fiba.basketball/en/players/272992-stasha-carey",
+      competitions: [
+        {
+          name: "Israel WBL · 2025–26", club: "Maccabi Bnot Ashdod",
+          summaryOnly: true, games: null, mpg: null, ppg: 11.1, rpg: 7.5, apg: 2.0,
+          tovpg: null, drebpg: null, orebpg: null, twoPct: null, threePct: null, ftPct: null,
+          spg: null, foulsPg: null, blocksForPg: null, pir: null, plusMinus: null
+        }
+      ],
+      read: [
+        "A published 2025–26 Maccabi Ashdod season summary lists Carey at 11.1 points, 7.5 rebounds and 2.0 assists per game.",
+        "FIBA lists Carey as a 188 cm American forward, providing an identity cross-check for the player record.",
+        "The available 2025–26 summary does not expose verified shooting attempts, turnovers or minutes. CourtIQ therefore does not calculate eFG%, TS%, AST/TO, 3P Rate, FT Rate or per-40 metrics from this sample.",
+        "Carey's box-score profile supports describing her as a productive rebounder in the Ashdod sample; tactical role and action type remain video-verification questions."
+      ],
+      video: [
+        "Interior usage — classify touches by post-up, roll, cut, seal and offensive-rebound possession.",
+        "Rebounding — separate box-out wins, pursuit rebounds and put-backs to understand the 7.5 RPG profile.",
+        "Screen game — verify roll frequency, short-roll decisions and screening impact.",
+        "Defensive role — identify primary matchups, pick-and-roll coverage and rim-protection responsibilities.",
+        "Transition to Holon — evaluate how her interior usage fits alongside Holon's existing creators and spacing."
+      ]
     }
   ];
 
@@ -373,5 +403,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams };
-  window.COURTIQ_BUILD = "075";
+  window.COURTIQ_BUILD = "076";
 })();
