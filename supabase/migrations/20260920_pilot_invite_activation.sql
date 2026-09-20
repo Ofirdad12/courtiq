@@ -12,6 +12,8 @@ create table if not exists public.pilot_invites (
 );
 alter table public.pilot_invites enable row level security;
 revoke all on public.pilot_invites from anon, authenticated;
+create policy "deny_direct_pilot_invite_access" on public.pilot_invites
+for all to anon, authenticated using (false) with check (false);
 create index if not exists pilot_invites_club_idx on public.pilot_invites(club_id);
 
 insert into public.pilot_invites (club_id,invitee_name,role)
