@@ -198,6 +198,30 @@ function openAccount(mode="signin"){
 
   const draw=()=>{
     const body=modal.querySelector("#accountBody");
+    if(view==="reset"){
+      body.innerHTML=`<h2>Set New Password</h2>
+        <p>Create a new password for your CourtIQ account.</p>
+        <div class="importFields">
+          <input id="newPassword" type="password" autocomplete="new-password" placeholder="New password · 10+ characters">
+          <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="Confirm new password">
+        </div>
+        <div id="accountStatus" class="impStatus"></div>
+        <button id="savePassword" class="runImport">UPDATE PASSWORD</button>
+        <div class="schema">The recovery link is verified by Supabase Auth. CourtIQ never stores your password.</div>`;
+      body.querySelector("#savePassword").onclick=async()=>{
+        const status=body.querySelector("#accountStatus"),p=body.querySelector("#newPassword").value,c=body.querySelector("#confirmPassword").value;
+        try{
+          if(p.length<10) throw new Error("Password must contain at least 10 characters.");
+          if(p!==c) throw new Error("Passwords do not match.");
+          status.textContent="Updating password…";
+          await data.updatePassword(p);
+          status.textContent="Password updated securely.";
+          setTimeout(()=>{modal.remove();render();openAccount();},500);
+        }catch(e){status.textContent=e.message}
+      };
+      return;
+    }
+
     if(signed){
       body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Club data is protected by Supabase Row Level Security.</p><div id="accountStatus" class="impStatus"></div><button id="loadClub" class="runImport">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
       body.querySelector("#loadClub").onclick=async()=>{
@@ -246,9 +270,19 @@ function openAccount(mode="signin"){
       <div class="importFields"><input id="loginEmail" type="email" autocomplete="username" placeholder="Email"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password"></div>
       <div id="accountStatus" class="impStatus"></div>
       <button id="signIn" class="runImport">SIGN IN</button>
+      <button id="forgotPassword" class="accountSecondary">FORGOT PASSWORD?</button>
       <button id="showActivate" class="accountSecondary">ACTIVATE PILOT INVITE</button>
-      <div class="schema">Pilot access is club-scoped. Public demo data remains separate from the secure workspace.</div>`;
+      <div class="schema">Pilot access is club-scoped. Password recovery is handled securely by Supabase Auth.</div>`;
     body.querySelector("#showActivate").onclick=()=>{view="activate";draw();};
+    body.querySelector("#forgotPassword").onclick=()=>{
+      body.innerHTML=`<h2>Reset Password</h2><p>Enter your CourtIQ account email. If an account exists, you will receive a secure reset link.</p><div class="importFields"><input id="resetEmail" type="email" autocomplete="email" placeholder="Email"></div><div id="accountStatus" class="impStatus"></div><button id="sendReset" class="runImport">SEND RESET LINK</button><button id="backSignIn" class="accountSecondary">BACK TO SIGN IN</button><div class="schema">For security, CourtIQ does not reveal whether an email address is registered.</div>`;
+      body.querySelector("#backSignIn").onclick=()=>{view="signin";draw();};
+      body.querySelector("#sendReset").onclick=async()=>{
+        const status=body.querySelector("#accountStatus"),email=body.querySelector("#resetEmail").value.trim();
+        try{if(!email)throw new Error("Enter your email address.");status.textContent="Sending secure reset link…";await data.requestPasswordReset(email);status.textContent="If this email is registered, a password reset link has been sent.";}
+        catch(e){status.textContent="Could not send the reset link. Please try again.";}
+      };
+    };
     body.querySelector("#signIn").onclick=async()=>{
       const status=body.querySelector("#accountStatus");
       const email=body.querySelector("#loginEmail").value.trim(),password=body.querySelector("#loginPassword").value;
@@ -373,5 +407,7 @@ document.addEventListener("click",e=>{
   if(item.textContent.includes("Reports")) openFullReport();
 });
 
+const recoveryMode=window.CourtIQData?.recoverySessionFromUrl?.()||false;
 render();
-if(new URLSearchParams(location.search).get("invite")) setTimeout(()=>openAccount("activate"),0);
+if(recoveryMode) setTimeout(()=>openAccount("reset"),0);
+else if(new URLSearchParams(location.search).get("invite")) setTimeout(()=>openAccount("activate"),0);
