@@ -12,7 +12,7 @@ const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.
 const j = (body: unknown, status=200) => new Response(JSON.stringify(body), {status, headers:cors});
 const clean=(s:string)=>s.replace(/\s+/g," ").trim();
 const num=(s:string)=>{const m=clean(s).replaceAll(",","").match(/-?\d+/); if(!m) throw new Error("Expected numeric value: "+s); return Number(m[0]);};
-const ma=(s:string)=>{const m=clean(s).match(/(\d+)\s*-\s*(\d+)/); if(!m) throw new Error("Expected made-attempted value: "+s); return [Number(m[1]),Number(m[2])];};
+const ma=(s:string)=>{const m=clean(s).match(/(\d+)\s*[-/\u2013\u2014]\s*(\d+)/); if(!m) throw new Error("Expected made-attempted value: "+s); return [Number(m[1]),Number(m[2])];};
 const pct=(a:number,b:number)=>b?Math.round(a/b*1000)/10:0;
 const r1=(n:number)=>Math.round(n*10)/10;
 
@@ -26,7 +26,11 @@ function validateUrl(raw:string){
   return {u, provider:isBasket?"WINNER_LEAGUE":"IBBA"};
 }
 function tableRows($:cheerio.CheerioAPI, table:any){
-  return $(table).find("tr").map((_:number,tr:any)=>$(tr).find("th,td").map((__:number,c:any)=>clean($(c).text())).get()).get();
+  // Cheerio's map() flattens arrays returned by the callback. Use a native
+  // array map so every table row remains a distinct string array.
+  return $(table).find("tr").toArray().map((tr:any)=>
+    $(tr).find("th,td").toArray().map((c:any)=>clean($(c).text()))
+  );
 }
 function idx(headers:string[], needles:string[]){
   const i=headers.findIndex(h=>needles.some(n=>h.includes(n)));
@@ -214,7 +218,7 @@ Deno.serve(async(req:Request)=>{
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="WINNER_LEAGUE"?"basket-v1":"ibba-v2",
+      parser:provider==="WINNER_LEAGUE"?"basket-v2":"ibba-v2",
       validated_at:new Date().toISOString()
     };
 
@@ -271,7 +275,7 @@ Deno.serve(async(req:Request)=>{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
           club_id:auditClubId,provider:auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v1":"ibba-v2"}
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v2":"ibba-v2"}
         });
       }catch(_){}
     }
