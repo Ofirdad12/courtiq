@@ -32,7 +32,21 @@ function splitLine(label,x){return x?`<div class="insight"><b>${label}</b> · TS
 function gameRow(g,dbMap=new Map()){
  const score=g.status==="FINAL"?`<b>${g.hs}–${g.as}</b>`:`<b>${g.time||"TBD"}</b>`,ui=g.gameId?dbMap.get(String(g.gameId)):null;
  const advanced=ui?`<div class="insight"><b>COURTIQ VERIFIED</b> · ${ui.metrics?.slice(0,3).map(x=>x[0]+": "+x[1]+" / "+x[2]).join(" · ")||""}</div>${ui.splits?`<div class="insight"><b>Starters vs Bench TS</b> · Home ${ui.splits.home.starters.ts}% / ${ui.splits.home.bench.ts}% · Away ${ui.splits.away.starters.ts}% / ${ui.splits.away.bench.ts}%</div>`:""}${ui.extra?`<div class="insight"><b>Play PTS</b> · Paint ${ui.extra.home.paint_points}–${ui.extra.away.paint_points} · ATO PTS ${ui.extra.home.points_off_turnovers}–${ui.extra.away.points_off_turnovers} · 2nd Chance ${ui.extra.home.second_chance_points}–${ui.extra.away.second_chance_points}</div>`:""}`:"";
- return `<div class="gameLibraryCard"><div><span class="libraryStatus">● ${g.status}</span><small>${g.date} · Winner Cup${g.gameId?" · #"+g.gameId:""}${g.note?" · "+g.note:""}</small></div><h3>${g.home} ${score} ${g.away}</h3>${advanced}</div>`
+ return `<button class="gameLibraryCard mensGameCard" data-winner-game="${g.gameId||""}"><div><span class="libraryStatus">● ${g.status}</span><small>${g.date} · Winner Cup${g.gameId?" · #"+g.gameId:""}${g.note?" · "+g.note:""}</small></div><h3>${g.home} ${score} ${g.away}</h3>${advanced}<footer><span>${ui?"OPEN ADVANCED GAME":"IMPORT & CALCULATE"}</span><b>→</b></footer></button>`
+}
+function bindWinnerGames(root,dbMap){
+ root.querySelectorAll("[data-winner-game]").forEach(b=>b.onclick=async()=>{
+  const id=b.dataset.winnerGame;if(!id)return;let ui=dbMap.get(String(id));
+  try{
+   if(!ui){
+    if(!window.CourtIQData?.isSignedIn()) throw new Error("Sign in to import and calculate this official game.");
+    const g=MEN_D1_WINNER_CUP_2026.find(x=>String(x.gameId)===String(id)); if(!g?.source) throw new Error("Official source is not loaded for this game.");
+    const old=b.innerHTML;b.disabled=true;b.innerHTML=old+"<div class=\"insight\">Importing official box score and calculating…</div>";
+    const result=await window.CourtIQData.importOfficialGame(g.source);ui=result.ui;dbMap.set(String(id),ui);
+   }
+   window.CourtIQOpenGame?.(ui);
+  }catch(e){alert(e.message||String(e));}finally{b.disabled=false}
+ });
 }
 async function loadWinnerWorkspace(){try{return window.CourtIQData?.isSignedIn()?await window.CourtIQData.workspace():null}catch(e){console.warn("Winner Cup workspace sync failed",e);return null}}
 async function openWinnerCup(){
@@ -42,6 +56,7 @@ async function openWinnerCup(){
  const body=mensTeams().map(([team,gs])=>`<section><h3>${team}</h3><div class="gameLibraryGrid">${gs.map(g=>gameRow(g,dbMap)).join("")}</div></section>`).join("");
  const card=modal.querySelector(".modalCard");card.innerHTML=`<button class="modalX">×</button><small class="eyebrow">ISRAEL MEN'S LEAGUE D1 · 2026/27</small><h2>Winner Cup · Games by Team</h2><p>Every team owns its Winner Cup matchups. Advanced metrics appear after verified official box-score ingestion.</p>${body}<div class="insight"><b>DATA CONFIRMED</b> · Team grouping uses the official Winner Cup schedule. Advanced fields are shown only from saved verified imports.</div>`;
  card.querySelector(".modalX").onclick=()=>modal.remove();
+ bindWinnerGames(card,dbMap);
 }
 async function openMensTeams(){
  const modal=document.createElement("div");modal.className="modal";
@@ -50,6 +65,6 @@ async function openMensTeams(){
  const card=modal.querySelector(".modalCard");
  card.innerHTML=`<button class="modalX">×</button><small class="eyebrow">COURTIQ · ISRAEL MEN'S LEAGUE D1</small><h2>Teams</h2><p>Winner Cup games and verified analytics grouped by team.</p><div class="gameLibraryGrid">${mensTeams().map(([team,gs])=>{const f=gs.filter(g=>g.status==="FINAL");const w=f.filter(g=>(g.home===team?g.hs:g.as)>(g.home===team?g.as:g.hs)).length;return `<button class="gameLibraryCard mensTeamCard" data-team="${team.replace(/"/g,"&quot;")}"><div><span class="libraryStatus">● WINNER CUP</span><small>${f.length} completed · ${w}-${f.length-w}</small></div><h3>${team}</h3><footer><span>VIEW TEAM GAMES + ANALYTICS</span><b>→</b></footer></button>`}).join("")}</div><div id="mensTeamGames"></div>`;
  card.querySelector(".modalX").onclick=()=>modal.remove();
- card.querySelectorAll("[data-team]").forEach(b=>b.onclick=()=>{const team=b.dataset.team,gs=MEN_D1_WINNER_CUP_2026.filter(g=>g.home===team||g.away===team);card.querySelector("#mensTeamGames").innerHTML=`<h3>${team} · Winner Cup Matchups</h3><div class="gameLibraryGrid">${gs.map(g=>gameRow(g,dbMap)).join("")}</div>`;});
+ card.querySelectorAll("[data-team]").forEach(b=>b.onclick=()=>{const team=b.dataset.team,gs=MEN_D1_WINNER_CUP_2026.filter(g=>g.home===team||g.away===team);const target=card.querySelector("#mensTeamGames");target.innerHTML=`<h3>${team} · Winner Cup Matchups</h3><div class="gameLibraryGrid">${gs.map(g=>gameRow(g,dbMap)).join("")}</div>`;bindWinnerGames(target,dbMap);});
 }
 window.CourtIQMens={games:MEN_D1_WINNER_CUP_2026,openWinnerCup,openTeams:openMensTeams};
