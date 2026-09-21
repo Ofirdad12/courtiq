@@ -46,6 +46,11 @@ async function syncProductData(){
   })().finally(()=>{productSyncPromise=null;});
   return productSyncPromise;
 }
+window.CourtIQOpenGame=(ui)=>{
+ if(!ui) return;
+ const key="winner_"+(ui.id||Date.now());
+ games[key]=ui; active=key; render(); window.scrollTo(0,0);
+};
 function productGameEntries(){
   const entries=Object.entries(games).filter(([,g])=>g&&g.home&&g.away);
   return window.CourtIQData?.isSignedIn()?entries.filter(([,g])=>g._dbId):entries;
