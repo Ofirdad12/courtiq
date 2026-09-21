@@ -32,6 +32,38 @@
     }, false);
   }
 
+  async function requestPasswordReset(email) {
+    const redirectTo = location.origin + location.pathname;
+    await jsonFetch("/auth/v1/recover?redirect_to=" + encodeURIComponent(redirectTo), {
+      method: "POST", body: JSON.stringify({email})
+    }, false);
+    return true;
+  }
+  function recoverySessionFromUrl() {
+    const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (hash.get("type") !== "recovery" || !hash.get("access_token")) return false;
+    saveSession({
+      access_token: hash.get("access_token"),
+      refresh_token: hash.get("refresh_token") || null,
+      token_type: hash.get("token_type") || "bearer",
+      expires_in: Number(hash.get("expires_in") || 3600),
+      user: null,
+      recovery: true
+    });
+    return true;
+  }
+  async function updatePassword(password) {
+    const session = readSession();
+    if (!session?.access_token) throw new Error("Open the password reset link from your email first.");
+    if (!password || password.length < 10) throw new Error("Password must contain at least 10 characters.");
+    const user = await jsonFetch("/auth/v1/user", {
+      method: "PUT", body: JSON.stringify({password})
+    });
+    if (session) { session.user = user; session.recovery = false; saveSession(session); }
+    history.replaceState({}, document.title, location.pathname + location.search);
+    return user;
+  }
+
   async function signIn(email, password) {
     const session = await jsonFetch("/auth/v1/token?grant_type=password", {
       method: "POST", body: JSON.stringify({email, password})
@@ -148,7 +180,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
