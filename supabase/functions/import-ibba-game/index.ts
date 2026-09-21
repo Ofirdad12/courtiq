@@ -71,6 +71,36 @@ function basketTeamTotal($:cheerio.CheerioAPI, table:any){
     dreb:num(total[idxAny(headers,["DR","DREB","הגנה"])]),oreb:num(total[idxAny(headers,["OR","OREB","התק"])]),
     tov:num(total[idxAny(headers,["TO","TOV","אב","איב"])]),ast:num(total[idxAny(headers,["AS","AST","אס"])])};
 }
+function basketSplit($:cheerio.CheerioAPI, table:any){
+  const rows=tableRows($,table).filter((r:string[])=>r.length);
+  const parse=(r:string[])=>{
+    if(r.length<17) throw new Error("Winner League starter/bench row is incomplete.");
+    const [two_pm,two_pa]=ma(r[3]), [three_pm,three_pa]=ma(r[5]), [ftm,fta]=ma(r[7]);
+    return {minutes:num(r[1]),points:num(r[2]),two_pm,two_pa,three_pm,three_pa,ftm,fta,dreb:num(r[9]),oreb:num(r[10]),tov:num(r[15]),ast:num(r[16])};
+  };
+  const starterRow=rows.find((r:string[])=>/^(חמישייה|starters?)$/i.test(clean(r[0]||"")));
+  const benchRow=rows.find((r:string[])=>/^(ספסל|bench)$/i.test(clean(r[0]||"")));
+  if(!starterRow||!benchRow) throw new Error("Winner League starter/bench split rows were not found.");
+  const starters=parse(starterRow), bench=parse(benchRow);
+  const total:any={};
+  for(const k of ["points","two_pm","two_pa","three_pm","three_pa","ftm","fta","dreb","oreb","tov","ast"]) total[k]=starters[k]+bench[k];
+  const splitMetrics=(x:any)=>{
+    const fga=x.two_pa+x.three_pa;
+    return {...x,ts:pct(x.points,2*(fga+.44*x.fta)),efg:pct(x.two_pm+x.three_pm+.5*x.three_pm,fga),ast_to:x.tov?Math.round(x.ast/x.tov*100)/100:null};
+  };
+  return {total,starters:splitMetrics(starters),bench:splitMetrics(bench)};
+}
+function basketExtra($:cheerio.CheerioAPI){
+  let out:any=null;
+  $("table").each((_:number,t:any)=>{
+    if(out)return; const rows=tableRows($,t).filter((r:string[])=>r.length);
+    const text=rows.slice(0,2).flat().join(" | ");
+    if(!/(נקודות מאיבודים|points off)/i.test(text)||!/(נקודות בצבע|paint)/i.test(text)) return;
+    const data=rows.slice(1).filter((r:string[])=>r.length>=4&&/\d/.test(r.join("")));
+    if(data.length>=2) out=data.slice(0,2).map((r:string[])=>({team:r[0],points_off_turnovers:num(r[1]),paint_points:num(r[2]),second_chance_points:num(r[3]),lead_time:r[4]||null}));
+  });
+  return out;
+}
 function basketNames($:cheerio.CheerioAPI){
   const title=clean($("title").text());
   const m=title.match(/:\s*([^:]+?)\s+(?:Vs\.?|vs\.?|נגד)\s+([^|]+)/i);
@@ -156,7 +186,7 @@ Deno.serve(async(req:Request)=>{
     const html=await res.text();
     const $=cheerio.load(html);
 
-    let homeName="",awayName="",quarters:any[]=[];
+    let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null;
     const playerTables:any[]=[];
     if(provider==="IBBA"){
       let quarter:any=null;
@@ -168,20 +198,19 @@ Deno.serve(async(req:Request)=>{
       $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
     }else{
       [homeName,awayName]=basketNames($);
+      const splitTables:any[]=[];
       $("table").each((_:number,t:any)=>{
         const h=tableRows($,t).slice(0,6).flat().join(" | ");
-        if(/(2PT|2P|2 נק|2\s*נק)/i.test(h)&&/(3PT|3P|3 נק|3\s*נק)/i.test(h)&&/(TO|TOV|אב|איב)/i.test(h)&&/(AS|AST|אס)/i.test(h)) playerTables.push(t);
+        if(/(חמישייה-ספסל|starters?.*bench)/i.test(h)&&/(2 נק|2PT|2P)/i.test(h)&&/(3 נק|3PT|3P)/i.test(h)) splitTables.push(t);
       });
-      if(playerTables.length<2){
-        const scripts=$("script").map((_:number,s:any)=>$(s).html()||"").get().join("\n");
-        const apiUrls=[...scripts.matchAll(/["']([^"']*(?:stat|box|game)[^"']*(?:asp|json|api)[^"']*)["']/ig)].map((m:any)=>m[1]).filter((x:string)=>/game|stat|box/i.test(x));
-        throw new Error("Winner League page loaded but box-score data is not in server-rendered tables. Dynamic endpoints detected: "+apiUrls.slice(0,3).join(", "));
-      }
+      if(splitTables.length<2) throw new Error("Could not locate both Winner League starter/bench tables.");
+      splitData=[basketSplit($,splitTables[0]),basketSplit($,splitTables[1])];
+      extraData=basketExtra($);
     }
     if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
-    if(playerTables.length<2) throw new Error(provider==="WINNER_LEAGUE"?"Could not locate both Winner League box-score tables. The game may not have a published box score yet.":"Could not locate both IBBA box-score tables.");
-    const home=provider==="WINNER_LEAGUE"?basketTeamTotal($,playerTables[0]):teamTotal($,playerTables[0]);
-    const away=provider==="WINNER_LEAGUE"?basketTeamTotal($,playerTables[1]):teamTotal($,playerTables[1]);
+    if(provider==="IBBA"&&playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
+    const home=provider==="WINNER_LEAGUE"?splitData[0].total:teamTotal($,playerTables[0]);
+    const away=provider==="WINNER_LEAGUE"?splitData[1].total:teamTotal($,playerTables[1]);
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
@@ -199,7 +228,16 @@ Deno.serve(async(req:Request)=>{
 
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
-    const payload={provider,source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},calculated:ui.calculated};
+    if(provider==="WINNER_LEAGUE"){
+      ui.splits={home:{starters:splitData[0].starters,bench:splitData[0].bench},away:{starters:splitData[1].starters,bench:splitData[1].bench}};
+      ui.matchup={home:homeName,away:awayName};
+      if(extraData?.length>=2){
+        ui.extra={home:extraData[0],away:extraData[1]};
+        ui.stats.push(["Points off Turnovers",extraData[0].points_off_turnovers,extraData[1].points_off_turnovers],["Paint Points",extraData[0].paint_points,extraData[1].paint_points],["Second Chance Points",extraData[0].second_chance_points,extraData[1].second_chance_points]);
+      }
+      ui.stats.push(["Assists",home.ast,away.ast],["Starters TS%",splitData[0].starters.ts+"%",splitData[1].starters.ts+"%"],["Bench TS%",splitData[0].bench.ts+"%",splitData[1].bench.ts+"%"]);
+    }
+    const payload={provider,source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},splits:ui.splits||null,extra:ui.extra||null,calculated:ui.calculated};
 
     const admin=createClient(supabaseUrl,serviceKey);
     const {data:game,error:gameErr}=await admin.from("games").upsert({
