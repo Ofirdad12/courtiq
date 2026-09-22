@@ -1,11 +1,13 @@
 const games={
 g1:{
 id:"001",comp:"Athena Winner Cup",date:"September 17, 2026",home:"Hapoel Lev Jerusalem",away:"Maccabi Karmiel",hs:90,as:66,
+sourceUrl:"https://ibasketball.co.il/match/x99002-1/",sourceLabel:"IBBA OFFICIAL BOX SCORE · DATA CONFIRMED",
+raw:{home:{points:90,two_pm:26,two_pa:44,three_pm:9,three_pa:26,ftm:11,fta:13,oreb:7,dreb:23,tov:10,ast:30},away:{points:66,two_pm:14,two_pa:32,three_pm:11,three_pa:26,ftm:5,fta:9,oreb:11,dreb:27,tov:29,ast:20}},
 quarters:[[24,11],[27,17],[31,11],[8,27]],
-metrics:[["Offensive Rating","113.4","83.2"],["eFG%","56.4%","52.6%"],["TS%","59.4%","53.3%"],["TOV%","11.7%","31.9%"],["AST/TO","3.00","0.69"]],
+metrics:[],
 findings:[["Turnover Dominance","29 opponent turnovers<br>20 steals<br>41 points off turnovers","+19 turnover differential"],["Interior Efficiency","59.1% on 2PT (26/44)<br>46 paint points","Controlled the game inside"],["Ball Movement","30 assists<br>10 turnovers<br>3.00 AST/TO","Excellent possession control"],["Bench Impact","51–18 bench scoring<br>65.1% TS (bench)","Superior depth and efficiency"],["Transition Game","24 fast-break points<br>41 points off turnovers","Defense created offense"]],
-stats:[["Points",90,66],["Rebounds",30,38],["Assists",30,20],["Turnovers",10,29],["Steals",20,5],["Blocks",2,1],["Paint Points",46,26],["Fast Break",24,12],["Points off TO",41,12],["Bench Points",51,18]],
-factors:[["eFG%",56.4,52.6],["TOV%",11.7,31.9],["ORB%",20.6,32.4],["FTr",18.6,15.5]],
+stats:[],
+factors:[],
 leaders:[["Joy Osigwe","20","69.8%"],["Hadar Mor Yosef","14","87.5%"],["Emili Giat","12","56.4%"]],
 awayLeaders:[["Shoval Kamisa","22","76.8%"],["Shiran Gozlan","13","46.8%"],["Annette Snow","8","44.4%"]],
 videos:["Review Karmiel's 29 turnovers","Analyze transition possessions","Examine 2PT efficiency (59.1%)","Classify Karmiel turnover types","Separate meaningful lineups from late-game effects"],
@@ -24,6 +26,52 @@ videos:["Review the 7–17 turnover gap","Audit Hapoel's 16 second-chance points
 ask:"Maccabi separated through possession control rather than superior raw shooting: only 7 turnovers versus Hapoel's 17, 25 points off turnovers, and a 10-point free-throw scoring advantage.",
 pnr:true
 }};
+const officialDemoRows={
+  home:[
+    ["אמילי גיאת",1,"26:03",12,"3-5","0-3","6-6",1,0,4,1,7,0,33],["פייתון וויליאמס",1,"21:21",10,"5-7","0-1","0-0",4,0,0,1,1,0,17],
+    ["ירדן דנן",1,"21:02",6,"3-5","0-4","0-0",4,0,1,2,5,0,31],["נוגה הרן",1,"20:20",8,"4-7","0-0","0-0",3,3,3,1,5,1,32],
+    ["דומוניק דייויס",1,"18:31",3,"1-1","0-0","1-2",3,2,2,3,2,0,9],["ג'וי אוסיגוואי",0,"22:77",20,"6-10","2-3","2-3",3,1,4,1,2,0,20],
+    ["הדר מור יוסף",0,"19:80",14,"1-1","4-7","0-0",2,0,4,1,3,1,29],["אלה במנולקר",0,"18:34",8,"3-4","0-3","2-2",0,1,0,0,2,0,-10],
+    ["מירנא אל סאיח",0,"15:02",6,"0-2","2-3","0-0",0,0,1,0,2,0,-3],["ליזה ברקני",0,"09:54",3,"0-1","1-2","0-0",1,0,1,0,1,0,-20],
+    ["נטע מישר",0,"07:70",0,"0-1","0-0","0-0",0,0,0,0,0,0,-18],["תמר גרינבוים",0,"00:00",0,"0-0","0-0","0-0",0,0,0,0,0,0,0]
+  ],
+  away:[
+    ["שובל כמיסה",1,"29:45",22,"3-7","5-6","1-3",2,3,3,3,3,0,-31],["נינה בוגיצביץ",1,"29:26",6,"2-2","0-1","2-2",3,0,1,2,2,1,-12],
+    ["בריה שאנטי הולמס",1,"27:13",7,"2-5","1-2","0-0",7,2,0,2,0,0,-13],["שירן גוזלן",1,"25:04",13,"4-9","1-4","2-2",3,1,0,6,6,0,-9],
+    ["סופיה גומז",1,"21:02",0,"0-1","0-4","0-0",1,0,0,4,3,0,-31],["נויה אלטמן",0,"18:57",2,"1-5","0-0","0-0",1,1,0,3,1,0,-34],
+    ["אנט סנואו",0,"18:22",8,"1-2","2-7","0-0",0,2,0,2,0,0,11],["מריה בליץ",0,"18:14",5,"1-1","1-1","0-2",4,0,1,1,4,0,3],
+    ["דוניא חדיד",0,"09:02",3,"0-0","1-1","0-0",0,0,0,3,1,0,-6],["אריאל הירן",0,"02:00",0,"0-0","0-0","0-0",0,0,0,0,0,0,2],
+    ["שהד עבוד",0,"00:00",0,"0-0","0-0","0-0",0,0,0,0,0,0,0]
+  ]
+};
+function hydrateOfficialDemoGame(game,rows){
+  const pct=(a,b)=>b?Math.round(a/b*1000)/10:0, r1=n=>Math.round(n*10)/10, r2=n=>Math.round(n*100)/100;
+  const madeAttempted=value=>String(value).split("-").map(Number);
+  // IBBA exports minutes as decimal hundredths separated by a colon (22:77 = 22.77).
+  const ibbaMinutes=value=>{const [whole,fraction]=String(value).split(":").map(Number);return r1(whole+(fraction||0)/100);};
+  const parse=row=>{const [name,starter,minutes,points,two,three,ft,dreb,oreb,steals,tov,ast,blocks,plus_minus]=row;
+    const [two_pm,two_pa]=madeAttempted(two),[three_pm,three_pa]=madeAttempted(three),[ftm,fta]=madeAttempted(ft);
+    return {name,starter:Boolean(starter),minutes:ibbaMinutes(minutes),points,two_pm,two_pa,three_pm,three_pa,ftm,fta,dreb,oreb,steals,tov,ast,blocks,plus_minus};};
+  const calcTeam=(team,opp)=>{const fgm=team.two_pm+team.three_pm,fga=team.two_pa+team.three_pa,oppFga=opp.two_pa+opp.three_pa;
+    const possessions=fga+.44*team.fta-team.oreb+team.tov,oppPossessions=oppFga+.44*opp.fta-opp.oreb+opp.tov;
+    const ortg=r1(team.points/possessions*100),drtg=r1(opp.points/oppPossessions*100),trb=team.oreb+team.dreb,oppTrb=opp.oreb+opp.dreb;
+    return {possessions:r1(possessions),pace:r1(possessions),ortg,drtg,net_rating:r1(ortg-drtg),fg_pct:pct(fgm,fga),two_pct:pct(team.two_pm,team.two_pa),three_pct:pct(team.three_pm,team.three_pa),ft_pct:pct(team.ftm,team.fta),efg:pct(fgm+.5*team.three_pm,fga),ts:pct(team.points,2*(fga+.44*team.fta)),pps:r2(team.points/fga),three_pa_rate:pct(team.three_pa,fga),tov:pct(team.tov,fga+.44*team.fta+team.tov),orb:pct(team.oreb,team.oreb+opp.dreb),drb:pct(team.dreb,team.dreb+opp.oreb),trb:pct(trb,trb+oppTrb),ftr:pct(team.fta,fga),ast_to:r2(team.ast/team.tov),assisted_fg_pct:pct(team.ast,fgm),margin:team.points-opp.points};};
+  const advancedPlayer=(player,team,opp)=>{const fgm=player.two_pm+player.three_pm,fga=player.two_pa+player.three_pa,missed=fga-fgm+player.fta-player.ftm;
+    const playEnds=fga+.44*player.fta+player.tov,teamPoss=team.two_pa+team.three_pa+.44*team.fta-team.oreb+team.tov,per40=value=>player.minutes?r1(value*40/player.minutes):0;
+    return {...player,fgm,fga,rebounds:player.oreb+player.dreb,fg_pct:pct(fgm,fga),two_pct:pct(player.two_pm,player.two_pa),three_pct:pct(player.three_pm,player.three_pa),ft_pct:pct(player.ftm,player.fta),efg:pct(fgm+.5*player.three_pm,fga),ts:pct(player.points,2*(fga+.44*player.fta)),pps:fga?r2(player.points/fga):0,three_pa_rate:pct(player.three_pa,fga),ast_to:player.tov?r2(player.ast/player.tov):(player.ast?"∞":0),points_per_40:per40(player.points),rebounds_per_40:per40(player.oreb+player.dreb),assists_per_40:per40(player.ast),play_end_share:pct(playEnds,teamPoss),oreb_pct:player.minutes?pct(player.oreb*40,player.minutes*(team.oreb+opp.dreb)):0,dreb_pct:player.minutes?pct(player.dreb*40,player.minutes*(team.dreb+opp.oreb)):0,box_impact_per_40:per40(player.points+player.oreb+player.dreb+player.ast+player.steals+player.blocks-missed-player.tov)};};
+  const aggregate=players=>{const keys=["minutes","points","two_pm","two_pa","three_pm","three_pa","ftm","fta","oreb","dreb","tov","ast","steals","blocks"],out={};
+    keys.forEach(key=>out[key]=r1(players.reduce((sum,p)=>sum+Number(p[key]||0),0)));const fga=out.two_pa+out.three_pa,fgm=out.two_pm+out.three_pm;
+    return {...out,efg:pct(fgm+.5*out.three_pm,fga),ts:pct(out.points,2*(fga+.44*out.fta)),ast_to:out.tov?r2(out.ast/out.tov):(out.ast?"∞":0)};};
+  const home=game.raw.home,away=game.raw.away,hm=calcTeam(home,away),am=calcTeam(away,home);
+  game.calculated={home:{...hm,bench_share:pct(51,home.points)},away:{...am,bench_share:pct(18,away.points)}};
+  game.players={home:rows.home.map(parse).map(p=>advancedPlayer(p,home,away)),away:rows.away.map(parse).map(p=>advancedPlayer(p,away,home))};
+  game.splits={home:{starters:aggregate(game.players.home.filter(p=>p.starter)),bench:aggregate(game.players.home.filter(p=>!p.starter))},away:{starters:aggregate(game.players.away.filter(p=>p.starter)),bench:aggregate(game.players.away.filter(p=>!p.starter))}};
+  game.metrics=[["Offensive Rating",hm.ortg.toFixed(1),am.ortg.toFixed(1)],["Defensive Rating",hm.drtg.toFixed(1),am.drtg.toFixed(1)],["Net Rating",hm.net_rating.toFixed(1),am.net_rating.toFixed(1)],["eFG%",hm.efg+"%",am.efg+"%"],["Pace",hm.pace.toFixed(1),am.pace.toFixed(1)]];
+  game.factors=[["eFG%",hm.efg,am.efg],["TOV%",hm.tov,am.tov],["ORB%",hm.orb,am.orb],["FTr",hm.ftr,am.ftr]];
+  game.stats=[["Points",90,66],["Point Margin",hm.margin,am.margin],["Possessions",hm.possessions,am.possessions],["Pace",hm.pace,am.pace],["ORtg",hm.ortg,am.ortg],["DRtg",hm.drtg,am.drtg],["Net Rating",hm.net_rating,am.net_rating],["FG","35/70","25/58"],["FG%",hm.fg_pct+"%",am.fg_pct+"%"],["2P","26/44","14/32"],["2P%",hm.two_pct+"%",am.two_pct+"%"],["3P","9/26","11/26"],["3P%",hm.three_pct+"%",am.three_pct+"%"],["FT","11/13","5/9"],["FT%",hm.ft_pct+"%",am.ft_pct+"%"],["eFG%",hm.efg+"%",am.efg+"%"],["TS%",hm.ts+"%",am.ts+"%"],["PPS",hm.pps,am.pps],["3PA Rate",hm.three_pa_rate+"%",am.three_pa_rate+"%"],["TOV%",hm.tov+"%",am.tov+"%"],["FTr",hm.ftr+"%",am.ftr+"%"],["Assists",30,20],["AST/TO",hm.ast_to,am.ast_to],["Assisted FG%",hm.assisted_fg_pct+"%",am.assisted_fg_pct+"%"],["Turnovers",10,29],["Offensive Rebounds",7,11],["Defensive Rebounds",23,27],["ORB%",hm.orb+"%",am.orb+"%"],["DRB%",hm.drb+"%",am.drb+"%"],["TRB%",hm.trb+"%",am.trb+"%"],["Steals",20,5],["Blocks",2,1],["Paint Points",46,26],["Fast Break",24,12],["Points off TO",41,12],["Starters Points",39,48],["Bench Points",51,18],["Bench Share","56.7%","27.3%"],["Starters TS%",game.splits.home.starters.ts+"%",game.splits.away.starters.ts+"%"],["Bench TS%",game.splits.home.bench.ts+"%",game.splits.away.bench.ts+"%"]];
+  game.leaders=[["ג'וי אוסיגוואי",20,"PTS"],["נוגה הרן",6,"REB"],["אמילי גיאת",7,"AST"]];game.awayLeaders=[["שובל כמיסה",22,"PTS"],["בריה שאנטי הולמס",9,"REB"],["שירן גוזלן",6,"AST"]];
+}
+hydrateOfficialDemoGame(games.g1,officialDemoRows);
 const menu=["▦ Dashboard","◉ Games","◉ Teams","◆ Israel Men's League D1 Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
 try{
   const savedPilot=localStorage.getItem("courtiq_pilot_game");
@@ -124,7 +172,7 @@ function render(){
 const G=games[active];
 const dbGameButtons=Object.entries(games).filter(([k])=>k.startsWith("db_")).map(([k,g])=>`<button data-game="${k}" class="${active===k?"sel":""}">DB · ${g.home} ${g.hs}–${g.as} ${g.away}</button>`).join("");
 document.querySelector("#app").innerHTML=`<div class="app"><aside class="side"><div class="logo">Court<span>IQ</span><small class="tagline">TURN DATA INTO WINS</small></div><div class="menu">${menu.map((x,i)=>`<div class="${i===0?"on":""}">${x[0]} <span>${x.slice(2)}</span></div>`).join("")}</div><div class="quote">“Better Analysis.<br>Better Basketball.”</div></aside><main class="main"><header class="top"><div class="search">⌕ &nbsp; Search games, teams, players...</div><button id="accountBtn" class="user accountBtn"><small>${window.CourtIQData?.isSignedIn()?"SIGNED IN":"PILOT ACCESS"}</small>${window.CourtIQData?.user()?.email||"Maccabi Bnot Ashdod"}</button></header><div class="content"><div class="v2bar"><div><b>MACCABI BNOT ASHDOD · BUILD 091</b> <span>— Women's Basketball Intelligence Workspace</span></div><div class="pills"><i class="pill">DATA CONFIRMED</i><i class="pill">TACTICAL EVIDENCE</i><i class="pill">VIDEO VERIFICATION</i><button id="playersHub" class="importBtn primaryAction">PLAYER INTELLIGENCE</button><button id="comparePlayers" class="importBtn primaryAction">COMPARE PLAYERS</button><button id="autoImport" class="importBtn primaryAction">AUTO IMPORT</button><button id="opponentScout" class="importBtn">OPPONENT SCOUT</button><button id="fullReport" class="importBtn">FULL GAME REPORT</button><button id="importUrl" class="importBtn secondaryAction">BOX SCORE LINK</button><button id="compareTeams" class="importBtn">COMPARE TEAMS</button><button id="importGame" class="importBtn secondaryAction">CSV FALLBACK</button></div></div><div class="clubbar"><div><small>PILOT WORKSPACE</small><b>Maccabi Bnot Ashdod · 2026/27</b></div><span>${G.sourceLabel||"COURTIQ DEMO DATA"}</span></div><div class="game-switch">${dbGameButtons}${dbGameButtons?"":`<button data-game="g1" class="${active==="g1"?"sel":""}">DEMO · Jerusalem 90–66 Karmiel</button><button data-game="g2" class="${active==="g2"?"sel":""}">DEMO · Maccabi 101–83 Hapoel</button>`}${!window.CourtIQData?.isSignedIn()&&games.pilot?`<button data-game="pilot" class="${active==="pilot"?"sel":""}">LOCAL · ${games.pilot.home} ${games.pilot.hs}–${games.pilot.as} ${games.pilot.away}</button>`:""}${!window.CourtIQData?.isSignedIn()&&games.url?`<button data-game="url" class="${active==="url"?"sel":""}">LOCAL · ${games.url.home} ${games.url.hs}–${games.url.as} ${games.url.away}</button>`:""}</div><div class="crumb">Games › ${G.comp} › ${G.home} vs ${G.away} · ${G.date}</div><section class="gamehead"><div class="team"><div class="badge">${teamBadge(G.home)}</div><h2>${G.home}</h2></div><div class="score">${G.hs} - ${G.as}<small>FINAL</small></div><div class="team right"><h2>${G.away}</h2><div class="badge">${teamBadge(G.away)}</div></div></section><div class="tabs">${["Overview","Team Stats","Player Stats","Lineups","Shot Chart","Play-by-Play","Video","AI Insights","Report"].map((x,i)=>`<span class="${i===0?"active":""}">${x}</span>`).join("")}</div><section class="kpis">${G.metrics.map(x=>`<div class="card kpi"><label>${x[0]}</label><b>${x[1]}</b><small>vs ${x[2]}</small></div>`).join("")}</section><section class="card takeaways"><div class="sectionhead"><h3><span>◆</span> KEY TAKEAWAYS</h3><small>${gameWinner(G)}</small></div><div class="findings">${G.findings.map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]}</p><em>→ ${x[2]}</em></div>`).join("")}</div></section><section class="grid"><div class="card box"><h3>Score by Quarter</h3><div class="bars">${G.quarters.map((q,i)=>`<div class="q"><div class="bar" style="height:${Math.min(q[0]*4,140)}px"><i>${q[0]}</i></div><div class="bar away" style="height:${Math.min(q[1]*4,140)}px"><i>${q[1]}</i></div><span class="qname">${quarterLabel(i)}</span></div>`).join("")}</div></div><div class="card box"><h3>Four Factors Analysis</h3><div class="factors">${G.factors.map(x=>`<div class="factor"><label>${x[0]} · ${G.home.split(" ")[0]} ${x[1]}% / ${G.away.split(" ")[0]} ${x[2]}%</label><div class="track"><div class="homefill" style="width:${x[1]}%"></div><div class="awayfill" style="width:${x[2]}%"></div></div></div>`).join("")}</div></div><div class="card box last"><h3>Key Team Stats</h3><table class="stats"><thead><tr><th>Metric</th><th>Home</th><th>Away</th></tr></thead><tbody>${G.stats.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</tbody></table></div><div class="card box"><h3>Leaders — ${G.home}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.leaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box"><h3>Leaders — ${G.away}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.awayLeaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box last"><h3>Next Steps: Video Investigation</h3><div class="videoList">${G.videos.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div></div></section>${G.pnr?pnrModule():""}<section class="card ask"><div><h3>Ask CourtIQ</h3><p>Ask a basketball question about Game #${G.id}.</p><div id="answer" class="answer"></div></div><input id="q" placeholder="What decided this game?"><button id="ask">Analyze</button></section><div class="footer">CourtIQ Product V1 · Maccabi Bnot Ashdod Pilot · Game #${G.id}</div></div></main></div>`;
-document.querySelector(".v2bar b").textContent="MACCABI BNOT ASHDOD · BUILD 103";
+document.querySelector(".v2bar b").textContent="MACCABI BNOT ASHDOD · BUILD 104";
 const exportActions=document.createElement("span");
 exportActions.className="exportActions";
 exportActions.innerHTML='<button id="exportJson" class="importBtn secondaryAction">EXPORT JSON</button><button id="exportCsv" class="importBtn secondaryAction">EXPORT PLAYERS CSV</button>';
@@ -378,7 +426,7 @@ function openPilotDashboard(){
   const playerCount=window.CourtIQPlayers?.players?.length||0;
   const signedIn=window.CourtIQData?.isSignedIn();
   modal.innerHTML=`<div class="modalCard productHome"><button class="modalX">×</button>
-    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 101</b></div></div>
+    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 104</b></div></div>
     <div class="productStats">
       <div><small>GAME LIBRARY</small><b>${stored.length}</b><span>${verified} verified imports</span></div>
       <div><small>SCOUTING PLAYERS</small><b>${playerCount}</b><span>verified source samples</span></div>

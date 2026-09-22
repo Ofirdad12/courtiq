@@ -76,6 +76,12 @@ function minutesValue(value:string){
   const n=Number(s);
   return Number.isFinite(n)?r1(n):0;
 }
+function ibbaMinutesValue(value:string){
+  const s=clean(value||"");
+  const decimal=s.match(/^(\d+):(\d{2})$/);
+  if(decimal) return r1(Number(decimal[1])+Number(decimal[2])/100);
+  return minutesValue(s);
+}
 function advancedPlayer(player:any,team:any,opp:any){
   const fgm=player.two_pm+player.three_pm, fga=player.two_pa+player.three_pa;
   const missed=fga-fgm+player.fta-player.ftm;
@@ -111,7 +117,7 @@ function ibbaPlayerData($:cheerio.CheerioAPI, table:any){
     const value=(key:string)=>clean($(tr).find(`[data-key="${key}"]`).text());
     const [two_pm,two_pa]=ma(value("fgs")), [three_pm,three_pa]=ma(value("threeps")), [ftm,fta]=ma(value("fts"));
     return {id:String($(tr).attr("data-player-id")||""),number:num($(tr).find(".data-number").text()),name:clean($(tr).find(".data-name").text()),
-      starter:$(tr).hasClass("lineup"),minutes:minutesValue(value("min")),points:num(value("pts")),two_pm,two_pa,three_pm,three_pa,ftm,fta,
+      starter:$(tr).hasClass("lineup"),minutes:ibbaMinutesValue(value("min")),points:num(value("pts")),two_pm,two_pa,three_pm,three_pa,ftm,fta,
       dreb:num(value("def")),oreb:num(value("off")),steals:num(value("stl")),tov:num(value("to")),ast:num(value("ast")),blocks:num(value("blk")),
       value:num(value("rate")),plus_minus:num(value("pm"))};
   });
@@ -362,7 +368,7 @@ Deno.serve(async(req:Request)=>{
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v4",
+      parser:provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v5",
       validated_at:new Date().toISOString()
     };
 
