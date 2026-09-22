@@ -24,7 +24,7 @@ def normalize(payload):
         if ball and ball.get("bbox"): ball_xy=project(*foot(ball["bbox"]),H)
         handler=None
         if ball_xy and players:
-            ranked=sorted((math.hypot(p["x"]-ball_xy[0],p["y"]-ball_xy[1]),p) for p in players)
+            ranked=sorted(((math.hypot(p["x"]-ball_xy[0],p["y"]-ball_xy[1]),p) for p in players), key=lambda item:item[0])
             if ranked[0][0]<=max_d: handler=ranked[0][1]["track_id"]
             if previous:
                 prev=next((d for d,p in ranked if p["track_id"]==previous),99)
