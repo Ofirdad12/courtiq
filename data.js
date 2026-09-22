@@ -2,6 +2,7 @@
   const SUPABASE_URL = "https://lgzfmoioecixmnivtqan.supabase.co";
   const PUBLISHABLE_KEY = "sb_publishable_LTCc5iEgOzrH7t8bxvxwOA_aWsHoY8l";
   const SESSION_KEY = "courtiq_supabase_session";
+  const CLUB_KEY = "courtiq_selected_club";
 
   function readSession() {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); }
@@ -88,19 +89,19 @@
   function signOut() { saveSession(null); }
   function user() { return readSession()?.user || null; }
 
+  async function accessibleClubs() {
+    if (!readSession()?.access_token) throw new Error("Sign in to load club workspaces.");
+    try { return await jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&order=name.asc"); }
+    catch (e) { if (/JWT|expired/i.test(e.message)) { await refreshSession(); return jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&order=name.asc"); } throw e; }
+  }
+  function selectedClubId() { return Number(localStorage.getItem(CLUB_KEY) || 0) || null; }
+  function selectClub(id) { if (id) localStorage.setItem(CLUB_KEY, String(id)); else localStorage.removeItem(CLUB_KEY); }
   async function workspace() {
-    if (!readSession()?.access_token) throw new Error("Sign in to load the club workspace.");
-    let clubs;
-    try {
-      clubs = await jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&slug=eq.maccabi-bnot-ashdod");
-    } catch (e) {
-      if (/JWT|expired/i.test(e.message)) {
-        await refreshSession();
-        clubs = await jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&slug=eq.maccabi-bnot-ashdod");
-      } else throw e;
-    }
-    const club = clubs?.[0];
-    if (!club) throw new Error("This account does not have access to the Maccabi Bnot Ashdod pilot.");
+    const clubs = await accessibleClubs();
+    const preferred = selectedClubId();
+    const club = clubs?.find(c => Number(c.id) === Number(preferred)) || clubs?.[0];
+    if (!club) throw new Error("This account does not have access to a CourtIQ club workspace.");
+    if (!preferred) selectClub(club.id);
     const [games, clubPlayers] = await Promise.all([
       jsonFetch("/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at&club_id=eq." + club.id + "&order=game_date.desc.nullslast"),
       jsonFetch("/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url,analysis)&club_id=eq." + club.id + "&season=eq." + encodeURIComponent(club.season))
@@ -180,7 +181,7 @@
     };
   }
 
-  async function importOfficialGame(url) {
+  async function importOfficialGame(url, clubId = selectedClubId()) {
     const session = readSession();
     if (!session?.access_token) throw new Error("Sign in before importing a game.");
     const res = await fetch(SUPABASE_URL + "/functions/v1/import-ibba-game", {
@@ -190,14 +191,14 @@
         Authorization: "Bearer " + session.access_token,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({url})
+      body: JSON.stringify({url, club_id: clubId})
     });
     let body = null;
     try { body = await res.json(); } catch (_) {}
     if (!res.ok) {
       if (res.status === 401) {
         const refreshed = await refreshSession();
-        if (refreshed) return importOfficialGame(url);
+        if (refreshed) return importOfficialGame(url, clubId);
       }
       throw new Error(body?.error || body?.message || "Official game import failed.");
     }
@@ -205,7 +206,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, gameVideo, tacticalEvents, hydrateGameVideo, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, accessibleClubs, selectedClubId, selectClub, workspace, playerIntelligence, gameReports, gameVideo, tacticalEvents, hydrateGameVideo, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
