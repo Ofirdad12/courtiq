@@ -206,7 +206,8 @@ function installGameViews(G){
     tabs.querySelectorAll("[data-game-tab]").forEach(el=>el.classList.toggle("active",el.dataset.gameTab===view));
   };
   tabs.querySelectorAll("[data-game-tab]").forEach(button=>button.onclick=()=>activate(button.dataset.gameTab));
-  document.querySelectorAll("[data-video-event]").forEach(b=>b.onclick=()=>playVideoEvidence(G,videoEvidenceEvents(G)[Number(b.dataset.videoEvent)]));\n  installTacticalTagger(G);
+  document.querySelectorAll("[data-video-event]").forEach(b=>b.onclick=()=>playVideoEvidence(G,videoEvidenceEvents(G)[Number(b.dataset.videoEvent)]));
+  installTacticalTagger(G);
   document.querySelectorAll(".teamStatsTable tbody tr").forEach(row=>{const stat=row.cells?.[0]?.textContent; if(statVideoMatcher(stat)){row.classList.add("videoLinkedStat");row.title="Open linked video evidence";row.onclick=()=>openVideoForStat(G,stat);}});
   activate("overview");
 }
