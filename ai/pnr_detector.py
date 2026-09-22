@@ -70,7 +70,7 @@ def detect_possession(pos):
     elif handler_def_gap>7:
         coverage,cov_score="drop",.66
     # ICE is supplied only when sideline geometry supports it; avoid overclaiming from ambiguous tracks.
-    if abs(float(h0["y"])-25)>17 and float(h1["y"])*float(h0["y"])>0 and abs(float(h1["y"])-25)>=abs(float(h0["y"])-25):
+    if abs(float(h0["y"])-25)>17 and (float(h1["y"])-25)*(float(h0["y"])-25)>0 and abs(float(h1["y"])-25)>=abs(float(h0["y"])-25):
         coverage,cov_score="ice",max(cov_score,.62)
     conf=clamp(.55*screen_score+.45*cov_score)
     return Candidate(max(0,si-3),si,min(len(frames)-1,si+8),hid,sid,coverage,conf,{
