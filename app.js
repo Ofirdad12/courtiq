@@ -144,18 +144,59 @@ function playByPlayModule(G){
   const content=events.length?`<div class="pbpMeta"><b>${events.length} official events</b><span>Chronological order · earliest to latest</span></div><div class="card pbpCard"><div class="playerScroll"><table class="stats pbpTable"><thead><tr><th>Period</th><th>Clock</th><th>Score</th><th>Team</th><th>Player</th><th>Play</th></tr></thead><tbody>${rows}</tbody></table></div></div>`:`<div class="card emptyView"><b>Play-by-Play is not published yet.</b><span>After the game, re-import the official IBBA link. CourtIQ will load the official event timeline automatically and will not invent possessions from the box score.</span><a href="${htmlEsc(source)}" target="_blank" rel="noopener">Open official game page</a></div>`;
   return `<section class="gameViewPanel" data-game-view="play"><div class="viewTitle"><div><small>OFFICIAL EVENT FEED</small><h3>Play-by-Play</h3></div><span>${events.length?"DATA CONFIRMED":"WAITING FOR IBBA"}</span></div>${content}</section>`;
 }
+function videoEvidenceEvents(G){
+  const source=Array.isArray(G.events)?G.events:(Array.isArray(G.playByPlay)?G.playByPlay:[]);
+  return source.filter(e=>Number.isFinite(Number(e.videoTime??e.video_time??e.videoStart??e.video_start)));
+}
+function videoEventTime(e){return Number(e.videoTime??e.video_time??e.videoStart??e.video_start);}
+function videoEventTags(e){return Array.isArray(e.tags)?e.tags.map(x=>String(x).toLowerCase()):[];}
+function statVideoMatcher(stat){
+  const key=String(stat||"").toLowerCase();
+  if(key.includes("turnover")||key==="tov%") return e=>String(e.type||e.action||"").toLowerCase().includes("turnover")||videoEventTags(e).includes("turnover");
+  if(key.includes("fast break")) return e=>videoEventTags(e).some(t=>t==="transition"||t==="fast_break");
+  if(key.includes("points off to")) return e=>videoEventTags(e).includes("points_off_turnover");
+  if(key.includes("paint")) return e=>videoEventTags(e).includes("paint");
+  if(key==="3p"||key==="3p%"||key.includes("3pa")) return e=>String(e.shotType||e.shot_type||"").toUpperCase()==="3PT";
+  if(key==="2p"||key==="2p%") return e=>String(e.shotType||e.shot_type||"").toUpperCase()==="2PT";
+  return null;
+}
+function videoRoomModule(G){
+  const video=G.video||{}; const url=video.url||G.videoUrl||G.video_url||""; const events=videoEvidenceEvents(G);
+  const eventRows=events.map((e,i)=>`<button type="button" class="videoEvent" data-video-event="${i}"><b>▶ ${htmlEsc(e.period_label||("Q"+(e.period||"—")))} ${htmlEsc(e.clock||"")}</b><span>${htmlEsc(e.player||e.team||"")} · ${htmlEsc(e.description||e.action||e.type||"Tagged event")}</span></button>`).join("");
+  const player=url?`<video id="gameVideo" class="gameVideo" controls preload="metadata" src="${htmlEsc(url)}"></video>`:`<div class="card emptyView"><b>No game video is linked yet.</b><span>Add <code>video.url</code> to the game payload. Tagged events may use <code>videoTime</code> or <code>videoStart/videoEnd</code>; CourtIQ will never invent timestamps.</span></div>`;
+  return `<section class="gameViewPanel" data-game-view="video"><div class="viewTitle"><div><small>TACTICAL EVIDENCE</small><h3>Video Room</h3></div><span>${events.length} timestamped events</span></div><div class="videoRoomLayout"><div>${player}<div id="videoNow" class="metricNote">Select a tagged event or click a supported statistic to jump to its evidence.</div></div><div class="card videoPlaylist"><h3>Evidence playlist</h3><div id="videoEventList">${eventRows||'<div class="productEmpty"><b>No timestamped evidence yet</b><span>Import or tag events with video timestamps to activate click-to-clip.</span></div>'}</div></div></div></section>`;
+}
+function playVideoEvidence(G,event){
+  const video=document.querySelector("#gameVideo"); if(!video||!event)return;
+  const focus=videoEventTime(event), start=Number(event.videoStart??event.video_start); const target=Number.isFinite(start)?start:Math.max(0,focus-3);
+  video.currentTime=target; const p=video.play(); if(p?.catch)p.catch(()=>{});
+  const end=Number(event.videoEnd??event.video_end); if(Number.isFinite(end)){
+    const stop=()=>{if(video.currentTime>=end){video.pause();video.removeEventListener("timeupdate",stop);}}; video.addEventListener("timeupdate",stop);
+  }
+  const now=document.querySelector("#videoNow"); if(now)now.textContent=(event.period_label||("Q"+(event.period||"—")))+" "+(event.clock||"")+" · "+(event.description||event.action||event.type||"Tagged event");
+}
+function openVideoForStat(G,stat){
+  const matcher=statVideoMatcher(stat); if(!matcher)return;
+  const matches=videoEvidenceEvents(G).filter(matcher); const tab=document.querySelector('[data-game-tab="video"]'); if(tab)tab.click();
+  const list=document.querySelector("#videoEventList"); if(!list)return;
+  list.innerHTML=matches.length?matches.map((e,i)=>`<button type="button" class="videoEvent" data-filtered-event="${i}"><b>▶ ${htmlEsc(e.period_label||("Q"+(e.period||"—")))} ${htmlEsc(e.clock||"")}</b><span>${htmlEsc(e.player||e.team||"")} · ${htmlEsc(e.description||e.action||e.type||"Tagged event")}</span></button>`).join(""):`<div class="productEmpty"><b>No timestamped clips for ${htmlEsc(stat)}</b><span>The statistic is valid, but CourtIQ has no linked video evidence for it yet.</span></div>`;
+  list.querySelectorAll("[data-filtered-event]").forEach(b=>b.onclick=()=>playVideoEvidence(G,matches[Number(b.dataset.filteredEvent)]));
+  if(matches.length)playVideoEvidence(G,matches[0]);
+}
 function installGameViews(G){
   const tabs=document.querySelector(".tabs");
   const overview=document.querySelector(".kpis");
   if(!tabs||!overview)return;
-  tabs.innerHTML=[["overview","Overview"],["team","Team Stats"],["player","Player Stats"],["play","Play-by-Play"]].map(([key,label],i)=>`<button type="button" data-game-tab="${key}" class="${i===0?"active":""}">${label}</button>`).join("");
-  overview.insertAdjacentHTML("beforebegin",teamStatsModule(G)+playerStatsView(G)+playByPlayModule(G));
+  tabs.innerHTML=[["overview","Overview"],["team","Team Stats"],["player","Player Stats"],["play","Play-by-Play"],["video","Video"]].map(([key,label],i)=>`<button type="button" data-game-tab="${key}" class="${i===0?"active":""}">${label}</button>`).join("");
+  overview.insertAdjacentHTML("beforebegin",teamStatsModule(G)+playerStatsView(G)+playByPlayModule(G)+videoRoomModule(G));
   [".kpis",".takeaways",".grid",".pgrid",".ask"].forEach(selector=>document.querySelectorAll(selector).forEach(el=>el.dataset.gameView="overview"));
   const activate=view=>{
     document.querySelectorAll("[data-game-view]").forEach(el=>{el.hidden=el.dataset.gameView!==view;});
     tabs.querySelectorAll("[data-game-tab]").forEach(el=>el.classList.toggle("active",el.dataset.gameTab===view));
   };
   tabs.querySelectorAll("[data-game-tab]").forEach(button=>button.onclick=()=>activate(button.dataset.gameTab));
+  document.querySelectorAll("[data-video-event]").forEach(b=>b.onclick=()=>playVideoEvidence(G,videoEvidenceEvents(G)[Number(b.dataset.videoEvent)]));
+  document.querySelectorAll(".teamStatsTable tbody tr").forEach(row=>{const stat=row.cells?.[0]?.textContent; if(statVideoMatcher(stat)){row.classList.add("videoLinkedStat");row.title="Open linked video evidence";row.onclick=()=>openVideoForStat(G,stat);}});
   activate("overview");
 }
 function downloadBlob(name,type,content){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
