@@ -101,7 +101,7 @@
     const preferred = selectedClubId();
     const club = clubs?.find(c => Number(c.id) === Number(preferred)) || clubs?.[0];
     if (!club) throw new Error("This account does not have access to a CourtIQ club workspace.");
-    if (!preferred) selectClub(club.id);
+    if (!preferred || Number(club.id) !== Number(preferred)) selectClub(club.id);
     const [games, clubPlayers] = await Promise.all([
       jsonFetch("/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at&club_id=eq." + club.id + "&order=game_date.desc.nullslast"),
       jsonFetch("/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url,analysis)&club_id=eq." + club.id + "&season=eq." + encodeURIComponent(club.season))
