@@ -144,6 +144,29 @@
     }));
   }
 
+  async function hydrateGamesMedia(rows) {
+    const gameIds = (rows || []).map(r => Number(r.id)).filter(Boolean);
+    if (!gameIds.length) return rows || [];
+    const ids = gameIds.join(",");
+    const [videos, events] = await Promise.all([
+      jsonFetch("/rest/v1/game_videos?select=id,game_id,club_id,playback_url,duration_seconds,fps,status,created_at&game_id=in.(" + ids + ")&order=created_at.desc"),
+      jsonFetch("/rest/v1/tactical_events?select=id,game_id,video_id,external_event_id,period,game_clock,video_start,video_time,video_end,offense_team,defense_team,action_type,coverage_type,ball_handler_ref,screener_ref,outcome_type,points,tags,confidence,verification,model_version,evidence,created_at&game_id=in.(" + ids + ")&order=video_time.asc")
+    ]);
+    const videoByGame = new Map();
+    for (const v of videos || []) if (!videoByGame.has(Number(v.game_id))) videoByGame.set(Number(v.game_id), v);
+    const eventsByGame = new Map();
+    for (const e of events || []) {
+      const key = Number(e.game_id); if (!eventsByGame.has(key)) eventsByGame.set(key, []);
+      eventsByGame.get(key).push({id:e.external_event_id || ("db_tactical_" + e.id),period:e.period,clock:e.game_clock,videoStart:Number(e.video_start),videoTime:Number(e.video_time),videoEnd:Number(e.video_end),offense:e.offense_team,defense:e.defense_team,type:"tactical",tactic:e.action_type,action:e.action_type,coverage:e.coverage_type,defenseMeta:{coverage:e.coverage_type},ballHandler:e.ball_handler_ref,screener:e.screener_ref,outcome:{type:e.outcome_type,points:e.points},points:e.points,tags:e.tags||[],confidence:e.confidence||{},verification:e.verification,model:e.model_version,evidence:e.evidence||{},_dbId:e.id});
+    }
+    for (const row of rows || []) {
+      const ui=row.payload?.ui; if (!ui) continue;
+      const v=videoByGame.get(Number(row.id)); if (v?.playback_url) ui.video={url:v.playback_url,id:v.id,status:v.status,duration:v.duration_seconds,fps:v.fps};
+      const es=eventsByGame.get(Number(row.id)); if (es?.length) ui.events=[...(Array.isArray(ui.events)?ui.events:[]),...es];
+    }
+    return rows;
+  }
+
   async function hydrateGameVideo(ui, gameId) {
     if (!gameId) return ui;
     const [video, events] = await Promise.all([gameVideo(gameId), tacticalEvents(gameId)]);
@@ -206,7 +229,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, accessibleClubs, selectedClubId, selectClub, workspace, playerIntelligence, gameReports, gameVideo, tacticalEvents, hydrateGameVideo, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, accessibleClubs, selectedClubId, selectClub, workspace, playerIntelligence, gameReports, gameVideo, tacticalEvents, hydrateGamesMedia, hydrateGameVideo, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
