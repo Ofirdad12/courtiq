@@ -26,3 +26,9 @@ def test_requires_calibration():
         assert False, "expected ValueError"
     except ValueError as e:
         assert "homography" in str(e)
+
+
+def test_equal_distance_candidates_do_not_crash():
+    payload={"fps":25,"frames":[{"frame":0,"ball":{"x":10,"y":10},"players":[{"id":"a","team":"home","x":9,"y":10},{"id":"b","team":"home","x":11,"y":10}]}]}
+    result=normalize(payload)
+    assert result["frames"][0]["ball_handler"] in {"a","b"}
