@@ -15,6 +15,21 @@ const num=(s:string)=>{const m=clean(s).replaceAll(",","").match(/-?\d+/); if(!m
 const ma=(s:string)=>{const m=clean(s).match(/(\d+)\s*[-/\u2013\u2014]\s*(\d+)/); if(!m) throw new Error("Expected made-attempted value: "+s); return [Number(m[1]),Number(m[2])];};
 const pct=(a:number,b:number)=>b?Math.round(a/b*1000)/10:0;
 const r1=(n:number)=>Math.round(n*10)/10;
+const r2=(n:number)=>Math.round(n*100)/100;
+const formulaCatalog={
+  version:"courtiq-formulas-v2",
+  box_score:{
+    fg_pct:"FGM / FGA × 100",two_pct:"2PM / 2PA × 100",three_pct:"3PM / 3PA × 100",ft_pct:"FTM / FTA × 100",
+    efg_pct:"(FGM + 0.5 × 3PM) / FGA × 100",ts_pct:"PTS / [2 × (FGA + 0.44 × FTA)] × 100",
+    pps:"PTS / FGA",three_pa_rate:"3PA / FGA × 100",possessions:"FGA + 0.44 × FTA - ORB + TOV",
+    ortg:"PTS / Poss × 100",drtg:"Opponent PTS / Opponent Poss × 100",net_rating:"ORtg - DRtg",
+    tov_pct:"TOV / (FGA + 0.44 × FTA + TOV) × 100",orb_pct:"ORB / (ORB + Opp DRB) × 100",
+    drb_pct:"DRB / (DRB + Opp ORB) × 100",trb_pct:"TRB / (TRB + Opp TRB) × 100",
+    ast_to:"AST / TOV",assisted_fg_pct:"AST / FGM × 100",ftr:"FTA / FGA × 100",
+    pace:"Poss / Game Minutes × 40",bench_share:"Bench PTS / Team PTS × 100",margin:"Points For - Points Against"
+  },
+  tagged_possessions_required:["Play-Type PPP","Play-Type Frequency","Transition PPP","Second-Chance PPP","Points-off-Turnover PPP","Success%"]
+};
 
 function validateUrl(raw:string){
   const u=new URL(raw);
@@ -69,7 +84,8 @@ function advancedPlayer(player:any,team:any,opp:any){
   const per40=(value:number)=>player.minutes?r1(value*40/player.minutes):0;
   const teamMinutes=200;
   return {...player,fgm,fga,rebounds:player.oreb+player.dreb,
-    efg:pct(fgm+.5*player.three_pm,fga),ts:pct(player.points,2*(fga+.44*player.fta)),
+    fg_pct:pct(fgm,fga),two_pct:pct(player.two_pm,player.two_pa),three_pct:pct(player.three_pm,player.three_pa),ft_pct:pct(player.ftm,player.fta),
+    efg:pct(fgm+.5*player.three_pm,fga),ts:pct(player.points,2*(fga+.44*player.fta)),pps:fga?r2(player.points/fga):0,three_pa_rate:pct(player.three_pa,fga),
     ast_to:player.tov?Math.round(player.ast/player.tov*100)/100:(player.ast?"∞":0),
     points_per_40:per40(player.points),rebounds_per_40:per40(player.oreb+player.dreb),assists_per_40:per40(player.ast),
     play_end_share:pct(playEnds,teamPoss),
@@ -216,14 +232,20 @@ function basketNames($:cheerio.CheerioAPI){
   const h=$("h1,h2,h3,h4,h5,h6").map((_:number,e:any)=>clean($(e).text())).get().filter(Boolean);
   return [h.find((x:string)=>!/cup|league|מנהלת|ליגת/i.test(x))||"Home", h.slice().reverse().find((x:string)=>!/cup|league|מנהלת|ליגת/i.test(x))||"Away"];
 }
-function calc(t:any, opp:any){
+function calc(t:any, opp:any, gameMinutes=40){
   const fgm=t.two_pm+t.three_pm, fga=t.two_pa+t.three_pa;
   const poss=fga+.44*t.fta-t.oreb+t.tov;
+  const oppFga=opp.two_pa+opp.three_pa;
+  const oppPoss=oppFga+.44*opp.fta-opp.oreb+opp.tov;
+  const ortg=r1(t.points/Math.max(poss,1)*100), drtg=r1(opp.points/Math.max(oppPoss,1)*100);
+  const trb=t.oreb+t.dreb, oppTrb=opp.oreb+opp.dreb;
   return {
-    possessions:r1(poss), ortg:r1(t.points/Math.max(poss,1)*100),
+    possessions:r1(poss),pace:r1(poss/Math.max(gameMinutes,1)*40),ortg,drtg,net_rating:r1(ortg-drtg),
+    fg_pct:pct(fgm,fga),two_pct:pct(t.two_pm,t.two_pa),three_pct:pct(t.three_pm,t.three_pa),ft_pct:pct(t.ftm,t.fta),
     efg:pct(fgm+.5*t.three_pm,fga), ts:pct(t.points,2*(fga+.44*t.fta)),
-    tov:pct(t.tov,fga+.44*t.fta+t.tov), orb:pct(t.oreb,t.oreb+opp.dreb),
-    ftr:pct(t.fta,fga), ast_to:t.tov?Math.round(t.ast/t.tov*100)/100:null
+    pps:fga?r2(t.points/fga):0,three_pa_rate:pct(t.three_pa,fga),
+    tov:pct(t.tov,fga+.44*t.fta+t.tov),orb:pct(t.oreb,t.oreb+opp.dreb),drb:pct(t.dreb,t.dreb+opp.oreb),trb:pct(trb,trb+oppTrb),
+    ftr:pct(t.fta,fga),ast_to:t.tov?Math.round(t.ast/t.tov*100)/100:(t.ast?"∞":0),assisted_fg_pct:pct(t.ast,fgm),margin:t.points-opp.points
   };
 }
 function validateTeam(t:any,label:string){
@@ -239,10 +261,14 @@ function validateTeam(t:any,label:string){
   return {status:"passed",expected_points:expectedPoints,box_score_points:t.points,fga,checks:["non_negative","makes_lte_attempts","points_reconcile","fga_positive"]};
 }
 function uiGame(meta:any,home:any,away:any,quarters:any[]){
-  const hm=calc(home,away), am=calc(away,home);
-  const metrics=[["Offensive Rating",hm.ortg.toFixed(1),am.ortg.toFixed(1)],["eFG%",hm.efg+"%",am.efg+"%"],["TS%",hm.ts+"%",am.ts+"%"],["TOV%",hm.tov+"%",am.tov+"%"],["AST/TO",hm.ast_to??"—",am.ast_to??"—"]];
+  const gameMinutes=40+Math.max(0,quarters.length-4)*5;
+  const hm=calc(home,away,gameMinutes), am=calc(away,home,gameMinutes);
+  const metrics=[["Offensive Rating",hm.ortg.toFixed(1),am.ortg.toFixed(1)],["Defensive Rating",hm.drtg.toFixed(1),am.drtg.toFixed(1)],["Net Rating",hm.net_rating.toFixed(1),am.net_rating.toFixed(1)],["eFG%",hm.efg+"%",am.efg+"%"],["Pace",hm.pace.toFixed(1),am.pace.toFixed(1)]];
   const factors=[["eFG%",hm.efg,am.efg],["TOV%",hm.tov,am.tov],["ORB%",hm.orb,am.orb],["FTr",hm.ftr,am.ftr]];
-  const stats=[["Points",home.points,away.points],["2P",home.two_pm+"/"+home.two_pa,away.two_pm+"/"+away.two_pa],["3P",home.three_pm+"/"+home.three_pa,away.three_pm+"/"+away.three_pa],["FT",home.ftm+"/"+home.fta,away.ftm+"/"+away.fta],["Assists",home.ast,away.ast],["Turnovers",home.tov,away.tov],["Offensive Rebounds",home.oreb,away.oreb],["Defensive Rebounds",home.dreb,away.dreb]];
+  const stats=[["Points",home.points,away.points],["Point Margin",hm.margin,am.margin],["Possessions",hm.possessions,am.possessions],["Pace",hm.pace,am.pace],["ORtg",hm.ortg,am.ortg],["DRtg",hm.drtg,am.drtg],["Net Rating",hm.net_rating,am.net_rating],
+    ["FG",(home.two_pm+home.three_pm)+"/"+(home.two_pa+home.three_pa),(away.two_pm+away.three_pm)+"/"+(away.two_pa+away.three_pa)],["FG%",hm.fg_pct+"%",am.fg_pct+"%"],["2P",home.two_pm+"/"+home.two_pa,away.two_pm+"/"+away.two_pa],["2P%",hm.two_pct+"%",am.two_pct+"%"],["3P",home.three_pm+"/"+home.three_pa,away.three_pm+"/"+away.three_pa],["3P%",hm.three_pct+"%",am.three_pct+"%"],["FT",home.ftm+"/"+home.fta,away.ftm+"/"+away.fta],["FT%",hm.ft_pct+"%",am.ft_pct+"%"],
+    ["eFG%",hm.efg+"%",am.efg+"%"],["TS%",hm.ts+"%",am.ts+"%"],["PPS",hm.pps,am.pps],["3PA Rate",hm.three_pa_rate+"%",am.three_pa_rate+"%"],["TOV%",hm.tov+"%",am.tov+"%"],["FTr",hm.ftr+"%",am.ftr+"%"],
+    ["Assists",home.ast,away.ast],["AST/TO",hm.ast_to,am.ast_to],["Assisted FG%",hm.assisted_fg_pct+"%",am.assisted_fg_pct+"%"],["Turnovers",home.tov,away.tov],["Offensive Rebounds",home.oreb,away.oreb],["Defensive Rebounds",home.dreb,away.dreb],["ORB%",hm.orb+"%",am.orb+"%"],["DRB%",hm.drb+"%",am.drb+"%"],["TRB%",hm.trb+"%",am.trb+"%"]];
   const findings=[
     ["Possession Efficiency",hm.ortg+" ORtg vs "+am.ortg+" ORtg","Descriptive efficiency gap from verified totals"],
     ["Shooting Efficiency",hm.efg+"% eFG vs "+am.efg+"%","Shot-value conversion; shot context requires video"],
@@ -259,7 +285,7 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
   return {id:meta.id,comp:meta.competition,date:meta.date_display,home:meta.home,away:meta.away,hs:home.points,as:away.points,quarters,metrics,factors,stats,findings,videos,
     leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
     ask:meta.home+" and "+meta.away+" are compared here using verified box-score totals. Tactical causation requires video verification.",
-    raw:{home,away},calculated:{home:hm,away:am}};
+    raw:{home,away},calculated:{home:hm,away:am},formulaCatalog};
 }
 Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS") return new Response(null,{headers:cors});
@@ -361,7 +387,7 @@ Deno.serve(async(req:Request)=>{
         away:{starters:aggregatePlayers(parsedPlayers[1].players.filter((p:any)=>p.starter)),bench:aggregatePlayers(parsedPlayers[1].players.filter((p:any)=>!p.starter))}};
       ui.matchup={home:homeName,away:awayName};
       ui.stats.push(["Starters Points",ui.splits.home.starters.points,ui.splits.away.starters.points],["Bench Points",ui.splits.home.bench.points,ui.splits.away.bench.points],
-        ["Starters TS%",ui.splits.home.starters.ts+"%",ui.splits.away.starters.ts+"%"],["Bench TS%",ui.splits.home.bench.ts+"%",ui.splits.away.bench.ts+"%"]);
+        ["Bench Share",pct(ui.splits.home.bench.points,home.points)+"%",pct(ui.splits.away.bench.points,away.points)+"%"],["Starters TS%",ui.splits.home.starters.ts+"%",ui.splits.away.starters.ts+"%"],["Bench TS%",ui.splits.home.bench.ts+"%",ui.splits.away.bench.ts+"%"]);
     }
     if(provider==="WINNER_LEAGUE"){
       ui.splits={home:{starters:splitData[0].starters,bench:splitData[0].bench},away:{starters:splitData[1].starters,bench:splitData[1].bench}};
@@ -370,7 +396,11 @@ Deno.serve(async(req:Request)=>{
         ui.extra={home:extraData[0],away:extraData[1]};
         ui.stats.push(["Points off Turnovers",extraData[0].points_off_turnovers,extraData[1].points_off_turnovers],["Paint Points",extraData[0].paint_points,extraData[1].paint_points],["Second Chance Points",extraData[0].second_chance_points,extraData[1].second_chance_points]);
       }
-      ui.stats.push(["Assists",home.ast,away.ast],["Starters TS%",splitData[0].starters.ts+"%",splitData[1].starters.ts+"%"],["Bench TS%",splitData[0].bench.ts+"%",splitData[1].bench.ts+"%"]);
+      ui.stats.push(["Bench Share",pct(splitData[0].bench.points,home.points)+"%",pct(splitData[1].bench.points,away.points)+"%"],["Starters TS%",splitData[0].starters.ts+"%",splitData[1].starters.ts+"%"],["Bench TS%",splitData[0].bench.ts+"%",splitData[1].bench.ts+"%"]);
+    }
+    if(ui.splits){
+      ui.calculated.home.bench_share=pct(ui.splits.home.bench.points,home.points);
+      ui.calculated.away.bench_share=pct(ui.splits.away.bench.points,away.points);
     }
     const payload={provider,source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},splits:ui.splits||null,extra:ui.extra||null,play_by_play:playByPlay,calculated:ui.calculated};
 
@@ -385,7 +415,7 @@ Deno.serve(async(req:Request)=>{
       version:"v1",game_id:game.id,generated_at:new Date().toISOString(),
       summary:{score:home.points+"-"+away.points,home:homeName,away:awayName},
       metrics:ui.metrics,four_factors:ui.factors,findings:ui.findings,team_stats:ui.stats,
-      player_analytics:ui.players,starter_bench:ui.splits||null,play_by_play:playByPlay,
+      player_analytics:ui.players,starter_bench:ui.splits||null,play_by_play:playByPlay,formula_catalog:formulaCatalog,
       video_investigation:ui.videos,confidence:"DATA CONFIRMED",validation
     };
     const {error:reportErr}=await admin.from("game_reports").upsert({
