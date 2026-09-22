@@ -2,6 +2,7 @@ name: CourtIQ tests
 on:
   push:
     branches: [main, feature/video-evidence-linking]
+  pull_request:
   workflow_dispatch:
 jobs:
   test:
