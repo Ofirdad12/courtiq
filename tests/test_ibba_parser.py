@@ -1,4 +1,4 @@
-from api.ibba import parse_ibba_html
+from api.ibba import parse_ibba_html, validate_ibba_url
 
 HTML="""<html><head><title>A — B - IBBA</title></head><body>
 <div>05-04-2026</div>
@@ -18,3 +18,7 @@ def test_ibba_parser_to_courtiq_schema():
     assert g["home"]["raw"]["team"]=="A"
     assert g["home"]["raw"]["fgm"]==30
     assert g["home"]["four_factors"]["eFG%"]==53.8
+
+def test_ibba_accepts_official_prefixed_match_ids():
+    url="https://ibasketball.co.il/match/x99002-2/"
+    assert validate_ibba_url(url)==url

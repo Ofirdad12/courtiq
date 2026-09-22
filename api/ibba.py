@@ -20,7 +20,7 @@ def _num(value:str)->int:
 
 def validate_ibba_url(url:str)->str:
     p=urlparse(url)
-    if p.scheme!="https" or p.hostname not in ALLOWED_HOSTS or not re.fullmatch(r"/match/\d+(?:-[^/]*)?/?",p.path):
+    if p.scheme!="https" or p.hostname not in ALLOWED_HOSTS or not re.fullmatch(r"/match/[a-z0-9]+(?:-[a-z0-9]+)*/?",p.path,re.I):
         raise ValueError("Only official https://ibasketball.co.il/match/... URLs are supported")
     return url
 
@@ -89,7 +89,7 @@ def parse_ibba_html(html:str,url:str)->dict:
     title=soup.title.get_text(" ",strip=True) if soup.title else f"{home_name} — {away_name}"
     text=soup.get_text(" ",strip=True)
     date_match=re.search(r"\b(\d{2}-\d{2}-\d{4})\b",text)
-    metadata={"id":re.search(r"/match/(\d+)",url).group(1),"home_team":home_name,"away_team":away_name,
+    metadata={"id":re.search(r"/match/([^/]+)",url).group(1),"home_team":home_name,"away_team":away_name,
               "date":date_match.group(1) if date_match else None,"title":title,"quarters":quarters}
     game=build_game(home,away,metadata,{"provider":"IBBA","url":url,"input":"official match URL"})
     game["home"]["raw"]["ast"]=home["ast"]; game["away"]["raw"]["ast"]=away["ast"]

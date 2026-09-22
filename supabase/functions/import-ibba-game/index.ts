@@ -21,7 +21,7 @@ function validateUrl(raw:string){
   if(u.protocol!=="https:" || !allowed.has(u.hostname)) throw new Error("Use an official ibasketball.co.il or basket.co.il game URL.");
   const isIbba=/^(www\.)?ibasketball\.co\.il$/.test(u.hostname);
   const isBasket=/^(www\.)?basket\.co\.il$/.test(u.hostname);
-  if(isIbba && !/^\/match\/\d+(?:-[^/]*)?\/?$/.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
+  if(isIbba && !/^\/match\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/i.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
   if(isBasket && !(u.pathname.toLowerCase().endsWith("/game-zone.asp") || u.pathname.toLowerCase()==="/game-zone.asp") || !u.searchParams.get("GameId")) throw new Error("Unsupported Winner League URL. Use basket.co.il/game-zone.asp?GameId=...");
   return {u, provider:isBasket?"WINNER_LEAGUE":"IBBA"};
 }
@@ -54,6 +54,81 @@ function teamTotal($:cheerio.CheerioAPI, table:any){
   };
 }
 
+function minutesValue(value:string){
+  const s=clean(value||"");
+  const clock=s.match(/^(\d+):(\d{2})$/);
+  if(clock) return r1(Number(clock[1])+Number(clock[2])/60);
+  const n=Number(s);
+  return Number.isFinite(n)?r1(n):0;
+}
+function advancedPlayer(player:any,team:any,opp:any){
+  const fgm=player.two_pm+player.three_pm, fga=player.two_pa+player.three_pa;
+  const missed=fga-fgm+player.fta-player.ftm;
+  const playEnds=fga+.44*player.fta+player.tov;
+  const teamPoss=(team.two_pa+team.three_pa)+.44*team.fta-team.oreb+team.tov;
+  const per40=(value:number)=>player.minutes?r1(value*40/player.minutes):0;
+  const teamMinutes=200;
+  return {...player,fgm,fga,rebounds:player.oreb+player.dreb,
+    efg:pct(fgm+.5*player.three_pm,fga),ts:pct(player.points,2*(fga+.44*player.fta)),
+    ast_to:player.tov?Math.round(player.ast/player.tov*100)/100:(player.ast?"∞":0),
+    points_per_40:per40(player.points),rebounds_per_40:per40(player.oreb+player.dreb),assists_per_40:per40(player.ast),
+    play_end_share:pct(playEnds,teamPoss),
+    oreb_pct:player.minutes?pct(player.oreb*teamMinutes/5,player.minutes*(team.oreb+opp.dreb)):0,
+    dreb_pct:player.minutes?pct(player.dreb*teamMinutes/5,player.minutes*(team.dreb+opp.oreb)):0,
+    box_impact_per_40:per40(player.points+player.oreb+player.dreb+player.ast+player.steals+player.blocks-missed-player.tov)};
+}
+function playerLeaders(players:any[]){
+  const played=players.filter(p=>p.minutes>0);
+  const top=(key:string)=>played.slice().sort((a:any,b:any)=>Number(b[key])-Number(a[key])||b.points-a.points)[0];
+  if(!played.length) return [];
+  const scorer=top("points"), rebounder=top("rebounds"), passer=top("ast");
+  return [[scorer.name,scorer.points,"PTS"],[rebounder.name,rebounder.rebounds,"REB"],[passer.name,passer.ast,"AST"]];
+}
+function aggregatePlayers(players:any[]){
+  const keys=["minutes","points","two_pm","two_pa","three_pm","three_pa","ftm","fta","oreb","dreb","tov","ast","steals","blocks"];
+  const out:any={}; for(const k of keys) out[k]=r1(players.reduce((sum,p)=>sum+Number(p[k]||0),0));
+  const fga=out.two_pa+out.three_pa, fgm=out.two_pm+out.three_pm;
+  return {...out,efg:pct(fgm+.5*out.three_pm,fga),ts:pct(out.points,2*(fga+.44*out.fta)),ast_to:out.tov?Math.round(out.ast/out.tov*100)/100:(out.ast?"∞":0)};
+}
+function ibbaPlayerData($:cheerio.CheerioAPI, table:any){
+  const players=$(table).find("tbody tr, tr").toArray().filter((tr:any)=>$(tr).find("td[data-key]").length).map((tr:any)=>{
+    const value=(key:string)=>clean($(tr).find(`[data-key="${key}"]`).text());
+    const [two_pm,two_pa]=ma(value("fgs")), [three_pm,three_pa]=ma(value("threeps")), [ftm,fta]=ma(value("fts"));
+    return {id:String($(tr).attr("data-player-id")||""),number:num($(tr).find(".data-number").text()),name:clean($(tr).find(".data-name").text()),
+      starter:$(tr).hasClass("lineup"),minutes:minutesValue(value("min")),points:num(value("pts")),two_pm,two_pa,three_pm,three_pa,ftm,fta,
+      dreb:num(value("def")),oreb:num(value("off")),steals:num(value("stl")),tov:num(value("to")),ast:num(value("ast")),blocks:num(value("blk")),
+      value:num(value("rate")),plus_minus:num(value("pm"))};
+  });
+  if(!players.length) throw new Error("IBBA player rows were not found.");
+  return {total:teamTotal($,table),players};
+}
+function ibbaPlayByPlay($:cheerio.CheerioAPI,homeName:string,awayName:string){
+  const seen=new Set<string>();
+  const events:any[]=[];
+  $("[data-event-timeline] .sp-vertical-timeline-minute").each((sourceOrder:number,el:any)=>{
+    const node=$(el), className=String(node.attr("class")||"");
+    const side=className.includes("timeline-minute-home")?"home":className.includes("timeline-minute-away")?"away":"";
+    const periodFromClass=className.match(/(?:^|\s)quarter-(\d+)(?:\s|$)/)?.[1];
+    const periodLabel=clean(node.find(".minute .quarter").first().text());
+    const period=Number(periodFromClass||periodLabel.match(/(\d+)/)?.[1]||0);
+    const clock=clean(node.find(".minute .time").first().text());
+    const score=clean(node.find(".minute .score").first().text());
+    const actionNode=node.find(".action").first();
+    const player=clean(actionNode.find("a").first().text());
+    const description=clean(actionNode.find(".description").first().text())||clean(actionNode.text());
+    const type=className.match(/(?:^|\s)key-([^\s]+)/)?.[1]||"event";
+    if(!period&&!clock&&!description)return;
+    const event={period,period_label:periodLabel||("Q"+period),clock,score,side,
+      team:side==="home"?homeName:side==="away"?awayName:"",player,description,type,_sourceOrder:sourceOrder};
+    const key=[period,clock,score,side,player,description,type].join("|");
+    if(seen.has(key))return;
+    seen.add(key); events.push(event);
+  });
+  const seconds=(clock:string)=>{const m=clock.match(/(\d+):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):0;};
+  events.sort((a,b)=>a.period-b.period||seconds(b.clock)-seconds(a.clock)||b._sourceOrder-a._sourceOrder);
+  return events.map(({_sourceOrder,...event})=>event);
+}
+
 function idxAny(headers:string[], needles:string[]){
   const norm=(s:string)=>clean(s).toLowerCase();
   const i=headers.findIndex(h=>needles.some(n=>norm(h)===norm(n)||norm(h).includes(norm(n))));
@@ -80,14 +155,13 @@ function basketPlayerData($:cheerio.CheerioAPI, table:any){
   if(!header) throw new Error("Winner League player table header was not found.");
   const playerCol=header.findIndex(c=>/^(player name|שם שחקן)$/i.test(clean(c)));
   const offset=playerCol-1;
-  const players=rows.filter((r:string[])=>/^\d+$/.test(clean(r[offset]||""))&&clean(r[playerCol]||"")).map((r:string[])=>({
-    number:num(r[offset]),name:clean(r[playerCol]),starter:clean(r[offset+2])==="*",minutes:num(r[offset+3]),points:num(r[offset+4]),
-    dreb:num(r[offset+11]),oreb:num(r[offset+12]),rebounds:num(r[offset+13]),steals:num(r[offset+16]),tov:num(r[offset+17]),ast:num(r[offset+18]),value:num(r[offset+21])
-  }));
+  const players=rows.filter((r:string[])=>/^\d+$/.test(clean(r[offset]||""))&&clean(r[playerCol]||"")).map((r:string[])=>{
+    const [two_pm,two_pa]=ma(r[offset+5]), [three_pm,three_pa]=ma(r[offset+7]), [ftm,fta]=ma(r[offset+9]);
+    return {number:num(r[offset]),name:clean(r[playerCol]),starter:clean(r[offset+2])==="*",minutes:minutesValue(r[offset+3]),points:num(r[offset+4]),
+      two_pm,two_pa,three_pm,three_pa,ftm,fta,dreb:num(r[offset+11]),oreb:num(r[offset+12]),steals:num(r[offset+16]),tov:num(r[offset+17]),ast:num(r[offset+18]),blocks:num(r[offset+19]||"0"),value:num(r[offset+21])};
+  });
   if(!players.length) throw new Error("Winner League player rows were not found.");
-  const top=(key:string)=>players.slice().sort((a:any,b:any)=>b[key]-a[key]||b.points-a.points)[0];
-  const scorer=top("points"), rebounder=top("rebounds"), passer=top("ast");
-  return {total:basketTeamTotal($,table),players,leaders:[[scorer.name,scorer.points,"PTS"],[rebounder.name,rebounder.rebounds,"REB"],[passer.name,passer.ast,"AST"]]};
+  return {total:basketTeamTotal($,table),players};
 }
 function basketQuarters($:cheerio.CheerioAPI){
   let result:any[]=[];
@@ -220,7 +294,7 @@ Deno.serve(async(req:Request)=>{
     const html=await res.text();
     const $=cheerio.load(html);
 
-    let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null, winnerPlayers:any=null;
+    let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null, parsedPlayers:any=null, playByPlay:any[]=[];
     const playerTables:any[]=[];
     if(provider==="IBBA"){
       let quarter:any=null;
@@ -228,7 +302,9 @@ Deno.serve(async(req:Request)=>{
       if(!quarter) throw new Error("Could not locate the IBBA quarter table.");
       const qrows=tableRows($,quarter).slice(1).filter((r:string[])=>r.length>=6&&r[0]);
       if(qrows.length<2) throw new Error("Could not read both teams.");
-      homeName=qrows[0][0]; awayName=qrows[1][0]; quarters=[0,1,2,3].map(i=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
+      homeName=qrows[0][0]; awayName=qrows[1][0];
+      const quarterCount=Math.max(4,Math.min(qrows[0].length-2,qrows[1].length-2));
+      quarters=Array.from({length:quarterCount},(_,i)=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
       $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
     }else{
       const splitTables:any[]=[];
@@ -245,18 +321,22 @@ Deno.serve(async(req:Request)=>{
       awayName=basketTableName($,playerTables[1])||fallbackNames[1];
       quarters=basketQuarters($);
       if(!quarters.length) throw new Error("Could not locate Winner League quarter scores.");
-      winnerPlayers=[basketPlayerData($,playerTables[0]),basketPlayerData($,playerTables[1])];
+      parsedPlayers=[basketPlayerData($,playerTables[0]),basketPlayerData($,playerTables[1])];
       splitData=[basketSplit($,splitTables[0]),basketSplit($,splitTables[1])];
       extraData=basketExtra($);
     }
     if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
     if(provider==="IBBA"&&playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
-    const home=provider==="WINNER_LEAGUE"?winnerPlayers[0].total:teamTotal($,playerTables[0]);
-    const away=provider==="WINNER_LEAGUE"?winnerPlayers[1].total:teamTotal($,playerTables[1]);
+    if(provider==="IBBA") parsedPlayers=[ibbaPlayerData($,playerTables[0]),ibbaPlayerData($,playerTables[1])];
+    if(provider==="IBBA") playByPlay=ibbaPlayByPlay($,homeName,awayName);
+    const home=parsedPlayers[0].total;
+    const away=parsedPlayers[1].total;
+    parsedPlayers[0].players=parsedPlayers[0].players.map((p:any)=>advancedPlayer(p,home,away));
+    parsedPlayers[1].players=parsedPlayers[1].players.map((p:any)=>advancedPlayer(p,away,home));
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="WINNER_LEAGUE"?"basket-v3":"ibba-v2",
+      parser:provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v4",
       validated_at:new Date().toISOString()
     };
 
@@ -264,16 +344,26 @@ Deno.serve(async(req:Request)=>{
     const dm=allText.match(/\b(\d{2})[-/](\d{2})[-/](\d{4})\b/);
     const gameDate=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null;
     const dateDisplay=dm?dm[1]+"/"+dm[2]+"/"+dm[3]:"Imported game";
-    const id=provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/(\d+)/)![1];
+    const id=provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
     auditExternalId=id;
     const title=clean($("title").text())||"IBBA";
 
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
+    ui.sourceUrl=u.toString();
+    ui.playByPlay=playByPlay;
+    ui.playByPlayStatus=playByPlay.length?"published":"not_published";
+    ui.leaders=playerLeaders(parsedPlayers[0].players);
+    ui.awayLeaders=playerLeaders(parsedPlayers[1].players);
+    ui.players={home:parsedPlayers[0].players,away:parsedPlayers[1].players};
+    if(provider==="IBBA"){
+      ui.splits={home:{starters:aggregatePlayers(parsedPlayers[0].players.filter((p:any)=>p.starter)),bench:aggregatePlayers(parsedPlayers[0].players.filter((p:any)=>!p.starter))},
+        away:{starters:aggregatePlayers(parsedPlayers[1].players.filter((p:any)=>p.starter)),bench:aggregatePlayers(parsedPlayers[1].players.filter((p:any)=>!p.starter))}};
+      ui.matchup={home:homeName,away:awayName};
+      ui.stats.push(["Starters Points",ui.splits.home.starters.points,ui.splits.away.starters.points],["Bench Points",ui.splits.home.bench.points,ui.splits.away.bench.points],
+        ["Starters TS%",ui.splits.home.starters.ts+"%",ui.splits.away.starters.ts+"%"],["Bench TS%",ui.splits.home.bench.ts+"%",ui.splits.away.bench.ts+"%"]);
+    }
     if(provider==="WINNER_LEAGUE"){
-      ui.leaders=winnerPlayers[0].leaders;
-      ui.awayLeaders=winnerPlayers[1].leaders;
-      ui.players={home:winnerPlayers[0].players,away:winnerPlayers[1].players};
       ui.splits={home:{starters:splitData[0].starters,bench:splitData[0].bench},away:{starters:splitData[1].starters,bench:splitData[1].bench}};
       ui.matchup={home:homeName,away:awayName};
       if(extraData?.length>=2){
@@ -282,7 +372,7 @@ Deno.serve(async(req:Request)=>{
       }
       ui.stats.push(["Assists",home.ast,away.ast],["Starters TS%",splitData[0].starters.ts+"%",splitData[1].starters.ts+"%"],["Bench TS%",splitData[0].bench.ts+"%",splitData[1].bench.ts+"%"]);
     }
-    const payload={provider,source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},splits:ui.splits||null,extra:ui.extra||null,calculated:ui.calculated};
+    const payload={provider,source_url:u.toString(),verified:true,imported_at:new Date().toISOString(),validation,ui,raw:{home,away},splits:ui.splits||null,extra:ui.extra||null,play_by_play:playByPlay,calculated:ui.calculated};
 
     const admin=createClient(supabaseUrl,serviceKey);
     const {data:game,error:gameErr}=await admin.from("games").upsert({
@@ -295,6 +385,7 @@ Deno.serve(async(req:Request)=>{
       version:"v1",game_id:game.id,generated_at:new Date().toISOString(),
       summary:{score:home.points+"-"+away.points,home:homeName,away:awayName},
       metrics:ui.metrics,four_factors:ui.factors,findings:ui.findings,team_stats:ui.stats,
+      player_analytics:ui.players,starter_bench:ui.splits||null,play_by_play:playByPlay,
       video_investigation:ui.videos,confidence:"DATA CONFIRMED",validation
     };
     const {error:reportErr}=await admin.from("game_reports").upsert({
@@ -316,7 +407,7 @@ Deno.serve(async(req:Request)=>{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
           club_id:auditClubId,provider:auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v3":"ibba-v2"}
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v4"}
         });
       }catch(_){}
     }
