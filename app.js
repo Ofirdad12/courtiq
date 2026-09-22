@@ -342,7 +342,7 @@ function apiGameToUi(x){
 
 function openUrlImport(){
   const modal=document.createElement("div"); modal.className="modal"; const signed=window.CourtIQData?.isSignedIn();
-  modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · VERIFIED IMPORT</small><h2>Import Official Game</h2><p>Paste an official IBBA or Winner League (basket.co.il) game URL. CourtIQ detects the source, validates the box score, calculates deterministic metrics, saves the game and creates a reusable V1 report.</p><div class="importFields"><input id="boxUrl" placeholder="ibasketball.co.il/match/... or basket.co.il/game-zone.asp?GameId=..."></div><div class="schema">${signed?"SECURE CLUB SESSION · Game will be saved to the Ashdod workspace.":"SIGN IN REQUIRED · Database imports are available only inside a club session."}</div><div id="urlStatus" class="impStatus"></div><button id="runUrl" class="runImport" ${signed?"":"disabled"}>IMPORT · VERIFY · SAVE</button></div>`;
+  modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · VERIFIED IMPORT</small><h2>Import Official Game</h2><p>Paste an official IBBA or Winner League (basket.co.il) game URL. CourtIQ detects the source, validates the box score, calculates deterministic metrics, saves the game and creates a reusable V1 report.</p><div class="importFields"><input id="boxUrl" placeholder="ibasketball.co.il/match/... or basket.co.il/game-zone.asp?GameId=..."></div><div class="schema">${signed?"SECURE CLUB SESSION · Game will be saved to your selected club workspace.":"SIGN IN REQUIRED · Database imports are available only inside a club session."}</div><div id="urlStatus" class="impStatus"></div><button id="runUrl" class="runImport" ${signed?"":"disabled"}>IMPORT · VERIFY · SAVE</button></div>`;
   document.body.appendChild(modal); modal.querySelector(".modalX").onclick=()=>modal.remove(); modal.onclick=e=>{if(e.target===modal)modal.remove()};
   const womenReady=document.createElement("button"); womenReady.type="button"; womenReady.className="importBtn secondaryAction tomorrowSource"; womenReady.textContent="23/09 · Maccabi Haifa vs Bnei Yehuda";
   womenReady.onclick=()=>{modal.querySelector("#boxUrl").value="https://ibasketball.co.il/match/x99002-2/";modal.querySelector("#urlStatus").textContent="Official game link selected. Import after the federation publishes the final box score.";};
@@ -417,12 +417,14 @@ function openAccount(mode="signin"){
     }
 
     if(signed){
-      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Club data is protected by Supabase Row Level Security.</p><div id="accountStatus" class="impStatus"></div><button id="loadClub" class="runImport">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
-      body.querySelector("#loadClub").onclick=async()=>{
-        const status=body.querySelector("#accountStatus");status.textContent="Checking secure club workspace…";
-        try{const x=await syncProductData(),w=x.workspace;status.textContent=`Connected · ${w.club.name} · ${w.clubPlayers.length} player records · ${w.games.length} saved games`;}
-        catch(e){status.textContent=e.message}
-      };
+      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Choose the workspace CourtIQ should use for imports, reports and analysis.</p><div id="clubChooser" class="importFields"><span>Loading accessible clubs…</span></div><div id="accountStatus" class="impStatus"></div><button id="loadClub" class="runImport">REFRESH WORKSPACE</button><button id="signOut" class="accountSecondary">SIGN OUT</button><div class="schema">Workspace access is enforced by Supabase Row Level Security.</div>`;
+      const chooser=body.querySelector("#clubChooser"),status=body.querySelector("#accountStatus");
+      data.accessibleClubs().then(clubs=>{
+        if(!clubs?.length){chooser.innerHTML="<span>No club workspace is assigned to this account.</span>";return;}
+        chooser.innerHTML=`<select id="clubSelect" aria-label="Club workspace">${clubs.map(c=>`<option value="${c.id}" ${Number(c.id)===Number(data.selectedClubId())?"selected":""}>${htmlEsc(c.name)} · ${htmlEsc(c.season||"")}</option>`).join("")}</select>`;
+        chooser.querySelector("#clubSelect").onchange=async e=>{data.selectClub(Number(e.target.value));status.textContent="Switching workspace…";try{await syncProductData();modal.remove();render();}catch(err){status.textContent=err.message}};
+      }).catch(e=>{chooser.innerHTML="";status.textContent=e.message});
+      body.querySelector("#loadClub").onclick=async()=>{status.textContent="Refreshing secure club workspace…";try{const x=await syncProductData(),w=x.workspace;status.textContent=`Connected · ${w.club.name} · ${w.clubPlayers.length} player records · ${w.games.length} saved games`;}catch(e){status.textContent=e.message}};
       body.querySelector("#signOut").onclick=()=>{data.signOut();modal.remove();render();};
       return;
     }
