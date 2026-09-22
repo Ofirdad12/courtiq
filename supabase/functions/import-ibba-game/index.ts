@@ -309,13 +309,16 @@ Deno.serve(async(req:Request)=>{
     const anon=Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const userDb=createClient(supabaseUrl,anon,{global:{headers:{Authorization:auth}}});
-    const {data:clubs,error:clubErr}=await userDb.from("clubs").select("id,name,season").eq("slug","maccabi-bnot-ashdod").limit(1);
+    const body=await req.json();
+    const requestedClubId=Number(body.club_id||0);
+    if(!Number.isInteger(requestedClubId)||requestedClubId<=0) return j({error:"Choose a club workspace before importing."},400);
+    // RLS on clubs is the authorization boundary: users can select only clubs they belong to.
+    const {data:clubs,error:clubErr}=await userDb.from("clubs").select("id,name,season").eq("id",requestedClubId).limit(1);
     if(clubErr) throw clubErr;
-    if(!clubs?.length) return j({error:"This account does not have access to the Ashdod pilot."},403);
+    if(!clubs?.length) return j({error:"This account does not have access to the selected club."},403);
 
     const club=clubs[0];
     auditClubId=club.id;
-    const body=await req.json();
     const parsed=validateUrl(String(body.url||""));
     const u=parsed.u, provider=parsed.provider;
     auditUrl=u.toString();
