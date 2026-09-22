@@ -96,3 +96,7 @@ button:disabled{opacity:.48;cursor:not-allowed}.impStatus{min-height:18px;margin
 #dashboardDataStatus{line-height:1.65}
 #dashboardDataStatus b{color:#fff}
 @media(max-width:620px){.piFilters{display:grid;grid-template-columns:1fr 1fr}.piFilters button{width:100%}}
+
+
+/* Video evidence linking */
+.videoRoomLayout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,.7fr);gap:12px}.gameVideo{display:block;width:100%;max-height:68vh;background:#000;border:1px solid var(--line);border-radius:10px}.videoPlaylist{padding:14px;min-height:0}.videoPlaylist h3{margin:0 0 10px}.videoPlaylist #videoEventList{display:grid;gap:7px;max-height:62vh;overflow:auto}.videoEvent{display:grid;gap:4px;width:100%;text-align:left;padding:10px;border:1px solid #27314a;border-radius:8px;background:#0d1422;color:#fff;cursor:pointer}.videoEvent:hover{border-color:#8e79ff;background:#151432}.videoEvent b{font-size:10px;color:#d8ceff}.videoEvent span{font-size:9px;color:var(--muted);line-height:1.4}.videoLinkedStat{cursor:pointer}.videoLinkedStat:hover td{background:#151432;color:#d8ceff}.videoLinkedStat td:first-child::after{content:"  ▶";color:#9b82ff;font-size:8px}.emptyView code{color:#d8ceff}@media(max-width:820px){.videoRoomLayout{grid-template-columns:1fr}.videoPlaylist #videoEventList{max-height:360px}}
