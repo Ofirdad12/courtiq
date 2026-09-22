@@ -85,7 +85,7 @@ async function syncProductData(){
   productSyncPromise=(async()=>{
     const w=await window.CourtIQData.workspace();
     Object.keys(games).filter(k=>k.startsWith("db_")).forEach(k=>delete games[k]);
-    for(const row of w.games||[]){const ui=row.payload?.ui;if(ui){ui._dbId=row.id;ui._provider=row.provider;ui._externalId=row.external_id;games["db_"+row.id]=ui;}}
+    for(const row of w.games||[]){const ui=row.payload?.ui;if(ui){ui._dbId=row.id;ui._provider=row.provider;ui._externalId=row.external_id;await window.CourtIQData.hydrateGameVideo?.(ui,row.id);games["db_"+row.id]=ui;}}
     const intelligence=await window.CourtIQData.playerIntelligence();
     window.CourtIQPlayers?.replacePlayers?.(intelligence);
     const dbKeys=Object.keys(games).filter(k=>k.startsWith("db_"));
