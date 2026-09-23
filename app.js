@@ -466,23 +466,32 @@ async function openGameLibrary(){
   let syncError="";if(window.CourtIQData?.isSignedIn()){try{await syncProductData();}catch(e){syncError=e.message;}}
   const modal=document.createElement("div");modal.className="modal";
   const items=productGameEntries();
-  const cards=items.length?items.map(([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
-    <div><span class="libraryStatus">${g.sourceLabel?.includes("CONFIRMED")?"● DATA CONFIRMED":"● COURTIQ DATA"}</span><small>${g.comp||"Competition"} · ${g.date||""}</small></div>
-    <h3>${g.home} <b>${g.hs}–${g.as}</b> ${g.away}</h3>
+  const categoryFor=(g)=>{
+    const provider=String(g._provider||"").toUpperCase(),comp=String(g.comp||"").toLowerCase();
+    if(provider==="FIBA"||comp.includes("eurocup women")) return {key:"eurocup",label:"EuroCup Women · FIBA"};
+    if(provider==="IBBA"||comp.includes("athena")||comp.includes("women")) return {key:"women",label:"Israel Women · IBBA"};
+    if(provider==="WINNER_LEAGUE"||comp.includes("winner")) return {key:"men",label:"Men's Competitions"};
+    return {key:"other",label:"Other Games"};
+  };
+  const grouped=new Map();
+  for(const entry of items){const cat=categoryFor(entry[1]);if(!grouped.has(cat.key))grouped.set(cat.key,{label:cat.label,items:[]});grouped.get(cat.key).items.push(entry);}
+  const card=([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
+    <div><span class="libraryStatus">${g.sourceLabel?.includes("CONFIRMED")?"● DATA CONFIRMED":"● COURTIQ DATA"}</span><small>${htmlEsc(g.comp||"Competition")} · ${htmlEsc(g.date||"")}</small></div>
+    <h3>${htmlEsc(g.home)} <b>${htmlEsc(g.hs)}–${htmlEsc(g.as)}</b> ${htmlEsc(g.away)}</h3>
     <footer><span>OPEN ANALYSIS</span><b>→</b></footer>
-  </button>`).join(""):`<div class="productEmpty"><b>NO VERIFIED CLUB GAMES YET</b><span>Import the first official IBBA game to start the persistent club library.</span></div>`;
+  </button>`;
+  const sections=items.length?[...grouped.values()].map(group=>`<section class="gameLibraryTopic"><h3 class="productSectionTitle">${htmlEsc(group.label)}</h3><div class="gameLibraryGrid">${group.items.map(card).join("")}</div></section>`).join(""):`<div class="productEmpty"><b>NO VERIFIED CLUB GAMES YET</b><span>Import the first official game to start the persistent club library.</span></div>`;
   modal.innerHTML=`<div class="modalCard compareModal gameLibrary"><button class="modalX">×</button>
-    <small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Game Library</h2>
-    <p>Persistent club games only. Demo and local browser data are excluded after sign-in.</p>
-    <div class="libraryTop"><div><small>GAMES AVAILABLE</small><b>${items.length}</b></div><div><small>WORKFLOW</small><b>Import → Verify → Analyze → Report</b></div><button id="libraryImport" class="runImport">IMPORT GAME</button></div>
-    <div class="gameLibraryGrid">${cards}</div><h3 class="productSectionTitle">Men\'s Competitions</h3><button id="winnerCupTab" class="runImport">WINNER CUP</button>
-    ${syncError?`<div class="insight warning">DATABASE · ${syncError}</div>`:""}<div class="insight">PILOT RULE · Tactical conclusions remain separate from verified box-score findings until video evidence is available.</div>
+    <small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Games</h2>
+    <p>Saved games are restored from the club database and organized automatically by competition/source.</p>
+    <div class="libraryTop"><div><small>GAMES AVAILABLE</small><b>${items.length}</b></div><div><small>WORKFLOW</small><b>Import → Verify → Save → Analyze</b></div><button id="libraryImport" class="runImport">IMPORT GAME</button></div>
+    ${sections}
+    ${syncError?`<div class="insight warning">DATABASE · ${htmlEsc(syncError)}</div>`:""}<div class="insight">PILOT RULE · Tactical conclusions remain separate from verified box-score findings until video evidence is available.</div>
   </div>`;
   document.body.appendChild(modal);
   modal.querySelector(".modalX").onclick=()=>modal.remove();
   modal.onclick=e=>{if(e.target===modal)modal.remove()};
   modal.querySelector("#libraryImport").onclick=()=>{modal.remove();openAutoImport();};
-  modal.querySelector("#winnerCupTab").onclick=()=>{modal.remove();window.CourtIQMens?.openWinnerCup?.();};
   modal.querySelectorAll("[data-library-game]").forEach(btn=>btn.onclick=()=>{active=btn.dataset.libraryGame;modal.remove();render();window.scrollTo(0,0);});
 }
 function openAutoImport(){
