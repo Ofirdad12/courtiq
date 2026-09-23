@@ -92,7 +92,8 @@ async function syncProductData(){
     const intelligence=await window.CourtIQData.playerIntelligence();
     window.CourtIQPlayers?.replacePlayers?.(intelligence);
     const dbKeys=Object.keys(games).filter(k=>k.startsWith("db_"));
-    if(dbKeys.length && !String(active).startsWith("db_")) active=dbKeys[0];\n    if(!dbKeys.length) active="g1";
+    if(dbKeys.length && !String(active).startsWith("db_")) active=dbKeys[0];
+    if(!dbKeys.length) active="g1";
     return {workspace:w,playerRows:intelligence,dbKeys};
   })().finally(()=>{productSyncPromise=null;});
   return productSyncPromise;
