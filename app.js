@@ -77,6 +77,7 @@ try{
   const savedPilot=localStorage.getItem("courtiq_pilot_game");
   if(savedPilot) games.pilot=JSON.parse(savedPilot); const savedUrl=localStorage.getItem("courtiq_url_game"); if(savedUrl) games.url=JSON.parse(savedUrl);
 }catch(e){console.warn("Could not restore pilot game",e)}
+let currentWorkspace=null;
 let active=games.url?"url":(games.pilot?"pilot":"g2");
 let productSyncPromise=null;
 async function syncProductData(){
@@ -84,12 +85,16 @@ async function syncProductData(){
   if(productSyncPromise) return productSyncPromise;
   productSyncPromise=(async()=>{
     const w=await window.CourtIQData.workspace();
+    currentWorkspace=w;
+    await window.CourtIQData.hydrateGamesMedia?.(w.games||[]);
     Object.keys(games).filter(k=>k.startsWith("db_")).forEach(k=>delete games[k]);
-    for(const row of w.games||[]){const ui=row.payload?.ui;if(ui){ui._dbId=row.id;ui._provider=row.provider;ui._externalId=row.external_id;games["db_"+row.id]=ui;}}
+    for(const row of w.games||[]){const ui=row.payload?.ui;if(ui){ui._dbId=row.id;ui._clubId=w.club?.id;ui._provider=row.provider;ui._externalId=row.external_id;games["db_"+row.id]=ui;}}
     const intelligence=await window.CourtIQData.playerIntelligence();
     window.CourtIQPlayers?.replacePlayers?.(intelligence);
+    for(const row of w.games||[]){const ui=row.payload?.ui;if(ui)window.CourtIQPlayers?.addGamePlayers?.(ui,{gameId:row.id,season:w.club?.season,source:row.provider+" official box score",sourceUrl:row.payload?.meta?.source_url||ui.sourceUrl});}
     const dbKeys=Object.keys(games).filter(k=>k.startsWith("db_"));
     if(dbKeys.length && !String(active).startsWith("db_")) active=dbKeys[0];
+    if(!dbKeys.length) active="g1";
     return {workspace:w,playerRows:intelligence,dbKeys};
   })().finally(()=>{productSyncPromise=null;});
   return productSyncPromise;
@@ -99,6 +104,20 @@ window.CourtIQOpenGame=(ui)=>{
  const key="winner_"+(ui.id||Date.now());
  games[key]=ui; active=key; render(); window.scrollTo(0,0);
 };
+function openGlobalSearch(){
+  const modal=document.createElement("div");modal.className="modal";
+  const entries=productGameEntries();
+  modal.innerHTML=`<div class="modalCard searchModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ · COMMAND SEARCH</small><h2>Find anything</h2><p>Jump directly to a game, team or player without digging through dashboards.</p><input id="globalSearchInput" class="globalSearchInput" autofocus placeholder="Search game, team, player, competition…"><div id="globalSearchResults" class="globalSearchResults"></div></div>`;
+  document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};
+  const input=modal.querySelector("#globalSearchInput"),results=modal.querySelector("#globalSearchResults");
+  const draw=()=>{
+    const q=input.value.trim().toLowerCase();
+    const gamesFound=entries.filter(([,g])=>!q||[g.home,g.away,g.comp,g.date].some(v=>String(v||"").toLowerCase().includes(q))).slice(0,8);
+    const players=[]; for(const [key,g] of entries) for(const side of ["home","away"]) for(const p of g.players?.[side]||[]) if(q&&String(p.name||"").toLowerCase().includes(q)) players.push({key,g,p});
+    results.innerHTML=`${gamesFound.map(([key,g])=>`<button class="searchHit" data-search-game="${key}"><b>${htmlEsc(g.home)} ${g.hs}–${g.as} ${htmlEsc(g.away)}</b><span>${htmlEsc(g.comp||"")} · ${htmlEsc(g.date||"")}</span></button>`).join("")}${players.slice(0,8).map(x=>`<button class="searchHit" data-search-game="${x.key}"><b>${htmlEsc(x.p.name)}</b><span>${htmlEsc(x.g.home)} vs ${htmlEsc(x.g.away)} · ${x.p.points??"—"} PTS</span></button>`).join("")}${!gamesFound.length&&!players.length?'<div class="productEmpty"><b>No results</b><span>Try a team, player or competition name.</span></div>':""}`;
+    results.querySelectorAll("[data-search-game]").forEach(b=>b.onclick=()=>{active=b.dataset.searchGame;modal.remove();render();window.scrollTo(0,0)});
+  }; input.oninput=draw;draw();setTimeout(()=>input.focus(),0);
+}
 function productGameEntries(){
   const entries=Object.entries(games).filter(([,g])=>g&&g.home&&g.away);
   return window.CourtIQData?.isSignedIn()?entries.filter(([,g])=>g._dbId):entries;
@@ -144,18 +163,70 @@ function playByPlayModule(G){
   const content=events.length?`<div class="pbpMeta"><b>${events.length} official events</b><span>Chronological order · earliest to latest</span></div><div class="card pbpCard"><div class="playerScroll"><table class="stats pbpTable"><thead><tr><th>Period</th><th>Clock</th><th>Score</th><th>Team</th><th>Player</th><th>Play</th></tr></thead><tbody>${rows}</tbody></table></div></div>`:`<div class="card emptyView"><b>Play-by-Play is not published yet.</b><span>After the game, re-import the official IBBA link. CourtIQ will load the official event timeline automatically and will not invent possessions from the box score.</span><a href="${htmlEsc(source)}" target="_blank" rel="noopener">Open official game page</a></div>`;
   return `<section class="gameViewPanel" data-game-view="play"><div class="viewTitle"><div><small>OFFICIAL EVENT FEED</small><h3>Play-by-Play</h3></div><span>${events.length?"DATA CONFIRMED":"WAITING FOR IBBA"}</span></div>${content}</section>`;
 }
+function videoEvidenceEvents(G){
+  const source=Array.isArray(G.events)?G.events:(Array.isArray(G.playByPlay)?G.playByPlay:[]);
+  return source.filter(e=>Number.isFinite(Number(e.videoTime??e.video_time??e.videoStart??e.video_start)));
+}
+function videoEventTime(e){return Number(e.videoTime??e.video_time??e.videoStart??e.video_start);}
+function videoEventTags(e){return Array.isArray(e.tags)?e.tags.map(x=>String(x).toLowerCase()):[];}
+function statVideoMatcher(stat){
+  const key=String(stat||"").toLowerCase();
+  if(key.includes("turnover")||key==="tov%") return e=>String(e.type||e.action||"").toLowerCase().includes("turnover")||videoEventTags(e).includes("turnover");
+  if(key.includes("fast break")) return e=>videoEventTags(e).some(t=>t==="transition"||t==="fast_break");
+  if(key.includes("points off to")) return e=>videoEventTags(e).includes("points_off_turnover");
+  if(key.includes("paint")) return e=>videoEventTags(e).includes("paint");
+  if(key==="3p"||key==="3p%"||key.includes("3pa")) return e=>String(e.shotType||e.shot_type||"").toUpperCase()==="3PT";
+  if(key==="2p"||key==="2p%") return e=>String(e.shotType||e.shot_type||"").toUpperCase()==="2PT";
+  return null;
+}
+function aiConfidence(e){const c=e?.confidence;return Number(c?.action??c?.tactic??c?.coverage??c??0)||0;}
+function tacticalVerification(e){return String(e?.verification||"").toLowerCase();}
+const tacticalTaxonomy={offense:["pick_and_roll","handoff","post_up","isolation","horns","spain_pnr","floppy","zoom","off_ball_screen","transition","ato"],coverage:["switch","drop","hedge_show","under","ice","trap","zone","top_lock","help_recover"],outcome:["rim","paint","midrange","2PT_MADE","2PT_MISSED","3PT_MADE","3PT_MISSED","turnover","foul","free_throws"]};
+function tacticLabel(v){return String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());}
+function tacticalEvents(G){return videoEvidenceEvents(G).filter(e=>e.tactic||e.action||e.coverage||e.defense?.coverage);}
+function tacticValue(e,key){return key==="coverage"?(e.coverage||e.defense?.coverage||""):(e[key]||"");}
+function tacticalSummary(G){const buckets={};tacticalEvents(G).forEach(e=>{const action=tacticValue(e,"tactic")||tacticValue(e,"action");if(!action)return;const coverage=tacticValue(e,"coverage")||"unclassified",key=action+"|"+coverage;if(!buckets[key])buckets[key]={action,coverage,count:0,points:0};buckets[key].count++;buckets[key].points+=Number(e.points??e.outcome?.points??0)||0;});return Object.values(buckets).sort((a,b)=>b.count-a.count);}
+function tacticalTaggerModule(G){const options=(xs)=>xs.map(x=>'<option value="'+x+'">'+tacticLabel(x)+'</option>').join("");return '<div class="card tacticPanel"><div class="tacticHead"><div><small>TACTICAL TAGGER</small><h3>Basketball actions & coverages</h3></div><span>Human-verified schema · AI-ready</span></div><div class="tacticControls"><label>Offense<select id="tagTactic">'+options(tacticalTaxonomy.offense)+'</select></label><label>Coverage<select id="tagCoverage">'+options(tacticalTaxonomy.coverage)+'</select></label><label>Outcome<select id="tagOutcome">'+options(tacticalTaxonomy.outcome)+'</select></label><label>Confidence<input id="tagConfidence" type="number" min="0" max="1" step="0.05" value="1"></label><button id="saveTacticTag" type="button">TAG CURRENT CLIP</button></div><div id="tacticStatus" class="metricNote">Play the video to the tactical action, then tag it. Tags stay in this game payload until backend persistence is connected.</div><div id="tacticSummaryList" class="tacticSummaryList"></div></div>';}
+function installTacticalSummary(G){const list=document.querySelector("#tacticSummaryList");if(!list)return;const summary=tacticalSummary(G);list.innerHTML=summary.length?summary.map((x,i)=>'<button type="button" class="tacticSummary" data-tactic-summary="'+i+'"><b>'+tacticLabel(x.action)+' vs '+tacticLabel(x.coverage)+'</b><span>'+x.count+' possessions · '+x.points+' points · '+(x.count?(x.points/x.count).toFixed(2):"0.00")+' PPP</span></button>').join(""):'<div class="productEmpty"><b>No tactical tags yet</b><span>Tag PnR, coverage and outcome to build a video-backed tactical sample.</span></div>';list.querySelectorAll("[data-tactic-summary]").forEach(b=>b.onclick=()=>{const x=summary[Number(b.dataset.tacticSummary)],matches=tacticalEvents(G).filter(e=>(tacticValue(e,"tactic")||tacticValue(e,"action"))===x.action&&(tacticValue(e,"coverage")||"unclassified")===x.coverage),playlist=document.querySelector("#videoEventList");if(!playlist)return;playlist.innerHTML=matches.map((e,i)=>'<button type="button" class="videoEvent" data-tactic-event="'+i+'"><b>▶ '+tacticLabel(x.action)+' · '+tacticLabel(x.coverage)+'</b><span>'+htmlEsc(e.player||e.team||"")+' '+htmlEsc(e.description||e.outcome?.type||"")+'</span></button>').join("");playlist.querySelectorAll("[data-tactic-event]").forEach(el=>el.onclick=()=>playVideoEvidence(G,matches[Number(el.dataset.tacticEvent)]));if(matches[0])playVideoEvidence(G,matches[0]);});}
+function installTacticalTagger(G){const video=document.querySelector("#gameVideo"),save=document.querySelector("#saveTacticTag");if(!save)return;save.disabled=!video;save.onclick=()=>{if(!video)return;if(!Array.isArray(G.events))G.events=[];const tactic=document.querySelector("#tagTactic").value,coverage=document.querySelector("#tagCoverage").value,outcome=document.querySelector("#tagOutcome").value,confidence=Math.max(0,Math.min(1,Number(document.querySelector("#tagConfidence").value)||0)),t=Math.max(0,video.currentTime),points=outcome==="3PT_MADE"?3:outcome==="2PT_MADE"?2:0;G.events.push({id:"tag_"+Date.now(),videoStart:Math.max(0,t-4),videoTime:t,videoEnd:t+8,type:"tactical",tactic,action:tactic,coverage,defense:{coverage},outcome:{type:outcome,points},points,tags:[tactic,coverage,outcome.toLowerCase()],confidence:{tactic:confidence,coverage:confidence},verification:"human"});const status=document.querySelector("#tacticStatus");if(status)status.textContent="Saved "+tacticLabel(tactic)+" vs "+tacticLabel(coverage)+" at "+Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0")+" · confidence "+confidence.toFixed(2);installTacticalSummary(G);};installTacticalSummary(G);}
+function videoRoomModule(G){
+  const video=G.video||{}; const url=video.url||G.videoUrl||G.video_url||""; const events=videoEvidenceEvents(G);
+  const eventRows=events.map((e,i)=>`<button type="button" class="videoEvent" data-video-event="${i}"><b>▶ ${htmlEsc(e.period_label||("Q"+(e.period||"—")))} ${htmlEsc(e.clock||"")} ${tacticalVerification(e)==="ai"?`· AI ${Math.round(aiConfidence(e)*100)}%`:""}</b><span>${htmlEsc(e.player||e.team||e.ballHandler||"")} · ${htmlEsc(e.description||e.action||e.type||"Tagged event")}</span></button>`).join("");
+  const player=url?`<video id="gameVideo" class="gameVideo" controls preload="metadata" src="${htmlEsc(url)}"></video>`:`<div class="card emptyView"><b>No game video is linked yet.</b><span>Add <code>video.url</code> to the game payload. Tagged events may use <code>videoTime</code> or <code>videoStart/videoEnd</code>; CourtIQ will never invent timestamps.</span></div>`;
+  return `<section class="gameViewPanel" data-game-view="video"><div class="viewTitle"><div><small>TACTICAL EVIDENCE</small><h3>Video Room</h3></div><span>${events.length} timestamped events</span></div><div class="videoRoomLayout"><div>${player}<div id="videoNow" class="metricNote">Select a tagged event or click a supported statistic to jump to its evidence.</div>${tacticalTaggerModule(G)}</div><div class="card videoPlaylist"><h3>Evidence playlist</h3><div id="videoEventList">${eventRows||'<div class="productEmpty"><b>No timestamped evidence yet</b><span>Import or tag events with video timestamps to activate click-to-clip.</span></div>'}</div></div></div></section>`;
+}
+function playVideoEvidence(G,event){
+  const video=document.querySelector("#gameVideo"); if(!video||!event)return;
+  const focus=videoEventTime(event), start=Number(event.videoStart??event.video_start); const target=Number.isFinite(start)?start:Math.max(0,focus-3);
+  video.currentTime=target; const p=video.play(); if(p?.catch)p.catch(()=>{});
+  const end=Number(event.videoEnd??event.video_end); if(Number.isFinite(end)){
+    const stop=()=>{if(video.currentTime>=end){video.pause();video.removeEventListener("timeupdate",stop);}}; video.addEventListener("timeupdate",stop);
+  }
+  const now=document.querySelector("#videoNow"); if(now)now.textContent=(event.period_label||("Q"+(event.period||"—")))+" "+(event.clock||"")+" · "+(event.description||event.action||event.type||"Tagged event");
+}
+function openVideoForStat(G,stat){
+  const matcher=statVideoMatcher(stat); if(!matcher)return;
+  const matches=videoEvidenceEvents(G).filter(matcher); const tab=document.querySelector('[data-game-tab="video"]'); if(tab)tab.click();
+  const list=document.querySelector("#videoEventList"); if(!list)return;
+  list.innerHTML=matches.length?matches.map((e,i)=>`<button type="button" class="videoEvent" data-filtered-event="${i}"><b>▶ ${htmlEsc(e.period_label||("Q"+(e.period||"—")))} ${htmlEsc(e.clock||"")}</b><span>${htmlEsc(e.player||e.team||"")} · ${htmlEsc(e.description||e.action||e.type||"Tagged event")}</span></button>`).join(""):`<div class="productEmpty"><b>No timestamped clips for ${htmlEsc(stat)}</b><span>The statistic is valid, but CourtIQ has no linked video evidence for it yet.</span></div>`;
+  list.querySelectorAll("[data-filtered-event]").forEach(b=>b.onclick=()=>playVideoEvidence(G,matches[Number(b.dataset.filteredEvent)]));
+  if(matches.length)playVideoEvidence(G,matches[0]);
+}
 function installGameViews(G){
   const tabs=document.querySelector(".tabs");
   const overview=document.querySelector(".kpis");
   if(!tabs||!overview)return;
-  tabs.innerHTML=[["overview","Overview"],["team","Team Stats"],["player","Player Stats"],["play","Play-by-Play"]].map(([key,label],i)=>`<button type="button" data-game-tab="${key}" class="${i===0?"active":""}">${label}</button>`).join("");
-  overview.insertAdjacentHTML("beforebegin",teamStatsModule(G)+playerStatsView(G)+playByPlayModule(G));
+  tabs.innerHTML=[["overview","Overview"],["team","Team Stats"],["player","Player Stats"],["play","Play-by-Play"],["video","Video"]].map(([key,label],i)=>`<button type="button" data-game-tab="${key}" class="${i===0?"active":""}">${label}</button>`).join("");
+  overview.insertAdjacentHTML("beforebegin",teamStatsModule(G)+playerStatsView(G)+playByPlayModule(G)+videoRoomModule(G));
   [".kpis",".takeaways",".grid",".pgrid",".ask"].forEach(selector=>document.querySelectorAll(selector).forEach(el=>el.dataset.gameView="overview"));
   const activate=view=>{
     document.querySelectorAll("[data-game-view]").forEach(el=>{el.hidden=el.dataset.gameView!==view;});
     tabs.querySelectorAll("[data-game-tab]").forEach(el=>el.classList.toggle("active",el.dataset.gameTab===view));
   };
   tabs.querySelectorAll("[data-game-tab]").forEach(button=>button.onclick=()=>activate(button.dataset.gameTab));
+  document.querySelectorAll("[data-video-event]").forEach(b=>b.onclick=()=>playVideoEvidence(G,videoEvidenceEvents(G)[Number(b.dataset.videoEvent)]));
+  installTacticalTagger(G);
+  document.querySelectorAll(".teamStatsTable tbody tr").forEach(row=>{const stat=row.cells?.[0]?.textContent; if(statVideoMatcher(stat)){row.classList.add("videoLinkedStat");row.title="Open linked video evidence";row.onclick=()=>openVideoForStat(G,stat);}});
   activate("overview");
 }
 function downloadBlob(name,type,content){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
@@ -167,28 +238,48 @@ function exportCurrentGame(G,format){
   const rows=[header,...[[G.home,G.players?.home||[]],[G.away,G.players?.away||[]]].flatMap(([team,players])=>players.map(p=>[team,p.name,p.starter?"starter":"bench",p.minutes,p.points,p.rebounds,p.ast,p.tov,p.fg_pct,p.two_pct,p.three_pct,p.ft_pct,p.efg,p.ts,p.pps,p.three_pa_rate,p.ast_to,p.points_per_40,p.rebounds_per_40,p.assists_per_40,p.play_end_share,p.oreb_pct,p.dreb_pct,p.box_impact_per_40,p.plus_minus]))];
   downloadBlob(`courtiq-${safe}-players.csv`,"text/csv;charset=utf-8","\ufeff"+rows.map(r=>r.map(quote).join(",")).join("\n"));
 }
+function coachBriefModule(G){
+  const events=tacticalEvents(G), ai=events.filter(e=>tacticalVerification(e)==="ai");
+  const groups={}; ai.forEach(e=>{const key=(e.action||e.tactic||"unclassified")+"|"+(e.coverage||"unclassified");if(!groups[key])groups[key]={action:e.action||e.tactic||"unclassified",coverage:e.coverage||"unclassified",n:0,pts:0,conf:0};const x=groups[key];x.n++;x.pts+=Number(e.points||0);x.conf+=aiConfidence(e);});
+  const top=Object.values(groups).sort((a,b)=>b.n-a.n).slice(0,4);
+  const rows=top.map(x=>`<tr><td>${htmlEsc(tacticLabel(x.action))}</td><td>${htmlEsc(tacticLabel(x.coverage))}</td><td>${x.n}</td><td>${x.n?(x.pts/x.n).toFixed(2):"—"}</td><td>${Math.round(x.conf/x.n*100)}%</td></tr>`).join("");
+  const findings=(G.findings||[]).slice(0,3).map(x=>`<div class="coachBriefFinding"><b>${htmlEsc(x[0])}</b><span>${String(x[1]||"").replaceAll("<br>"," · ")}</span></div>`).join("");
+  return `<section class="card box coachBrief"><div class="viewTitle"><div><small>COACH BRIEF</small><h3>What matters before the next practice</h3></div><span>${ai.length?ai.length+" AI-tagged possessions":"Box-score brief · video pending"}</span></div><div class="coachBriefGrid"><div>${findings}</div><div><h4>Verified tactical sample</h4>${rows?`<div class="playerScroll"><table class="stats"><tr><th>Action</th><th>Coverage</th><th>Poss.</th><th>PPP</th><th>AI conf.</th></tr>${rows}</table></div>`:'<div class="productEmpty"><b>No verified tactical sample yet</b><span>Link processed video to turn this brief into film-backed coaching evidence.</span></div>'}</div></div><div class="metricNote">CourtIQ separates confirmed box-score facts from AI video inference. Low-confidence tactical events should be reviewed before staff distribution.</div></section>`;
+}
+function exportCoachBrief(G){
+  const tactical=tacticalEvents(G).filter(e=>tacticalVerification(e)==="ai");
+  const lines=[`CourtIQ Coach Brief — ${G.home} ${G.hs}–${G.as} ${G.away}`,`Game: ${G.date||""} · ${G.comp||""}`,"","KEY FINDINGS"];
+  (G.findings||[]).slice(0,5).forEach((x,i)=>lines.push(`${i+1}. ${x[0]} — ${String(x[1]||"").replace(/<br\s*\/?>/gi," · ")}`));
+  lines.push("","VIDEO INTELLIGENCE",tactical.length?`${tactical.length} AI-tagged tactical events are linked to video evidence.`:"No AI tactical events are verified for this game yet.");
+  const groups={}; tactical.forEach(e=>{const k=(e.action||e.tactic||"unclassified")+" vs "+(e.coverage||"unclassified");groups[k]=groups[k]||{n:0,pts:0};groups[k].n++;groups[k].pts+=Number(e.points||0);});
+  Object.entries(groups).sort((a,b)=>b[1].n-a[1].n).forEach(([k,v])=>lines.push(`- ${tacticLabel(k)}: ${v.n} possessions · ${(v.pts/v.n).toFixed(2)} PPP`));
+  lines.push("","NEXT FILM QUESTIONS");(G.videos||[]).slice(0,5).forEach((x,i)=>lines.push(`${i+1}. ${x}`));
+  downloadBlob(`courtiq-${String(G.id||"game").replace(/[^a-z0-9_-]/gi,"-")}-coach-brief.txt`,"text/plain;charset=utf-8","\ufeff"+lines.join("\n"));
+}
 function pnrModule(){return `<section class="pgrid"><div class="card box audit"><h3>PnR Intelligence — scoring sample</h3><div class="coverage"><div class="card cov"><b>23</b><small>PnR points</small></div><div class="card cov"><b>10</b><small>scoring clips</small></div><div class="card cov"><b>78.3%</b><small>points ≤12 sec</small></div><div class="card cov"><b>10</b><small>points final 6 sec</small></div></div><div class="insight">18 of 23 supplied PnR scoring points came with 12 seconds or fewer on the shot clock.</div><div class="insight">Switch: 8 pts · Hedge / Show: 8 · Under / Contain: 5 · Other late-clock: 2.</div><div class="insight warning">SCORING-SAMPLE LIMITATION: this does not establish coverage frequency, PPP or defensive efficiency. Full PnR outcomes are required.</div></div><div class="card box audit"><h3>PnR Coverage × Shot Clock — points</h3><table class="stats matrix"><tr><th>Coverage</th><th>18–12</th><th>12–6</th><th>6–0</th><th>Total</th></tr><tr><td>Hedge / Show</td><td>2</td><td>6</td><td>0</td><td>8</td></tr><tr><td>Switch</td><td>0</td><td>0</td><td>8</td><td>8</td></tr><tr><td>Under / Contain</td><td>3</td><td>0</td><td>2</td><td>5</td></tr><tr><td>Other late-clock</td><td>0</td><td>2</td><td>0</td><td>2</td></tr></table><div class="insight">Film read: switch scoring included two corner threes and a rim finish; Hedge / Show scoring continued the advantage into paint/rim finishes.</div></div></section>`}
 function render(){
 const G=games[active];
 const dbGameButtons=Object.entries(games).filter(([k])=>k.startsWith("db_")).map(([k,g])=>`<button data-game="${k}" class="${active===k?"sel":""}">DB · ${g.home} ${g.hs}–${g.as} ${g.away}</button>`).join("");
-document.querySelector("#app").innerHTML=`<div class="app"><aside class="side"><div class="logo">Court<span>IQ</span><small class="tagline">TURN DATA INTO WINS</small></div><div class="menu">${menu.map((x,i)=>`<div class="${i===0?"on":""}">${x[0]} <span>${x.slice(2)}</span></div>`).join("")}</div><div class="quote">“Better Analysis.<br>Better Basketball.”</div></aside><main class="main"><header class="top"><div class="search">⌕ &nbsp; Search games, teams, players...</div><button id="accountBtn" class="user accountBtn"><small>${window.CourtIQData?.isSignedIn()?"SIGNED IN":"PILOT ACCESS"}</small>${window.CourtIQData?.user()?.email||"Maccabi Bnot Ashdod"}</button></header><div class="content"><div class="v2bar"><div><b>MACCABI BNOT ASHDOD · BUILD 091</b> <span>— Women's Basketball Intelligence Workspace</span></div><div class="pills"><i class="pill">DATA CONFIRMED</i><i class="pill">TACTICAL EVIDENCE</i><i class="pill">VIDEO VERIFICATION</i><button id="playersHub" class="importBtn primaryAction">PLAYER INTELLIGENCE</button><button id="comparePlayers" class="importBtn primaryAction">COMPARE PLAYERS</button><button id="autoImport" class="importBtn primaryAction">AUTO IMPORT</button><button id="opponentScout" class="importBtn">OPPONENT SCOUT</button><button id="fullReport" class="importBtn">FULL GAME REPORT</button><button id="importUrl" class="importBtn secondaryAction">BOX SCORE LINK</button><button id="compareTeams" class="importBtn">COMPARE TEAMS</button><button id="importGame" class="importBtn secondaryAction">CSV FALLBACK</button></div></div><div class="clubbar"><div><small>PILOT WORKSPACE</small><b>Maccabi Bnot Ashdod · 2026/27</b></div><span>${G.sourceLabel||"COURTIQ DEMO DATA"}</span></div><div class="game-switch">${dbGameButtons}${dbGameButtons?"":`<button data-game="g1" class="${active==="g1"?"sel":""}">DEMO · Jerusalem 90–66 Karmiel</button><button data-game="g2" class="${active==="g2"?"sel":""}">DEMO · Maccabi 101–83 Hapoel</button>`}${!window.CourtIQData?.isSignedIn()&&games.pilot?`<button data-game="pilot" class="${active==="pilot"?"sel":""}">LOCAL · ${games.pilot.home} ${games.pilot.hs}–${games.pilot.as} ${games.pilot.away}</button>`:""}${!window.CourtIQData?.isSignedIn()&&games.url?`<button data-game="url" class="${active==="url"?"sel":""}">LOCAL · ${games.url.home} ${games.url.hs}–${games.url.as} ${games.url.away}</button>`:""}</div><div class="crumb">Games › ${G.comp} › ${G.home} vs ${G.away} · ${G.date}</div><section class="gamehead"><div class="team"><div class="badge">${teamBadge(G.home)}</div><h2>${G.home}</h2></div><div class="score">${G.hs} - ${G.as}<small>FINAL</small></div><div class="team right"><h2>${G.away}</h2><div class="badge">${teamBadge(G.away)}</div></div></section><div class="tabs">${["Overview","Team Stats","Player Stats","Lineups","Shot Chart","Play-by-Play","Video","AI Insights","Report"].map((x,i)=>`<span class="${i===0?"active":""}">${x}</span>`).join("")}</div><section class="kpis">${G.metrics.map(x=>`<div class="card kpi"><label>${x[0]}</label><b>${x[1]}</b><small>vs ${x[2]}</small></div>`).join("")}</section><section class="card takeaways"><div class="sectionhead"><h3><span>◆</span> KEY TAKEAWAYS</h3><small>${gameWinner(G)}</small></div><div class="findings">${G.findings.map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]}</p><em>→ ${x[2]}</em></div>`).join("")}</div></section><section class="grid"><div class="card box"><h3>Score by Quarter</h3><div class="bars">${G.quarters.map((q,i)=>`<div class="q"><div class="bar" style="height:${Math.min(q[0]*4,140)}px"><i>${q[0]}</i></div><div class="bar away" style="height:${Math.min(q[1]*4,140)}px"><i>${q[1]}</i></div><span class="qname">${quarterLabel(i)}</span></div>`).join("")}</div></div><div class="card box"><h3>Four Factors Analysis</h3><div class="factors">${G.factors.map(x=>`<div class="factor"><label>${x[0]} · ${G.home.split(" ")[0]} ${x[1]}% / ${G.away.split(" ")[0]} ${x[2]}%</label><div class="track"><div class="homefill" style="width:${x[1]}%"></div><div class="awayfill" style="width:${x[2]}%"></div></div></div>`).join("")}</div></div><div class="card box last"><h3>Key Team Stats</h3><table class="stats"><thead><tr><th>Metric</th><th>Home</th><th>Away</th></tr></thead><tbody>${G.stats.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</tbody></table></div><div class="card box"><h3>Leaders — ${G.home}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.leaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box"><h3>Leaders — ${G.away}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.awayLeaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box last"><h3>Next Steps: Video Investigation</h3><div class="videoList">${G.videos.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div></div></section>${G.pnr?pnrModule():""}<section class="card ask"><div><h3>Ask CourtIQ</h3><p>Ask a basketball question about Game #${G.id}.</p><div id="answer" class="answer"></div></div><input id="q" placeholder="What decided this game?"><button id="ask">Analyze</button></section><div class="footer">CourtIQ Product V1 · Maccabi Bnot Ashdod Pilot · Game #${G.id}</div></div></main></div>`;
-document.querySelector(".v2bar b").textContent="MACCABI BNOT ASHDOD · BUILD 104";
+document.querySelector("#app").innerHTML=`<div class="app"><aside class="side"><div class="logo">Court<span>IQ</span><small class="tagline">TURN DATA INTO WINS</small></div><div class="menu">${menu.map((x,i)=>`<div class="${i===0?"on":""}">${x[0]} <span>${x.slice(2)}</span></div>`).join("")}</div><div class="quote">“Better Analysis.<br>Better Basketball.”</div></aside><main class="main"><header class="top"><button id="globalSearch" class="search globalSearchBtn">⌕ &nbsp; Search games, teams, players... <kbd>⌘K</kbd></button><button id="accountBtn" class="user accountBtn"><small>${window.CourtIQData?.isSignedIn()?"SIGNED IN":"PILOT ACCESS"}</small>${window.CourtIQData?.user()?.email||"Maccabi Bnot Ashdod"}</button></header><div class="content"><div class="v2bar"><div><b>MACCABI BNOT ASHDOD · BUILD 091</b> <span>— Women's Basketball Intelligence Workspace</span></div><div class="pills"><i class="pill">DATA CONFIRMED</i><i class="pill">TACTICAL EVIDENCE</i><i class="pill">VIDEO VERIFICATION</i><button id="playersHub" class="importBtn primaryAction">PLAYER INTELLIGENCE</button><button id="comparePlayers" class="importBtn primaryAction">COMPARE PLAYERS</button><button id="autoImport" class="importBtn primaryAction">AUTO IMPORT</button><button id="opponentScout" class="importBtn">OPPONENT SCOUT</button><button id="fullReport" class="importBtn">FULL GAME REPORT</button><button id="importUrl" class="importBtn secondaryAction">BOX SCORE LINK</button><button id="compareTeams" class="importBtn">COMPARE TEAMS</button><button id="importGame" class="importBtn secondaryAction">CSV FALLBACK</button></div></div><div class="clubbar"><div><small>CLUB WORKSPACE</small><b>${htmlEsc(currentWorkspace?.club?.name||"CourtIQ")} · ${htmlEsc(currentWorkspace?.club?.season||"")}</b></div><span>${G.sourceLabel||"COURTIQ DEMO DATA"}</span></div><div class="game-switch">${dbGameButtons}${dbGameButtons?"":(window.CourtIQData?.isSignedIn()?`<button id="emptyImport" class="emptyWorkspaceAction">＋ IMPORT YOUR FIRST GAME</button>`:`<button data-game="g1" class="${active==="g1"?"sel":""}">DEMO · Jerusalem 90–66 Karmiel</button><button data-game="g2" class="${active==="g2"?"sel":""}">DEMO · Maccabi 101–83 Hapoel</button>`)}${!window.CourtIQData?.isSignedIn()&&games.pilot?`<button data-game="pilot" class="${active==="pilot"?"sel":""}">LOCAL · ${games.pilot.home} ${games.pilot.hs}–${games.pilot.as} ${games.pilot.away}</button>`:""}${!window.CourtIQData?.isSignedIn()&&games.url?`<button data-game="url" class="${active==="url"?"sel":""}">LOCAL · ${games.url.home} ${games.url.hs}–${games.url.as} ${games.url.away}</button>`:""}</div><div class="crumb">Games › ${G.comp} › ${G.home} vs ${G.away} · ${G.date}</div><section class="gamehead"><div class="team"><div class="badge">${teamBadge(G.home)}</div><h2>${G.home}</h2></div><div class="score">${G.hs} - ${G.as}<small>FINAL</small></div><div class="team right"><h2>${G.away}</h2><div class="badge">${teamBadge(G.away)}</div></div></section><div class="tabs">${["Overview","Team Stats","Player Stats","Lineups","Shot Chart","Play-by-Play","Video","AI Insights","Report"].map((x,i)=>`<span class="${i===0?"active":""}">${x}</span>`).join("")}</div><section class="kpis">${G.metrics.map(x=>`<div class="card kpi"><label>${x[0]}</label><b>${x[1]}</b><small>vs ${x[2]}</small></div>`).join("")}</section><section class="card takeaways"><div class="sectionhead"><h3><span>◆</span> KEY TAKEAWAYS</h3><small>${gameWinner(G)}</small></div><div class="findings">${G.findings.map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]}</p><em>→ ${x[2]}</em></div>`).join("")}</div></section><section class="grid"><div class="card box"><h3>Score by Quarter</h3><div class="bars">${G.quarters.map((q,i)=>`<div class="q"><div class="bar" style="height:${Math.min(q[0]*4,140)}px"><i>${q[0]}</i></div><div class="bar away" style="height:${Math.min(q[1]*4,140)}px"><i>${q[1]}</i></div><span class="qname">${quarterLabel(i)}</span></div>`).join("")}</div></div><div class="card box"><h3>Four Factors Analysis</h3><div class="factors">${G.factors.map(x=>`<div class="factor"><label>${x[0]} · ${G.home.split(" ")[0]} ${x[1]}% / ${G.away.split(" ")[0]} ${x[2]}%</label><div class="track"><div class="homefill" style="width:${x[1]}%"></div><div class="awayfill" style="width:${x[2]}%"></div></div></div>`).join("")}</div></div><div class="card box last"><h3>Key Team Stats</h3><table class="stats"><thead><tr><th>Metric</th><th>Home</th><th>Away</th></tr></thead><tbody>${G.stats.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</tbody></table></div><div class="card box"><h3>Leaders — ${G.home}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.leaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box"><h3>Leaders — ${G.away}</h3><table class="stats"><tr><th>Player</th><th>Value</th><th>Metric</th></tr>${G.awayLeaders.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join("")}</table></div><div class="card box last"><h3>Next Steps: Video Investigation</h3><div class="videoList">${G.videos.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div></div></section>${coachBriefModule(G)}${G.pnr?pnrModule():""}<section class="card ask"><div><h3>Ask CourtIQ</h3><p>Ask a basketball question about Game #${G.id}.</p><div id="answer" class="answer"></div></div><input id="q" placeholder="What decided this game?"><button id="ask">Analyze</button></section><div class="footer">CourtIQ Product V1 · ${htmlEsc(currentWorkspace?.club?.name||"Club Workspace")} · Game #${G.id}</div></div></main></div>`;
+document.querySelector(".v2bar b").textContent=(currentWorkspace?.club?.name||"COURTIQ")+" · BUILD 104";
 const exportActions=document.createElement("span");
 exportActions.className="exportActions";
-exportActions.innerHTML='<button id="exportJson" class="importBtn secondaryAction">EXPORT JSON</button><button id="exportCsv" class="importBtn secondaryAction">EXPORT PLAYERS CSV</button>';
+exportActions.innerHTML='<button id="exportBrief" class="importBtn primaryAction">COACH BRIEF</button><button id="exportJson" class="importBtn secondaryAction">EXPORT JSON</button><button id="exportCsv" class="importBtn secondaryAction">EXPORT PLAYERS CSV</button>';
 document.querySelector(".pills").appendChild(exportActions);
 installGameViews(G);
 document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.dataset.game;render();window.scrollTo(0,0)});
 document.querySelector("#ask").onclick=()=>{document.querySelector("#answer").textContent=G.ask};
-document.querySelector("#importGame").onclick=openImport;
+document.querySelector("#importGame").onclick=openImport;\nconst emptyImport=document.querySelector("#emptyImport");if(emptyImport)emptyImport.onclick=openAutoImport;
 document.querySelector("#importUrl").onclick=openUrlImport;
 document.querySelector("#compareTeams").onclick=openCompare;
 document.querySelector("#autoImport").onclick=openAutoImport;
 document.querySelector("#opponentScout").onclick=openOpponentScout;
 document.querySelector("#fullReport").onclick=openFullReport;
 document.querySelector("#accountBtn").onclick=openAccount;
+document.querySelector("#globalSearch").onclick=openGlobalSearch;
 document.querySelector("#playersHub").onclick=()=>window.CourtIQPlayers?.openPlayers();
 document.querySelector("#comparePlayers").onclick=()=>window.CourtIQPlayers?.openPlayerCompare();
+document.querySelector("#exportBrief").onclick=()=>exportCoachBrief(G);
 document.querySelector("#exportJson").onclick=()=>exportCurrentGame(G,"json");
 document.querySelector("#exportCsv").onclick=()=>exportCurrentGame(G,"csv");
 }
@@ -270,12 +361,12 @@ function apiGameToUi(x){
 
 function openUrlImport(){
   const modal=document.createElement("div"); modal.className="modal"; const signed=window.CourtIQData?.isSignedIn();
-  modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · VERIFIED IMPORT</small><h2>Import Official Game</h2><p>Paste an official IBBA or Winner League (basket.co.il) game URL. CourtIQ detects the source, validates the box score, calculates deterministic metrics, saves the game and creates a reusable V1 report.</p><div class="importFields"><input id="boxUrl" placeholder="ibasketball.co.il/match/... or basket.co.il/game-zone.asp?GameId=..."></div><div class="schema">${signed?"SECURE CLUB SESSION · Game will be saved to the Ashdod workspace.":"SIGN IN REQUIRED · Database imports are available only inside a club session."}</div><div id="urlStatus" class="impStatus"></div><button id="runUrl" class="runImport" ${signed?"":"disabled"}>IMPORT · VERIFY · SAVE</button></div>`;
+  modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · VERIFIED IMPORT</small><h2>Import Official Game</h2><p>Paste an official IBBA or Winner League (basket.co.il) game URL. CourtIQ detects the source, validates the box score, calculates deterministic metrics, saves the game and creates a reusable V1 report.</p><div class="importFields"><input id="boxUrl" placeholder="ibasketball.co.il/match/... or basket.co.il/game-zone.asp?GameId=..."></div><div class="schema">${signed?"SECURE CLUB SESSION · Game will be saved to your selected club workspace.":"SIGN IN REQUIRED · Database imports are available only inside a club session."}</div><div id="urlStatus" class="impStatus"></div><button id="runUrl" class="runImport" ${signed?"":"disabled"}>IMPORT · VERIFY · SAVE</button></div>`;
   document.body.appendChild(modal); modal.querySelector(".modalX").onclick=()=>modal.remove(); modal.onclick=e=>{if(e.target===modal)modal.remove()};
   const womenReady=document.createElement("button"); womenReady.type="button"; womenReady.className="importBtn secondaryAction tomorrowSource"; womenReady.textContent="23/09 · Maccabi Haifa vs Bnei Yehuda";
   womenReady.onclick=()=>{modal.querySelector("#boxUrl").value="https://ibasketball.co.il/match/x99002-2/";modal.querySelector("#urlStatus").textContent="Official game link selected. Import after the federation publishes the final box score.";};
   modal.querySelector(".schema").insertAdjacentElement("afterend",womenReady);
-  modal.querySelector("#runUrl").onclick=async()=>{const status=modal.querySelector("#urlStatus"),url=modal.querySelector("#boxUrl").value.trim(),btn=modal.querySelector("#runUrl");try{if(!url)throw new Error("Paste an official IBBA or basket.co.il game URL.");setBusy(btn,true,"IMPORTING…");status.textContent="Fetching official source → validating totals → calculating → saving…";const body=await window.CourtIQData.importOfficialGame(url);const key="db_"+body.game_id;games[key]={...body.ui,_dbId:body.game_id};active=key;await syncProductData();modal.remove();render();window.scrollTo(0,0);}catch(e){status.textContent=e.message;setBusy(btn,false);}};
+  modal.querySelector("#runUrl").onclick=async()=>{const status=modal.querySelector("#urlStatus"),url=modal.querySelector("#boxUrl").value.trim(),btn=modal.querySelector("#runUrl");try{if(!url)throw new Error("Paste an official IBBA or basket.co.il game URL.");setBusy(btn,true,"IMPORTING…");status.textContent="Fetching official source → validating totals → calculating → saving…";const body=await window.CourtIQData.importOfficialGame(url);const key="db_"+body.game_id;games[key]={...body.ui,_dbId:body.game_id};active=key;window.CourtIQPlayers?.addGamePlayers?.(body.ui,{gameId:body.game_id,source:"Official imported box score",sourceUrl:url});await syncProductData();modal.remove();render();window.scrollTo(0,0);}catch(e){status.textContent=e.message;setBusy(btn,false);}};
 }
 
 async function openCompare(){
@@ -345,12 +436,14 @@ function openAccount(mode="signin"){
     }
 
     if(signed){
-      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Club data is protected by Supabase Row Level Security.</p><div id="accountStatus" class="impStatus"></div><button id="loadClub" class="runImport">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
-      body.querySelector("#loadClub").onclick=async()=>{
-        const status=body.querySelector("#accountStatus");status.textContent="Checking secure club workspace…";
-        try{const x=await syncProductData(),w=x.workspace;status.textContent=`Connected · ${w.club.name} · ${w.clubPlayers.length} player records · ${w.games.length} saved games`;}
-        catch(e){status.textContent=e.message}
-      };
+      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Choose the workspace CourtIQ should use for imports, reports and analysis.</p><div id="clubChooser" class="importFields"><span>Loading accessible clubs…</span></div><div id="accountStatus" class="impStatus"></div><button id="loadClub" class="runImport">REFRESH WORKSPACE</button><button id="signOut" class="accountSecondary">SIGN OUT</button><div class="schema">Workspace access is enforced by Supabase Row Level Security.</div>`;
+      const chooser=body.querySelector("#clubChooser"),status=body.querySelector("#accountStatus");
+      data.accessibleClubs().then(clubs=>{
+        if(!clubs?.length){chooser.innerHTML="<span>No club workspace is assigned to this account.</span>";return;}
+        chooser.innerHTML=`<select id="clubSelect" aria-label="Club workspace">${clubs.map(c=>`<option value="${c.id}" ${Number(c.id)===Number(data.selectedClubId())?"selected":""}>${htmlEsc(c.name)} · ${htmlEsc(c.season||"")}</option>`).join("")}</select>`;
+        chooser.querySelector("#clubSelect").onchange=async e=>{data.selectClub(Number(e.target.value));status.textContent="Switching workspace…";try{await syncProductData();modal.remove();render();}catch(err){status.textContent=err.message}};
+      }).catch(e=>{chooser.innerHTML="";status.textContent=e.message});
+      body.querySelector("#loadClub").onclick=async()=>{status.textContent="Refreshing secure club workspace…";try{const x=await syncProductData(),w=x.workspace;status.textContent=`Connected · ${w.club.name} · ${w.clubPlayers.length} player records · ${w.games.length} saved games`;}catch(e){status.textContent=e.message}};
       body.querySelector("#signOut").onclick=()=>{data.signOut();modal.remove();render();};
       return;
     }
@@ -426,7 +519,7 @@ function openPilotDashboard(){
   const playerCount=window.CourtIQPlayers?.players?.length||0;
   const signedIn=window.CourtIQData?.isSignedIn();
   modal.innerHTML=`<div class="modalCard productHome"><button class="modalX">×</button>
-    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 104</b></div></div>
+    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>${htmlEsc(currentWorkspace?.club?.name||"CourtIQ Workspace")}</h2><p>${htmlEsc(currentWorkspace?.club?.season||"Club Intelligence")}</p></div><div class="pilotBadge"><span>● WORKSPACE ACTIVE</span><b>BUILD 104</b></div></div>
     <div class="productStats">
       <div><small>GAME LIBRARY</small><b>${stored.length}</b><span>${verified} verified imports</span></div>
       <div><small>SCOUTING PLAYERS</small><b>${playerCount}</b><span>verified source samples</span></div>
@@ -533,3 +626,5 @@ const recoveryMode=window.CourtIQData?.recoverySessionFromUrl?.()||false;
 render();
 if(recoveryMode) setTimeout(()=>openAccount("reset"),0);
 else if(new URLSearchParams(location.search).get("invite")) setTimeout(()=>openAccount("activate"),0);
+
+window.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openGlobalSearch();}});

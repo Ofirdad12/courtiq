@@ -2,6 +2,7 @@
   const SUPABASE_URL = "https://lgzfmoioecixmnivtqan.supabase.co";
   const PUBLISHABLE_KEY = "sb_publishable_LTCc5iEgOzrH7t8bxvxwOA_aWsHoY8l";
   const SESSION_KEY = "courtiq_supabase_session";
+  const CLUB_KEY = "courtiq_selected_club";
 
   function readSession() {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); }
@@ -88,19 +89,19 @@
   function signOut() { saveSession(null); }
   function user() { return readSession()?.user || null; }
 
+  async function accessibleClubs() {
+    if (!readSession()?.access_token) throw new Error("Sign in to load club workspaces.");
+    try { return await jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&order=name.asc"); }
+    catch (e) { if (/JWT|expired/i.test(e.message)) { await refreshSession(); return jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&order=name.asc"); } throw e; }
+  }
+  function selectedClubId() { return Number(localStorage.getItem(CLUB_KEY) || 0) || null; }
+  function selectClub(id) { if (id) localStorage.setItem(CLUB_KEY, String(id)); else localStorage.removeItem(CLUB_KEY); }
   async function workspace() {
-    if (!readSession()?.access_token) throw new Error("Sign in to load the club workspace.");
-    let clubs;
-    try {
-      clubs = await jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&slug=eq.maccabi-bnot-ashdod");
-    } catch (e) {
-      if (/JWT|expired/i.test(e.message)) {
-        await refreshSession();
-        clubs = await jsonFetch("/rest/v1/clubs?select=id,slug,name,season,country,competition,pilot&slug=eq.maccabi-bnot-ashdod");
-      } else throw e;
-    }
-    const club = clubs?.[0];
-    if (!club) throw new Error("This account does not have access to the Maccabi Bnot Ashdod pilot.");
+    const clubs = await accessibleClubs();
+    const preferred = selectedClubId();
+    const club = clubs?.find(c => Number(c.id) === Number(preferred)) || clubs?.[0];
+    if (!club) throw new Error("This account does not have access to a CourtIQ club workspace.");
+    if (!preferred || Number(club.id) !== Number(preferred)) selectClub(club.id);
     const [games, clubPlayers] = await Promise.all([
       jsonFetch("/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at&club_id=eq." + club.id + "&order=game_date.desc.nullslast"),
       jsonFetch("/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url,analysis)&club_id=eq." + club.id + "&season=eq." + encodeURIComponent(club.season))
@@ -124,6 +125,54 @@
 
   async function gameReports(gameId) {
     return jsonFetch("/rest/v1/game_reports?select=id,game_id,report_version,payload,updated_at&game_id=eq." + Number(gameId) + "&order=updated_at.desc");
+  }
+
+  async function gameVideo(gameId) {
+    const rows = await jsonFetch("/rest/v1/game_videos?select=id,game_id,club_id,storage_bucket,storage_path,playback_url,duration_seconds,fps,status,created_at&game_id=eq." + Number(gameId) + "&order=created_at.desc&limit=1");
+    return rows?.[0] || null;
+  }
+
+  async function tacticalEvents(gameId) {
+    const rows = await jsonFetch("/rest/v1/tactical_events?select=id,game_id,video_id,external_event_id,period,game_clock,video_start,video_time,video_end,offense_team,defense_team,action_type,coverage_type,ball_handler_ref,screener_ref,outcome_type,points,tags,confidence,verification,model_version,evidence,created_at&game_id=eq." + Number(gameId) + "&order=video_time.asc");
+    return (rows || []).map(e => ({
+      id:e.external_event_id || ("db_tactical_" + e.id), period:e.period, clock:e.game_clock,
+      videoStart:Number(e.video_start), videoTime:Number(e.video_time), videoEnd:Number(e.video_end),
+      offense:e.offense_team, defense:e.defense_team, type:"tactical", tactic:e.action_type, action:e.action_type,
+      coverage:e.coverage_type, defenseMeta:{coverage:e.coverage_type}, ballHandler:e.ball_handler_ref, screener:e.screener_ref,
+      outcome:{type:e.outcome_type,points:e.points}, points:e.points, tags:e.tags || [], confidence:e.confidence || {},
+      verification:e.verification, model:e.model_version, evidence:e.evidence || {}, _dbId:e.id
+    }));
+  }
+
+  async function hydrateGamesMedia(rows) {
+    const gameIds = (rows || []).map(r => Number(r.id)).filter(Boolean);
+    if (!gameIds.length) return rows || [];
+    const ids = gameIds.join(",");
+    const [videos, events] = await Promise.all([
+      jsonFetch("/rest/v1/game_videos?select=id,game_id,club_id,playback_url,duration_seconds,fps,status,created_at&game_id=in.(" + ids + ")&order=created_at.desc"),
+      jsonFetch("/rest/v1/tactical_events?select=id,game_id,video_id,external_event_id,period,game_clock,video_start,video_time,video_end,offense_team,defense_team,action_type,coverage_type,ball_handler_ref,screener_ref,outcome_type,points,tags,confidence,verification,model_version,evidence,created_at&game_id=in.(" + ids + ")&order=video_time.asc")
+    ]);
+    const videoByGame = new Map();
+    for (const v of videos || []) if (!videoByGame.has(Number(v.game_id))) videoByGame.set(Number(v.game_id), v);
+    const eventsByGame = new Map();
+    for (const e of events || []) {
+      const key = Number(e.game_id); if (!eventsByGame.has(key)) eventsByGame.set(key, []);
+      eventsByGame.get(key).push({id:e.external_event_id || ("db_tactical_" + e.id),period:e.period,clock:e.game_clock,videoStart:Number(e.video_start),videoTime:Number(e.video_time),videoEnd:Number(e.video_end),offense:e.offense_team,defense:e.defense_team,type:"tactical",tactic:e.action_type,action:e.action_type,coverage:e.coverage_type,defenseMeta:{coverage:e.coverage_type},ballHandler:e.ball_handler_ref,screener:e.screener_ref,outcome:{type:e.outcome_type,points:e.points},points:e.points,tags:e.tags||[],confidence:e.confidence||{},verification:e.verification,model:e.model_version,evidence:e.evidence||{},_dbId:e.id});
+    }
+    for (const row of rows || []) {
+      const ui=row.payload?.ui; if (!ui) continue;
+      const v=videoByGame.get(Number(row.id)); if (v?.playback_url) ui.video={url:v.playback_url,id:v.id,status:v.status,duration:v.duration_seconds,fps:v.fps};
+      const es=eventsByGame.get(Number(row.id)); if (es?.length) ui.events=[...(Array.isArray(ui.events)?ui.events:[]),...es];
+    }
+    return rows;
+  }
+
+  async function hydrateGameVideo(ui, gameId) {
+    if (!gameId) return ui;
+    const [video, events] = await Promise.all([gameVideo(gameId), tacticalEvents(gameId)]);
+    if (video?.playback_url) ui.video = {url:video.playback_url,id:video.id,status:video.status,duration:video.duration_seconds,fps:video.fps};
+    if (events?.length) ui.events = [...(Array.isArray(ui.events)?ui.events:[]), ...events];
+    return ui;
   }
 
   async function importRuns(clubId) {
@@ -155,7 +204,7 @@
     };
   }
 
-  async function importOfficialGame(url) {
+  async function importOfficialGame(url, clubId = selectedClubId()) {
     const session = readSession();
     if (!session?.access_token) throw new Error("Sign in before importing a game.");
     const res = await fetch(SUPABASE_URL + "/functions/v1/import-ibba-game", {
@@ -165,14 +214,14 @@
         Authorization: "Bearer " + session.access_token,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({url})
+      body: JSON.stringify({url, club_id: clubId})
     });
     let body = null;
     try { body = await res.json(); } catch (_) {}
     if (!res.ok) {
       if (res.status === 401) {
         const refreshed = await refreshSession();
-        if (refreshed) return importOfficialGame(url);
+        if (refreshed) return importOfficialGame(url, clubId);
       }
       throw new Error(body?.error || body?.message || "Official game import failed.");
     }
@@ -180,7 +229,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, accessibleClubs, selectedClubId, selectClub, workspace, playerIntelligence, gameReports, gameVideo, tacticalEvents, hydrateGamesMedia, hydrateGameVideo, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();

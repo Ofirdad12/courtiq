@@ -1,7 +1,8 @@
 name: CourtIQ tests
 on:
   push:
-    branches: [main]
+    branches: [main, feature/video-evidence-linking]
+  pull_request:
   workflow_dispatch:
 jobs:
   test:
@@ -27,6 +28,10 @@ jobs:
           node --check players.js
           node --check mens.js
           node tests/test_official_demo.js
+          grep -q 'hydrateGameVideo' data.js
+          grep -q 'tacticalEvents' data.js
+          grep -q 'verification' ai/pnr_detector.py
+          grep -q 'game_videos' supabase/schema/video_tactical_events.sql
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
