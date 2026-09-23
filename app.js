@@ -91,6 +91,7 @@ async function syncProductData(){
     for(const row of w.games||[]){const ui=row.payload?.ui;if(ui){ui._dbId=row.id;ui._clubId=w.club?.id;ui._provider=row.provider;ui._externalId=row.external_id;games["db_"+row.id]=ui;}}
     const intelligence=await window.CourtIQData.playerIntelligence();
     window.CourtIQPlayers?.replacePlayers?.(intelligence);
+    for(const row of w.games||[]){const ui=row.payload?.ui;if(ui)window.CourtIQPlayers?.addGamePlayers?.(ui,{gameId:row.id,season:w.club?.season,source:row.provider+" official box score",sourceUrl:row.payload?.meta?.source_url||ui.sourceUrl});}
     const dbKeys=Object.keys(games).filter(k=>k.startsWith("db_"));
     if(dbKeys.length && !String(active).startsWith("db_")) active=dbKeys[0];
     if(!dbKeys.length) active="g1";
@@ -365,7 +366,7 @@ function openUrlImport(){
   const womenReady=document.createElement("button"); womenReady.type="button"; womenReady.className="importBtn secondaryAction tomorrowSource"; womenReady.textContent="23/09 · Maccabi Haifa vs Bnei Yehuda";
   womenReady.onclick=()=>{modal.querySelector("#boxUrl").value="https://ibasketball.co.il/match/x99002-2/";modal.querySelector("#urlStatus").textContent="Official game link selected. Import after the federation publishes the final box score.";};
   modal.querySelector(".schema").insertAdjacentElement("afterend",womenReady);
-  modal.querySelector("#runUrl").onclick=async()=>{const status=modal.querySelector("#urlStatus"),url=modal.querySelector("#boxUrl").value.trim(),btn=modal.querySelector("#runUrl");try{if(!url)throw new Error("Paste an official IBBA or basket.co.il game URL.");setBusy(btn,true,"IMPORTING…");status.textContent="Fetching official source → validating totals → calculating → saving…";const body=await window.CourtIQData.importOfficialGame(url);const key="db_"+body.game_id;games[key]={...body.ui,_dbId:body.game_id};active=key;await syncProductData();modal.remove();render();window.scrollTo(0,0);}catch(e){status.textContent=e.message;setBusy(btn,false);}};
+  modal.querySelector("#runUrl").onclick=async()=>{const status=modal.querySelector("#urlStatus"),url=modal.querySelector("#boxUrl").value.trim(),btn=modal.querySelector("#runUrl");try{if(!url)throw new Error("Paste an official IBBA or basket.co.il game URL.");setBusy(btn,true,"IMPORTING…");status.textContent="Fetching official source → validating totals → calculating → saving…";const body=await window.CourtIQData.importOfficialGame(url);const key="db_"+body.game_id;games[key]={...body.ui,_dbId:body.game_id};active=key;window.CourtIQPlayers?.addGamePlayers?.(body.ui,{gameId:body.game_id,source:"Official imported box score",sourceUrl:url});await syncProductData();modal.remove();render();window.scrollTo(0,0);}catch(e){status.textContent=e.message;setBusy(btn,false);}};
 }
 
 async function openCompare(){
