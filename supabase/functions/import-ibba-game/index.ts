@@ -170,21 +170,37 @@ function balancedJsonObject(text:string,start:number){
   throw new Error("FIBA page data is incomplete.");
 }
 function fibaPageData($:cheerio.CheerioAPI){
+  // FIBA's Next.js RSC payload may split game, box score and rosters across
+  // several self.__next_f.push(...) script chunks. Do not require every key
+  // to exist in the same script.
+  const merged:any={};
+  const wanted=["game","gameDetails","playersTeamA","playersTeamB","playByPlay"];
+  const absorb=(value:any,depth=0)=>{
+    if(!value||depth>8) return;
+    if(Array.isArray(value)){for(const item of value) absorb(item,depth+1);return;}
+    if(typeof value!=="object") return;
+    for(const key of wanted) if(value[key]!=null) merged[key]=value[key];
+    for(const child of Object.values(value)) absorb(child,depth+1);
+  };
   for(const script of $("script").toArray()){
     const raw=$(script).html()||"";
-    if(!raw.includes("gameDetails")||!raw.includes("playersTeamA")) continue;
-    try{
-      const push=raw.indexOf("push("),end=raw.lastIndexOf(")");
-      if(push<0||end<push) continue;
-      const flight=JSON.parse(raw.slice(push+5,end));
-      const decoded=String(flight?.[1]||"");
-      const start=decoded.indexOf("{");
-      if(start<0) continue;
-      const data=balancedJsonObject(decoded,start);
-      if(data?.game&&Array.isArray(data?.gameDetails?.c)&&Array.isArray(data?.playersTeamA)&&Array.isArray(data?.playersTeamB)) return data;
-    }catch(_){/* A FIBA page contains many unrelated Next.js flight chunks. */}
+    if(!raw.includes("__next_f")&&!raw.includes("gameDetails")&&!raw.includes("playersTeam")) continue;
+    const re=/push\((\[[\s\S]*?\])\)\s*;?/g;
+    let match:RegExpExecArray|null;
+    while((match=re.exec(raw))){
+      try{
+        const flight=JSON.parse(match[1]);
+        const decoded=String(flight?.[1]||"");
+        // A decoded RSC chunk can contain framing text before the JSON object.
+        for(let start=decoded.indexOf("{");start>=0;start=decoded.indexOf("{",start+1)){
+          try{absorb(balancedJsonObject(decoded,start));}catch(_){/* try next object */}
+          if(merged.game&&Array.isArray(merged?.gameDetails?.c)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)) return merged;
+        }
+      }catch(_){/* unrelated/partial Next.js flight chunk */}
+    }
   }
-  throw new Error("FIBA official box score is not published yet. Import again after the game is final and FIBA publishes Boxscore data.");
+  if(merged.game&&Array.isArray(merged?.gameDetails?.c)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)) return merged;
+  throw new Error("FIBA box score payload was not readable. The game may be live/final, but FIBA's page data format was not recognized.");
 }
 function fibaTeamData(team:any,roster:any[]){
   const s=team?.Stats||{};
