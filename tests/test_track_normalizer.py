@@ -29,6 +29,7 @@ def test_requires_calibration():
 
 
 def test_equal_distance_candidates_do_not_crash():
-    payload={"fps":25,"frames":[{"frame":0,"ball":{"x":10,"y":10},"players":[{"id":"a","team":"home","x":9,"y":10},{"id":"b","team":"home","x":11,"y":10}]}]}
+    payload={"fps":25,"homography":[[1,0,0],[0,1,0],[0,0,1]],"frames":[{"frame":0,"ball":{"bbox":[9.5,9,10.5,11]},"players":[{"track_id":"a","team":"home","bbox":[8,8,10,10]},{"track_id":"b","team":"home","bbox":[10,8,12,10]}]}]}
     result=normalize(payload)
-    assert result["frames"][0]["ball_handler"] in {"a","b"}
+    handlers=[p["track_id"] for p in result["frames"][0]["players"] if p["has_ball"]]
+    assert handlers in [["a"],["b"]]
