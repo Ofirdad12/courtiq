@@ -481,6 +481,42 @@
     draw(initialFilter);
   }
 
+  function gamePlayersToCompare(game, meta={}) {
+    const sides=[["home",game?.home],["away",game?.away]], out=[];
+    for(const [side,team] of sides) for(const p of game?.players?.[side]||[]) {
+      const minutes=Number(p.minutes)||0;
+      out.push({
+        id:"game-"+(meta.gameId||game.id||"current")+"-"+side+"-"+(p.id||p.number||p.name),
+        name:p.name||("Player "+(p.number||"")),
+        team:team||p.team||"—",
+        position:p.position||"—",
+        season:meta.season||game.season||"Game sample",
+        rosterStatus:"game",
+        source:meta.source||game.source||game.provider||"Official game box score",
+        sourceUrl:meta.sourceUrl||game.sourceUrl||game.source_url||null,
+        competitions:[{
+          name:(game.comp||game.competition||"Game")+" · "+(game.date||"official box score"),
+          club:team||p.team||"—", games:1, minutes,
+          points:Number(p.points)||0, two_pm:Number(p.two_pm)||0, two_pa:Number(p.two_pa)||0,
+          three_pm:Number(p.three_pm)||0, three_pa:Number(p.three_pa)||0, ftm:Number(p.ftm)||0, fta:Number(p.fta)||0,
+          oreb:Number(p.oreb)||0, dreb:Number(p.dreb)||0, rebounds:Number(p.rebounds ?? ((Number(p.oreb)||0)+(Number(p.dreb)||0)))||0,
+          assists:Number(p.ast??p.assists)||0, steals:Number(p.steals)||0, blocks:Number(p.blocks)||0, turnovers:Number(p.tov??p.turnovers)||0,
+          sourceNote:"Official single-game box-score sample imported into CourtIQ."
+        }],
+        read:[], video:[]
+      });
+    }
+    return out.filter(p=>p.name);
+  }
+  function addGamePlayers(game, meta={}) {
+    const incoming=gamePlayersToCompare(game,meta);
+    if(!incoming.length)return 0;
+    const existing=new Set(players.map(p=>p.id));
+    for(const p of incoming) if(!existing.has(p.id)){players.push(p);existing.add(p.id);}
+    window.dispatchEvent(new CustomEvent("courtiq:players-loaded",{detail:{count:incoming.length,source:"game"}}));
+    return incoming.length;
+  }
+
   function replacePlayers(databaseRows) {
     if (!Array.isArray(databaseRows) || !databaseRows.length) return;
     const mapped = databaseRows.map(row => {
@@ -522,6 +558,6 @@
     if (e.target.closest("#comparePlayers")) openPlayerCompare();
   });
 
-  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
-  window.COURTIQ_BUILD = "091";
+  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers, gamePlayersToCompare, addGamePlayers };
+  window.COURTIQ_BUILD = "092";
 })();
