@@ -285,6 +285,11 @@
   }
 
   function competitionCard(s) {
+    if (s.pending) return `<div class="piComp card piPending">
+      <div class="piPhase">2026/27 ROSTER</div>
+      <div class="piCompHead"><div><small>${s.name}</small><b>${s.club}</b></div><span>AWAITING OFFICIAL GAME DATA</span></div>
+      <div class="piCaution">The player is available in Compare Players. Metrics will appear automatically after a verified IBBA or FIBA box score is imported.</div>
+    </div>`;
     const m = metrics(s);
     const pct = v => v == null ? "—" : v + "%";
     const minutesLabel = s.summaryOnly ? s.mpg : r1(s.minutes/s.games);
@@ -321,7 +326,7 @@
     ];
     return `<div class="piHero">
       <div><small>PLAYER INTELLIGENCE · ${p.season}</small><h2>${p.name}</h2><p>${p.position} · ${p.team}</p></div>
-      <span class="piStatus">● DATA CONFIRMED</span>
+      <span class="piStatus">${p.competitions.some(x=>!x.pending)?"● DATA CONFIRMED":"● ROSTER LOADED · DATA PENDING"}</span>
     </div>
     <div class="piSource">SOURCE · ${p.source} · Advanced metrics calculated by CourtIQ from displayed totals.</div>
     ${p.id==="tal-lev"?'<div class="piSampleNotice"><b>2025–26 DATA SPLIT</b><span>Regular Season and Playoffs are shown as separate verified samples below.</span></div>':""}
@@ -498,6 +503,10 @@
           return {...published, name: sample.competition, club: sample.club_name, games: sample.games ?? published.games, minutes: sample.minutes ?? published.minutes, summaryOnly: true, sourceNote: sample.source_note};
         }
         return {...raw, name: sample.competition, club: sample.club_name, games: sample.games ?? raw.games, minutes: sample.minutes ?? raw.minutes, sourceNote: sample.source_note};
+      });
+      if (!competitions.length && row.roster_status === "roster") competitions.push({
+        name: "Official games · 2026/27", club: "Maccabi Bnot Ashdod", games: 0, pending: true, summaryOnly: true,
+        ppg: null, rpg: null, apg: null, twoPct: null, threePct: null, ftPct: null, tovpg: null, mpg: null
       });
       return {
         id: "db-" + p.id,

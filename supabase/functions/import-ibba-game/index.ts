@@ -8,7 +8,7 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json"
 };
-const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il"]);
+const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il","fiba.basketball","www.fiba.basketball"]);
 const j = (body: unknown, status=200) => new Response(JSON.stringify(body), {status, headers:cors});
 const clean=(s:string)=>s.replace(/\s+/g," ").trim();
 const num=(s:string)=>{const m=clean(s).replaceAll(",","").match(/-?\d+/); if(!m) throw new Error("Expected numeric value: "+s); return Number(m[0]);};
@@ -33,12 +33,14 @@ const formulaCatalog={
 
 function validateUrl(raw:string){
   const u=new URL(raw);
-  if(u.protocol!=="https:" || !allowed.has(u.hostname)) throw new Error("Use an official ibasketball.co.il or basket.co.il game URL.");
+  if(u.protocol!=="https:" || !allowed.has(u.hostname)) throw new Error("Use an official ibasketball.co.il, basket.co.il or FIBA game URL.");
   const isIbba=/^(www\.)?ibasketball\.co\.il$/.test(u.hostname);
   const isBasket=/^(www\.)?basket\.co\.il$/.test(u.hostname);
+  const isFiba=/^(www\.)?fiba\.basketball$/.test(u.hostname);
   if(isIbba && !/^\/match\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/i.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
   if(isBasket && !(u.pathname.toLowerCase().endsWith("/game-zone.asp") || u.pathname.toLowerCase()==="/game-zone.asp") || !u.searchParams.get("GameId")) throw new Error("Unsupported Winner League URL. Use basket.co.il/game-zone.asp?GameId=...");
-  return {u, provider:isBasket?"WINNER_LEAGUE":"IBBA"};
+  if(isFiba && !/^\/en\/events\/eurocup-women-\d{2}-\d{2}\/games\/\d+-[a-z0-9-]+\/?$/i.test(u.pathname)) throw new Error("Unsupported FIBA URL. Use an official EuroCup Women game page.");
+  return {u, provider:isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
 }
 function tableRows($:cheerio.CheerioAPI, table:any){
   // Cheerio's map() flattens arrays returned by the callback. Use a native
@@ -149,6 +151,65 @@ function ibbaPlayByPlay($:cheerio.CheerioAPI,homeName:string,awayName:string){
   const seconds=(clock:string)=>{const m=clock.match(/(\d+):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):0;};
   events.sort((a,b)=>a.period-b.period||seconds(b.clock)-seconds(a.clock)||b._sourceOrder-a._sourceOrder);
   return events.map(({_sourceOrder,...event})=>event);
+}
+
+function balancedJsonObject(text:string,start:number){
+  let depth=0,inString=false,escaped=false;
+  for(let i=start;i<text.length;i++){
+    const c=text[i];
+    if(inString){
+      if(escaped) escaped=false;
+      else if(c==="\\") escaped=true;
+      else if(c==='"') inString=false;
+      continue;
+    }
+    if(c==='"') inString=true;
+    else if(c==="{") depth++;
+    else if(c==="}"&&--depth===0) return JSON.parse(text.slice(start,i+1));
+  }
+  throw new Error("FIBA page data is incomplete.");
+}
+function fibaPageData($:cheerio.CheerioAPI){
+  for(const script of $("script").toArray()){
+    const raw=$(script).html()||"";
+    if(!raw.includes("gameDetails")||!raw.includes("playersTeamA")) continue;
+    try{
+      const push=raw.indexOf("push("),end=raw.lastIndexOf(")");
+      if(push<0||end<push) continue;
+      const flight=JSON.parse(raw.slice(push+5,end));
+      const decoded=String(flight?.[1]||"");
+      const start=decoded.indexOf("{");
+      if(start<0) continue;
+      const data=balancedJsonObject(decoded,start);
+      if(data?.game&&Array.isArray(data?.gameDetails?.c)&&Array.isArray(data?.playersTeamA)&&Array.isArray(data?.playersTeamB)) return data;
+    }catch(_){/* A FIBA page contains many unrelated Next.js flight chunks. */}
+  }
+  throw new Error("FIBA official box score is not published yet. Import again after the game is final and FIBA publishes Boxscore data.");
+}
+function fibaTeamData(team:any,roster:any[]){
+  const s=team?.Stats||{};
+  const byId=new Map((roster||[]).map((p:any)=>[String(p.personId),p]));
+  const players=(team?.Children||[]).map((row:any)=>{
+    const ps=row?.Stats||{},person=byId.get(String(row?.Id||"").replace(/^P_/,""))||{};
+    return {id:String(row?.Id||"").replace(/^P_/,""),number:Number(person.uniformNumber||0),name:clean([person.firstName,person.lastName].filter(Boolean).join(" "))||String(row?.Id||"Player"),position:person.position||null,
+      starter:Boolean(ps.Starter),has_played:Boolean(ps.HasPlayed),minutes:minutesValue(String(ps.TP||"0:00")),points:Number(ps.PTS||0),two_pm:Number(ps.FG2M||0),two_pa:Number(ps.FG2A||0),three_pm:Number(ps.FG3M||0),three_pa:Number(ps.FG3A||0),ftm:Number(ps.FTM||0),fta:Number(ps.FTA||0),
+      dreb:Number(ps.DR||0),oreb:Number(ps.OR||0),steals:Number(ps.ST||0),tov:Number(ps.TO||0),ast:Number(ps.AS||0),blocks:Number(ps.BS||0),value:Number(ps.EFF||0),plus_minus:Number(ps.PM||0)};
+  });
+  return {total:{points:Number(s.PTS??team?.Score??0),two_pm:Number(s.FG2M||0),two_pa:Number(s.FG2A||0),three_pm:Number(s.FG3M||0),three_pa:Number(s.FG3A||0),ftm:Number(s.FTM||0),fta:Number(s.FTA||0),oreb:Number(s.OR||0),dreb:Number(s.DR||0),tov:Number(s.TO||0),ast:Number(s.AS||0)},players};
+}
+function fibaPlayByPlay(data:any,homeName:string,awayName:string){
+  const homeOrg=Number(data?.game?.teamA?.organisationId),awayOrg=Number(data?.game?.teamB?.organisationId);
+  const people=new Map([...(data?.playersTeamA||[]),...(data?.playersTeamB||[])].map((p:any)=>[Number(p.personId),clean([p.firstName,p.lastName].filter(Boolean).join(" "))]));
+  return Object.entries(data?.playByPlay?.items||{}).flatMap(([periodLabel,periodData]:any)=>{
+    const period=Number(String(periodLabel).match(/\d+/)?.[0]||0);
+    return (periodData?.items||[]).map((event:any)=>({period,period_label:periodLabel,clock:String(event.Time||""),score:Number(event.SA||0)+"-"+Number(event.SB||0),
+      side:Number(event.oId)===homeOrg?"home":Number(event.oId)===awayOrg?"away":"",team:Number(event.oId)===homeOrg?homeName:Number(event.oId)===awayOrg?awayName:"",
+      player:people.get(Number(event.pId))||"",description:String(event.txt||""),type:String(event.ac||event.act||"event")}));
+  });
+}
+function playerNameKey(value:string){
+  const base=value.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  return ({yahelyenbin:"yaheljovanovic",katarinavuckovic:"katvuckovic"} as Record<string,string>)[base]||base;
 }
 
 function idxAny(headers:string[], needles:string[]){
@@ -289,7 +350,7 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
     "Review the possessions that produced the largest efficiency gap before assigning tactical causation."
   ];
   return {id:meta.id,comp:meta.competition,date:meta.date_display,home:meta.home,away:meta.away,hs:home.points,as:away.points,quarters,metrics,factors,stats,findings,videos,
-    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
+    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="FIBA"?"FIBA EUROCUP WOMEN OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
     ask:meta.home+" and "+meta.away+" are compared here using verified box-score totals. Tactical causation requires video verification.",
     raw:{home,away},calculated:{home:hm,away:am},formulaCatalog};
 }
@@ -326,7 +387,7 @@ Deno.serve(async(req:Request)=>{
     const html=await res.text();
     const $=cheerio.load(html);
 
-    let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null, parsedPlayers:any=null, playByPlay:any[]=[];
+    let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null, parsedPlayers:any=null, playByPlay:any[]=[], fibaData:any=null;
     const playerTables:any[]=[];
     if(provider==="IBBA"){
       let quarter:any=null;
@@ -338,7 +399,7 @@ Deno.serve(async(req:Request)=>{
       const quarterCount=Math.max(4,Math.min(qrows[0].length-2,qrows[1].length-2));
       quarters=Array.from({length:quarterCount},(_,i)=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
       $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
-    }else{
+    }else if(provider==="WINNER_LEAGUE"){
       const splitTables:any[]=[];
       $("table.stats_tbl").each((_:number,t:any)=>{
         const rows=tableRows($,t);
@@ -356,6 +417,17 @@ Deno.serve(async(req:Request)=>{
       parsedPlayers=[basketPlayerData($,playerTables[0]),basketPlayerData($,playerTables[1])];
       splitData=[basketSplit($,splitTables[0]),basketSplit($,splitTables[1])];
       extraData=basketExtra($);
+    }else{
+      fibaData=fibaPageData($);
+      const game=fibaData.game,teams=fibaData.gameDetails.c;
+      homeName=clean(game.teamA?.shortName||game.teamA?.officialName||"");
+      awayName=clean(game.teamB?.shortName||game.teamB?.officialName||"");
+      parsedPlayers=[fibaTeamData(teams[0],fibaData.playersTeamA),fibaTeamData(teams[1],fibaData.playersTeamB)];
+      const homePeriods=teams[0]?.Periods||[],awayPeriods=teams[1]?.Periods||[];
+      quarters=homePeriods.map((p:any,i:number)=>[Number(p.Score||0),Number(awayPeriods[i]?.Score||0)]);
+      playByPlay=fibaPlayByPlay(fibaData,homeName,awayName);
+      const extras=(team:any,name:string)=>({team:name,points_off_turnovers:Number(team?.Stats?.A_PAT||0),paint_points:Number(team?.Stats?.A_PIP||0),second_chance_points:Number(team?.Stats?.A_SCP||0),fast_break_points:Number(team?.Stats?.A_FBP||0)});
+      extraData=[extras(teams[0],homeName),extras(teams[1],awayName)];
     }
     if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
     if(provider==="IBBA"&&playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
@@ -368,17 +440,20 @@ Deno.serve(async(req:Request)=>{
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v5",
+      parser:provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v5",
       validated_at:new Date().toISOString()
     };
 
     const allText=clean($.root().text());
     const dm=allText.match(/\b(\d{2})[-/](\d{2})[-/](\d{4})\b/);
-    const gameDate=dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null;
-    const dateDisplay=dm?dm[1]+"/"+dm[2]+"/"+dm[3]:"Imported game";
-    const id=provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
+    const fibaDate=provider==="FIBA"?String(fibaData?.game?.gameDateTimeUTC||fibaData?.game?.gameDateTime||"").slice(0,10):"";
+    const gameDate=fibaDate||(dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null);
+    const dateDisplay=gameDate?gameDate.split("-").reverse().join("/"):"Imported game";
+    const id=provider==="FIBA"?u.pathname.match(/\/games\/(\d+)-/)![1]:provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
     auditExternalId=id;
-    const title=clean($("title").text())||"IBBA";
+    const eventSlug=u.pathname.match(/\/events\/([^/]+)/)?.[1]||"";
+    const eventSeason=eventSlug.match(/-(\d{2})-(\d{2})$/);
+    const title=provider==="FIBA"?"EuroCup Women "+(eventSeason?"20"+eventSeason[1]+"/"+eventSeason[2]:""):clean($("title").text())||"IBBA";
 
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
@@ -388,7 +463,7 @@ Deno.serve(async(req:Request)=>{
     ui.leaders=playerLeaders(parsedPlayers[0].players);
     ui.awayLeaders=playerLeaders(parsedPlayers[1].players);
     ui.players={home:parsedPlayers[0].players,away:parsedPlayers[1].players};
-    if(provider==="IBBA"){
+    if(provider==="IBBA"||provider==="FIBA"){
       ui.splits={home:{starters:aggregatePlayers(parsedPlayers[0].players.filter((p:any)=>p.starter)),bench:aggregatePlayers(parsedPlayers[0].players.filter((p:any)=>!p.starter))},
         away:{starters:aggregatePlayers(parsedPlayers[1].players.filter((p:any)=>p.starter)),bench:aggregatePlayers(parsedPlayers[1].players.filter((p:any)=>!p.starter))}};
       ui.matchup={home:homeName,away:awayName};
@@ -404,6 +479,10 @@ Deno.serve(async(req:Request)=>{
       }
       ui.stats.push(["Bench Share",pct(splitData[0].bench.points,home.points)+"%",pct(splitData[1].bench.points,away.points)+"%"],["Starters TS%",splitData[0].starters.ts+"%",splitData[1].starters.ts+"%"],["Bench TS%",splitData[0].bench.ts+"%",splitData[1].bench.ts+"%"]);
     }
+    if(provider==="FIBA"&&extraData?.length>=2){
+      ui.extra={home:extraData[0],away:extraData[1]};
+      ui.stats.push(["Points off Turnovers",extraData[0].points_off_turnovers,extraData[1].points_off_turnovers],["Paint Points",extraData[0].paint_points,extraData[1].paint_points],["Second Chance Points",extraData[0].second_chance_points,extraData[1].second_chance_points],["Fast Break Points",extraData[0].fast_break_points,extraData[1].fast_break_points]);
+    }
     if(ui.splits){
       ui.calculated.home.bench_share=pct(ui.splits.home.bench.points,home.points);
       ui.calculated.away.bench_share=pct(ui.splits.away.bench.points,away.points);
@@ -417,11 +496,33 @@ Deno.serve(async(req:Request)=>{
     },{onConflict:"provider,external_id"}).select("id").single();
     if(gameErr) throw gameErr;
 
+    let linkedPlayerSamples=0;
+    if(provider==="FIBA"){
+      const ashdodSide=/ashdod/i.test(homeName)?0:/ashdod/i.test(awayName)?1:-1;
+      if(ashdodSide>=0){
+        const {data:rosterRows,error:rosterErr}=await admin.from("club_players").select("player_id,players(id,name)").eq("club_id",club.id).eq("season",club.season).eq("roster_status","roster");
+        if(rosterErr) throw rosterErr;
+        const rosterByName=new Map((rosterRows||[]).map((row:any)=>[playerNameKey(String(row.players?.name||"")),row]));
+        const teamPlayers=parsedPlayers[ashdodSide].players.filter((p:any)=>p.has_played||p.minutes>0);
+        for(const player of teamPlayers){
+          const rosterRow:any=rosterByName.get(playerNameKey(player.name));
+          if(!rosterRow) continue;
+          const rawStats={games:1,minutes:player.minutes,points:player.points,rebounds:player.rebounds,assists:player.ast,turnovers:player.tov,two_pm:player.two_pm,two_pa:player.two_pa,three_pm:player.three_pm,three_pa:player.three_pa,ftm:player.ftm,fta:player.fta,oreb:player.oreb,dreb:player.dreb,steals:player.steals,blocks:player.blocks,value:player.value,plus_minus:player.plus_minus,starter:player.starter};
+          const sample={player_id:rosterRow.player_id,season:club.season,competition:title,club_name:"Maccabi Bnot Ashdod",phase:fibaData?.game?.round?.roundName||"Game",games:1,minutes:player.minutes,raw_stats:rawStats,published_summary:{},source_label:"FIBA EuroCup Women official box score",source_url:u.toString(),source_note:"Single-game verified FIBA sample. Advanced metrics are calculated from official totals.",verified:true};
+          const {data:existing,error:existingErr}=await admin.from("player_samples").select("id").eq("player_id",rosterRow.player_id).eq("source_url",u.toString()).limit(1);
+          if(existingErr) throw existingErr;
+          const save=existing?.length?await admin.from("player_samples").update(sample).eq("id",existing[0].id):await admin.from("player_samples").insert(sample);
+          if(save.error) throw save.error;
+          linkedPlayerSamples++;
+        }
+      }
+    }
+
     const report={
       version:"v1",game_id:game.id,generated_at:new Date().toISOString(),
       summary:{score:home.points+"-"+away.points,home:homeName,away:awayName},
       metrics:ui.metrics,four_factors:ui.factors,findings:ui.findings,team_stats:ui.stats,
-      player_analytics:ui.players,starter_bench:ui.splits||null,play_by_play:playByPlay,formula_catalog:formulaCatalog,
+      player_analytics:ui.players,starter_bench:ui.splits||null,play_by_play:playByPlay,formula_catalog:formulaCatalog,linked_player_samples:linkedPlayerSamples,
       video_investigation:ui.videos,confidence:"DATA CONFIRMED",validation
     };
     const {error:reportErr}=await admin.from("game_reports").upsert({
@@ -435,15 +536,15 @@ Deno.serve(async(req:Request)=>{
     });
     if(auditErr) throw auditErr;
 
-    return j({game_id:game.id,ui,report,validation,saved:true});
+    return j({game_id:game.id,ui,report,validation,saved:true,linked_player_samples:linkedPlayerSamples});
   }catch(e){
     const message=e instanceof Error?e.message:String(e);
     if(auditClubId&&auditUrl){
       try{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
-          club_id:auditClubId,provider:auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v4"}
+          club_id:auditClubId,provider:auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v4"}
         });
       }catch(_){}
     }

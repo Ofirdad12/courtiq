@@ -48,11 +48,11 @@ The existing GitHub Pages dashboard remains available from the repository root. 
 ## Women's basketball ingestion
 CourtIQ V0.3 now supports normalized ingestion for:
 - Israeli Women's Premier League / Winner Cup from official IBBA/SWISH CSV or JSON exports.
-- EuroCup Women from official FIBA LiveStats/GDAP JSON exports.
+- EuroCup Women from official FIBA game URLs after the final box score is published, plus LiveStats/GDAP JSON exports.
 
 Examples and commands: `docs/WOMEN_INGESTION.md`.
 
 Both sources flow into the same verified CourtIQ schema, so the dashboard and AI layer do not need competition-specific calculations.
 
-## Next
-Connect authorized source APIs where available -> player stats -> play-by-play -> generated game JSON -> frontend ingestion -> AI Analyst.
+## Official URL flow
+Import Official Game -> verified Team Stats -> Player Stats -> starters/bench -> Play-by-Play -> saved game report -> Player Intelligence samples.
