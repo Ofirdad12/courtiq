@@ -473,14 +473,19 @@ async function openGameLibrary(){
     if(provider==="WINNER_LEAGUE"||comp.includes("winner")) return {key:"men",label:"Men's Competitions"};
     return {key:"other",label:"Other Games"};
   };
-  const grouped=new Map();
-  for(const entry of items){const cat=categoryFor(entry[1]);if(!grouped.has(cat.key))grouped.set(cat.key,{label:cat.label,items:[]});grouped.get(cat.key).items.push(entry);}
+  const grouped=new Map([
+    ["women",{label:"Israel Women · IBBA",items:[]}],
+    ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
+    ["men",{label:"Men's Competitions",items:[]}],
+    ["other",{label:"Other Games",items:[]}]
+  ]);
+  for(const entry of items){const cat=categoryFor(entry[1]);grouped.get(cat.key).items.push(entry);}
   const card=([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
     <div><span class="libraryStatus">${g.sourceLabel?.includes("CONFIRMED")?"● DATA CONFIRMED":"● COURTIQ DATA"}</span><small>${htmlEsc(g.comp||"Competition")} · ${htmlEsc(g.date||"")}</small></div>
     <h3>${htmlEsc(g.home)} <b>${htmlEsc(g.hs)}–${htmlEsc(g.as)}</b> ${htmlEsc(g.away)}</h3>
     <footer><span>OPEN ANALYSIS</span><b>→</b></footer>
   </button>`;
-  const sections=items.length?[...grouped.values()].map(group=>`<section class="gameLibraryTopic"><h3 class="productSectionTitle">${htmlEsc(group.label)}</h3><div class="gameLibraryGrid">${group.items.map(card).join("")}</div></section>`).join(""):`<div class="productEmpty"><b>NO VERIFIED CLUB GAMES YET</b><span>Import the first official game to start the persistent club library.</span></div>`;
+  const sections=[...grouped.values()].map(group=>`<section class="gameLibraryTopic"><h3 class="productSectionTitle">${htmlEsc(group.label)} <small>· ${group.items.length} games</small></h3>${group.items.length?`<div class="gameLibraryGrid">${group.items.map(card).join("")}</div>`:`<div class="productEmpty"><b>NO SAVED GAMES YET</b><span>Imported games for this competition will appear here automatically.</span></div>`}</section>`).join("");
   modal.innerHTML=`<div class="modalCard compareModal gameLibrary"><button class="modalX">×</button>
     <small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Games</h2>
     <p>Saved games are restored from the club database and organized automatically by competition/source.</p>
