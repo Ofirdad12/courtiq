@@ -174,7 +174,7 @@ function fibaPageData($:cheerio.CheerioAPI){
   // several self.__next_f.push(...) script chunks. Do not require every key
   // to exist in the same script.
   const merged:any={};
-  const wanted=["game","gameDetails","playersTeamA","playersTeamB","playByPlay"];
+  const wanted=["game","gameData","gameDetails","playersTeamA","playersTeamB","playByPlay","sidebar","minimal","status","teamColors"];
   const absorb=(value:any,depth=0)=>{
     if(!value||depth>8) return;
     if(Array.isArray(value)){for(const item of value) absorb(item,depth+1);return;}
@@ -194,12 +194,14 @@ function fibaPageData($:cheerio.CheerioAPI){
         // A decoded RSC chunk can contain framing text before the JSON object.
         for(let start=decoded.indexOf("{");start>=0;start=decoded.indexOf("{",start+1)){
           try{absorb(balancedJsonObject(decoded,start));}catch(_){/* try next object */}
-          if(merged.game&&Array.isArray(merged?.gameDetails?.c)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)) return merged;
+          const teams=merged?.gameDetails?.c||merged?.gameData?.c||merged?.gameData?.gameDetails?.c;
+          if(merged.game&&Array.isArray(teams)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)){ merged.gameDetails={...(merged.gameDetails||{}),c:teams}; return merged; }
         }
       }catch(_){/* unrelated/partial Next.js flight chunk */}
     }
   }
-  if(merged.game&&Array.isArray(merged?.gameDetails?.c)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)) return merged;
+  const teams=merged?.gameDetails?.c||merged?.gameData?.c||merged?.gameData?.gameDetails?.c;
+          if(merged.game&&Array.isArray(teams)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)){ merged.gameDetails={...(merged.gameDetails||{}),c:teams}; return merged; }
   throw new Error("FIBA box score payload was not readable. The game may be live/final, but FIBA's page data format was not recognized.");
 }
 function fibaTeamData(team:any,roster:any[]){
