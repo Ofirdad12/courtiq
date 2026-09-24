@@ -429,7 +429,7 @@ function openPilotDashboard(){
   const playerCount=window.CourtIQPlayers?.players?.length||0;
   const signedIn=window.CourtIQData?.isSignedIn();
   modal.innerHTML=`<div class="modalCard productHome"><button class="modalX">×</button>
-    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace · Israel WBL + FIBA EuroCup Women</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 105</b></div></div>
+    <div class="productHero"><div><small class="eyebrow">COURTIQ · CLUB INTELLIGENCE</small><h2>Maccabi Bnot Ashdod</h2><p>2026–27 Pilot Workspace · Israel WBL + FIBA EuroCup Women + EuroLeague</p></div><div class="pilotBadge"><span>● PILOT ACTIVE</span><b>BUILD 105</b></div></div>
     <div class="productStats">
       <div><small>GAME LIBRARY</small><b>${stored.length}</b><span>${verified} verified imports</span></div>
       <div><small>SCOUTING PLAYERS</small><b>${playerCount}</b><span>verified source samples</span></div>
@@ -468,6 +468,7 @@ async function openGameLibrary(){
   const items=productGameEntries();
   const categoryFor=(g)=>{
     const provider=String(g._provider||"").toUpperCase(),comp=String(g.comp||"").toLowerCase();
+    if(provider==="EUROLEAGUE"||comp.includes("euroleague")) return {key:"euroleague",label:"EuroLeague · Euroleague Basketball"};
     if(provider==="FIBA"||comp.includes("eurocup women")) return {key:"eurocup",label:"EuroCup Women · FIBA"};
     if(provider==="IBBA"||comp.includes("athena")||comp.includes("women")) return {key:"women",label:"Israel Women · IBBA"};
     if(provider==="WINNER_LEAGUE"||comp.includes("winner")) return {key:"men",label:"Men's Competitions"};
@@ -476,6 +477,7 @@ async function openGameLibrary(){
   const grouped=new Map([
     ["women",{label:"Israel Women · IBBA",items:[]}],
     ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
+    ["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],
     ["men",{label:"Men's Competitions",items:[]}],
     ["other",{label:"Other Games",items:[]}]
   ]);
