@@ -474,14 +474,20 @@ async function openGameLibrary(){
     if(provider==="WINNER_LEAGUE"||comp.includes("winner")) return {key:"men",label:"Men's Competitions"};
     return {key:"other",label:"Other Games"};
   };
+  const privilegedEmail="ofirdad12345@gmail.com";
+  const currentEmail=String(window.CourtIQData?.user()?.email||"").trim().toLowerCase();
+  const canSeeMensCompetitions=currentEmail===privilegedEmail;
   const grouped=new Map([
     ["women",{label:"Israel Women · IBBA",items:[]}],
     ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
-    ["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],
-    ["men",{label:"Men's Competitions",items:[]}],
+    ...(canSeeMensCompetitions?[["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],["men",{label:"Winner Cup · Men's Competitions",items:[]}]]:[]),
     ["other",{label:"Other Games",items:[]}]
   ]);
-  for(const entry of items){const cat=categoryFor(entry[1]);grouped.get(cat.key).items.push(entry);}
+  for(const entry of items){
+    const cat=categoryFor(entry[1]);
+    if((cat.key==="euroleague"||cat.key==="men")&&!canSeeMensCompetitions) continue;
+    grouped.get(cat.key)?.items.push(entry);
+  }
   const card=([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
     <div><span class="libraryStatus">${g.sourceLabel?.includes("CONFIRMED")?"● DATA CONFIRMED":"● COURTIQ DATA"}</span><small>${htmlEsc(g.comp||"Competition")} · ${htmlEsc(g.date||"")}</small></div>
     <h3>${htmlEsc(g.home)} <b>${htmlEsc(g.hs)}–${htmlEsc(g.as)}</b> ${htmlEsc(g.away)}</h3>
