@@ -339,9 +339,9 @@ function calc(t:any, opp:any, gameMinutes=40){
   const oppFga=opp.two_pa+opp.three_pa;
   const oppPoss=oppFga+.44*opp.fta-opp.oreb+opp.tov;
   const ortg=r1(t.points/Math.max(poss,1)*100), drtg=r1(opp.points/Math.max(oppPoss,1)*100);
-  const trb=t.oreb+t.dreb, oppTrb=opp.oreb+opp.dreb;
+  const pace=r1((poss+oppPoss)/2), trb=t.oreb+t.dreb, oppTrb=opp.oreb+opp.dreb;
   return {
-    possessions:r1(poss),pace:r1(poss/Math.max(gameMinutes,1)*40),ortg,drtg,net_rating:r1(ortg-drtg),
+    possessions:r1(poss),pace,ortg,drtg,net_rating:r1(ortg-drtg),
     fg_pct:pct(fgm,fga),two_pct:pct(t.two_pm,t.two_pa),three_pct:pct(t.three_pm,t.three_pa),ft_pct:pct(t.ftm,t.fta),
     efg:pct(fgm+.5*t.three_pm,fga), ts:pct(t.points,2*(fga+.44*t.fta)),
     pps:fga?r2(t.points/fga):0,three_pa_rate:pct(t.three_pa,fga),
