@@ -1,0 +1,23 @@
+-- CourtIQ Data API grants policy
+-- Supabase is moving new public-schema objects to explicit Data API grants.
+-- Keep grants in the SAME migration that creates an exposed table/function.
+--
+-- Required pattern for a new public table:
+--   alter table public.<table_name> enable row level security;
+--   grant select on table public.<table_name> to anon; -- ONLY if anonymous reads are intended
+--   grant select, insert, update, delete on table public.<table_name> to authenticated;
+--   grant select, insert, update, delete on table public.<table_name> to service_role;
+--   -- Then add least-privilege RLS policies for anon/authenticated.
+--
+-- Server-only table pattern:
+--   alter table public.<table_name> enable row level security;
+--   revoke all on table public.<table_name> from anon, authenticated;
+--   grant select, insert, update, delete on table public.<table_name> to service_role;
+--
+-- Functions exposed through the Data API must also receive explicit EXECUTE grants.
+-- Do not grant anon/authenticated access unless the product actually requires it.
+--
+-- This migration intentionally changes no existing table privileges. Existing CourtIQ
+-- tables remain on their current grants/RLS; this file establishes the rule for all
+-- future migrations after the Supabase explicit-grants change.
+select 1;
