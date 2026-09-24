@@ -55,6 +55,6 @@ def compute_team_analytics(team: dict, opponent: dict, game_minutes: float = 40)
         "TRB%": _pct(trb, trb + opp_trb),
         "AST/TO": round(team["ast"] / team["tov"], 2) if team["tov"] else ("∞" if team["ast"] else 0),
         "Assisted FG%": _pct(team["ast"], fgm), "FTr": _pct(fta, fga),
-        "Pace": round(poss / game_minutes * 40, 1) if game_minutes else 0.0,
+        "Pace": round((poss + opp_poss) / 2, 1),
         "+/-": team["points"] - opponent["points"],
     }
