@@ -54,8 +54,8 @@ function hydrateOfficialDemoGame(game,rows){
     return {name,starter:Boolean(starter),minutes:ibbaMinutes(minutes),points,two_pm,two_pa,three_pm,three_pa,ftm,fta,dreb,oreb,steals,tov,ast,blocks,plus_minus};};
   const calcTeam=(team,opp)=>{const fgm=team.two_pm+team.three_pm,fga=team.two_pa+team.three_pa,oppFga=opp.two_pa+opp.three_pa;
     const possessions=fga+.44*team.fta-team.oreb+team.tov,oppPossessions=oppFga+.44*opp.fta-opp.oreb+opp.tov;
-    const ortg=r1(team.points/possessions*100),drtg=r1(opp.points/oppPossessions*100),trb=team.oreb+team.dreb,oppTrb=opp.oreb+opp.dreb;
-    return {possessions:r1(possessions),pace:r1(possessions),ortg,drtg,net_rating:r1(ortg-drtg),fg_pct:pct(fgm,fga),two_pct:pct(team.two_pm,team.two_pa),three_pct:pct(team.three_pm,team.three_pa),ft_pct:pct(team.ftm,team.fta),efg:pct(fgm+.5*team.three_pm,fga),ts:pct(team.points,2*(fga+.44*team.fta)),pps:r2(team.points/fga),three_pa_rate:pct(team.three_pa,fga),tov:pct(team.tov,fga+.44*team.fta+team.tov),orb:pct(team.oreb,team.oreb+opp.dreb),drb:pct(team.dreb,team.dreb+opp.oreb),trb:pct(trb,trb+oppTrb),ftr:pct(team.fta,fga),ast_to:r2(team.ast/team.tov),assisted_fg_pct:pct(team.ast,fgm),margin:team.points-opp.points};};
+    const pace=r1((possessions+oppPossessions)/2),ortg=r1(team.points/possessions*100),drtg=r1(opp.points/oppPossessions*100),trb=team.oreb+team.dreb,oppTrb=opp.oreb+opp.dreb;
+    return {possessions:r1(possessions),pace,ortg,drtg,net_rating:r1(ortg-drtg),fg_pct:pct(fgm,fga),two_pct:pct(team.two_pm,team.two_pa),three_pct:pct(team.three_pm,team.three_pa),ft_pct:pct(team.ftm,team.fta),efg:pct(fgm+.5*team.three_pm,fga),ts:pct(team.points,2*(fga+.44*team.fta)),pps:r2(team.points/fga),three_pa_rate:pct(team.three_pa,fga),tov:pct(team.tov,fga+.44*team.fta+team.tov),orb:pct(team.oreb,team.oreb+opp.dreb),drb:pct(team.dreb,team.dreb+opp.oreb),trb:pct(trb,trb+oppTrb),ftr:pct(team.fta,fga),ast_to:r2(team.ast/team.tov),assisted_fg_pct:pct(team.ast,fgm),margin:team.points-opp.points};};
   const advancedPlayer=(player,team,opp)=>{const fgm=player.two_pm+player.three_pm,fga=player.two_pa+player.three_pa,missed=fga-fgm+player.fta-player.ftm;
     const playEnds=fga+.44*player.fta+player.tov,teamPoss=team.two_pa+team.three_pa+.44*team.fta-team.oreb+team.tov,per40=value=>player.minutes?r1(value*40/player.minutes):0;
     return {...player,fgm,fga,rebounds:player.oreb+player.dreb,fg_pct:pct(fgm,fga),two_pct:pct(player.two_pm,player.two_pa),three_pct:pct(player.three_pm,player.three_pa),ft_pct:pct(player.ftm,player.fta),efg:pct(fgm+.5*player.three_pm,fga),ts:pct(player.points,2*(fga+.44*player.fta)),pps:fga?r2(player.points/fga):0,three_pa_rate:pct(player.three_pa,fga),ast_to:player.tov?r2(player.ast/player.tov):(player.ast?"∞":0),points_per_40:per40(player.points),rebounds_per_40:per40(player.oreb+player.dreb),assists_per_40:per40(player.ast),play_end_share:pct(playEnds,teamPoss),oreb_pct:player.minutes?pct(player.oreb*40,player.minutes*(team.oreb+opp.dreb)):0,dreb_pct:player.minutes?pct(player.dreb*40,player.minutes*(team.dreb+opp.oreb)):0,box_impact_per_40:per40(player.points+player.oreb+player.dreb+player.ast+player.steals+player.blocks-missed-player.tov)};};
@@ -218,11 +218,11 @@ function teamFromRow(row){
 }
 function pct(a,b){return b?Math.round(a/b*1000)/10:0}
 function importedGame(home,away,meta){
-  const hp=home.fga+.44*home.fta-home.oreb+home.tov, ap=away.fga+.44*away.fta-away.oreb+away.tov;
+  const hp=home.fga+.44*home.fta-home.oreb+home.tov, ap=away.fga+.44*away.fta-away.oreb+away.tov, pace=Math.round(((hp+ap)/2)*10)/10;
   const hf=[pct(home.fgm+.5*home.three,home.fga),pct(home.tov,home.fga+.44*home.fta+home.tov),pct(home.oreb,home.oreb+away.dreb),pct(home.fta,home.fga)];
   const af=[pct(away.fgm+.5*away.three,away.fga),pct(away.tov,away.fga+.44*away.fta+away.tov),pct(away.oreb,away.oreb+home.dreb),pct(away.fta,away.fga)];
   return {id:"PILOT",comp:meta.competition||"Pilot Import",date:meta.date||"Imported game",home:home.team,away:away.team,hs:home.pts,as:away.pts,quarters:[],sourceLabel:"OFFICIAL BOXSCORE IMPORT · DATA CONFIRMED",confidence:"DATA CONFIRMED",
-    metrics:[["Estimated Possessions",hp.toFixed(1),ap.toFixed(1)],["eFG%",hf[0]+"%",af[0]+"%"],["TOV%",hf[1]+"%",af[1]+"%"],["ORB%",hf[2]+"%",af[2]+"%"],["FTr",hf[3]+"%",af[3]+"%"]],
+    metrics:[["Pace",pace.toFixed(1),pace.toFixed(1)],["Estimated Possessions",hp.toFixed(1),ap.toFixed(1)],["eFG%",hf[0]+"%",af[0]+"%"],["TOV%",hf[1]+"%",af[1]+"%"],["ORB%",hf[2]+"%",af[2]+"%"],["FTr",hf[3]+"%",af[3]+"%"]],
     findings:[["Verified Import","Box score passed required-field validation","Ready for deterministic analysis"],["Possession Estimate",hp.toFixed(1)+" vs "+ap.toFixed(1),"Calculated from box score"],["Shooting",hf[0]+"% vs "+af[0]+"% eFG","Compare shot-making efficiency"],["Turnovers",home.tov+" vs "+away.tov,"Review possession protection"],["Rebounding",home.oreb+" vs "+away.oreb+" OREB","Review offensive glass"]],
     stats:[["Points",home.pts,away.pts],["FG",home.fgm+"/"+home.fga,away.fgm+"/"+away.fga],["3P",home.three+"/"+home.threeA,away.three+"/"+away.threeA],["FT",home.ftm+"/"+home.fta,away.ftm+"/"+away.fta],["Offensive Rebounds",home.oreb,away.oreb],["Defensive Rebounds",home.dreb,away.dreb],["Turnovers",home.tov,away.tov]],
     factors:[["eFG%",hf[0],af[0]],["TOV%",hf[1],af[1]],["ORB%",hf[2],af[2]],["FTr",hf[3],af[3]]],
@@ -255,12 +255,12 @@ function openImport(){
 const API_BASE=()=>localStorage.getItem("courtiq_api_base")||"";
 
 function apiGameToUi(x){
-  const h=x.home.raw,a=x.away.raw,hf=x.home.four_factors,af=x.away.four_factors,q=x.game.quarters||{};
+  const h=x.home.raw,a=x.away.raw,hf=x.home.four_factors,af=x.away.four_factors,q=x.game.quarters||{},pace=Math.round(((Number(x.home.possessions_est)||0)+(Number(x.away.possessions_est)||0))/2*10)/10;
   const qh=q.home||[],qa=q.away||[];
   const astH=h.ast,astA=a.ast;
   return {id:x.game.id||"URL",comp:"IBBA Official",date:x.game.date||"Imported from URL",home:h.team||x.game.home_team,away:a.team||x.game.away_team,hs:h.points,as:a.points,
     quarters:qh.map((v,i)=>[v,qa[i]??0]),sourceLabel:"IBBA OFFICIAL URL · DATA CONFIRMED",
-    metrics:[["Estimated Possessions",x.home.possessions_est,x.away.possessions_est],["eFG%",hf["eFG%"]+"%",af["eFG%"]+"%"],["TOV%",hf["TOV%"]+"%",af["TOV%"]+"%"],["ORB%",hf["ORB%"]+"%",af["ORB%"]+"%"],["FTr",hf.FTr+"%",af.FTr+"%"]],
+    metrics:[["Pace",pace.toFixed(1),pace.toFixed(1)],["Estimated Possessions",x.home.possessions_est,x.away.possessions_est],["eFG%",hf["eFG%"]+"%",af["eFG%"]+"%"],["TOV%",hf["TOV%"]+"%",af["TOV%"]+"%"],["ORB%",hf["ORB%"]+"%",af["ORB%"]+"%"],["FTr",hf.FTr+"%",af.FTr+"%"]],
     findings:[["Official URL Imported","Source parsed and basketball totals validated","DATA CONFIRMED"],["Shooting Efficiency",hf["eFG%"]+"% vs "+af["eFG%"]+"% eFG","Verified from official box score"],["Turnover Control",h.tov+" vs "+a.tov+" turnovers","Review possession protection"],["Offensive Glass",h.oreb+" vs "+a.oreb+" OREB","Review second-chance opportunities"],["Video Next","Box score establishes outcomes, not tactical causation","VIDEO VERIFICATION REQUIRED"]],
     stats:[["Points",h.points,a.points],["FG",h.fgm+"/"+h.fga,a.fgm+"/"+a.fga],["3P",h.three_pm+"/"+h.three_pa,a.three_pm+"/"+a.three_pa],["FT",h.ftm+"/"+h.fta,a.ftm+"/"+a.fta],["Offensive Rebounds",h.oreb,a.oreb],["Defensive Rebounds",h.dreb,a.dreb],["Turnovers",h.tov,a.tov],["Assists",astH??"—",astA??"—"]],
     factors:[["eFG%",hf["eFG%"],af["eFG%"]],["TOV%",hf["TOV%"],af["TOV%"]],["ORB%",hf["ORB%"],af["ORB%"]],["FTr",hf.FTr,af.FTr]],
