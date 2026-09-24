@@ -62,3 +62,11 @@ IBBA says its SWISH rollout provides online score, play-by-play, boxscore and st
 FIBA GDAP provides official API data but requires authenticated access to subscribed product APIs. CourtIQ does not call a private or credentialed endpoint without authorization. The URL importer reads the official data embedded in the public FIBA game page after publication; the JSON adapter remains available for authorized exports.
 
 Once authorized API credentials are available, only the fetch layer changes. The normalized CourtIQ schema, validation, metrics, dashboard and AI layer stay the same.
+
+
+## EuroLeague
+
+CourtIQ also supports EuroLeague ingestion through the existing EuroLeague data engine.
+Use competition code `E` with season start year and official game code. The pipeline fetches the public EuroLeague box score, validates team totals, and calculates deterministic metrics before saving output.
+
+Games stored with provider `EUROLEAGUE` or a competition containing `EuroLeague` are displayed under **Games → EuroLeague · Euroleague Basketball**.
