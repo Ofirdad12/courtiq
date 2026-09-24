@@ -170,39 +170,55 @@ function balancedJsonObject(text:string,start:number){
   throw new Error("FIBA page data is incomplete.");
 }
 function fibaPageData($:cheerio.CheerioAPI){
-  // FIBA's Next.js RSC payload may split game, box score and rosters across
-  // several self.__next_f.push(...) script chunks. Do not require every key
-  // to exist in the same script.
+  // Next.js serializes FIBA data in RSC/Flight script strings. The previous
+  // parser tried to regex the outer push() call; that is brittle because the
+  // encoded string itself can contain brackets and framing. Instead parse the
+  // script as JSON strings, decode each string, then extract balanced objects.
   const merged:any={};
   const wanted=["game","gameData","gameDetails","playersTeamA","playersTeamB","playByPlay","sidebar","minimal","status","teamColors"];
   const absorb=(value:any,depth=0)=>{
-    if(!value||depth>8) return;
-    if(Array.isArray(value)){for(const item of value) absorb(item,depth+1);return;}
+    if(!value||depth>12) return;
+    if(Array.isArray(value)){ for(const item of value) absorb(item,depth+1); return; }
     if(typeof value!=="object") return;
     for(const key of wanted) if(value[key]!=null) merged[key]=value[key];
     for(const child of Object.values(value)) absorb(child,depth+1);
   };
+  const ready=()=>{
+    const teams=merged?.gameDetails?.c||merged?.gameData?.c||merged?.gameData?.gameDetails?.c;
+    if(merged.game&&Array.isArray(teams)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)){
+      merged.gameDetails={...(merged.gameDetails||{}),c:teams};
+      return true;
+    }
+    return false;
+  };
+  const inspectText=(decoded:string)=>{
+    for(let start=decoded.indexOf("{");start>=0;start=decoded.indexOf("{",start+1)){
+      try{ absorb(balancedJsonObject(decoded,start)); }catch(_){}
+      if(ready()) return true;
+    }
+    return false;
+  };
   for(const script of $("script").toArray()){
     const raw=$(script).html()||"";
-    if(!raw.includes("__next_f")&&!raw.includes("gameDetails")&&!raw.includes("playersTeam")) continue;
-    const re=/push\((\[[\s\S]*?\])\)\s*;?/g;
-    let match:RegExpExecArray|null;
-    while((match=re.exec(raw))){
+    if(!raw.includes("__next_f")&&!raw.includes("gameData")&&!raw.includes("playersTeam")) continue;
+
+    // Extract every JSON string literal from the script. JSON.parse performs
+    // the required unescaping of Next Flight chunks.
+    const strings=raw.match(/"(?:\\\\.|[^"\\\\])*"/g)||[];
+    for(const token of strings){
       try{
-        const flight=JSON.parse(match[1]);
-        const decoded=String(flight?.[1]||"");
-        // A decoded RSC chunk can contain framing text before the JSON object.
-        for(let start=decoded.indexOf("{");start>=0;start=decoded.indexOf("{",start+1)){
-          try{absorb(balancedJsonObject(decoded,start));}catch(_){/* try next object */}
-          const teams=merged?.gameDetails?.c||merged?.gameData?.c||merged?.gameData?.gameDetails?.c;
-          if(merged.game&&Array.isArray(teams)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)){ merged.gameDetails={...(merged.gameDetails||{}),c:teams}; return merged; }
+        const decoded=JSON.parse(token);
+        if(typeof decoded==="string" && (decoded.includes("gameData")||decoded.includes("gameDetails")||decoded.includes("playersTeam")||decoded.includes("playByPlay"))){
+          if(inspectText(decoded)) return merged;
         }
-      }catch(_){/* unrelated/partial Next.js flight chunk */}
+      }catch(_){}
     }
+
+    // Some builds still contain directly parseable JSON objects.
+    if(inspectText(raw)) return merged;
   }
-  const teams=merged?.gameDetails?.c||merged?.gameData?.c||merged?.gameData?.gameDetails?.c;
-          if(merged.game&&Array.isArray(teams)&&Array.isArray(merged.playersTeamA)&&Array.isArray(merged.playersTeamB)){ merged.gameDetails={...(merged.gameDetails||{}),c:teams}; return merged; }
-  throw new Error("FIBA box score payload was not readable. The game may be live/final, but FIBA's page data format was not recognized.");
+  if(ready()) return merged;
+  throw new Error("FIBA box score payload was not readable. The official result exists, but the Next.js game payload was not recognized.");
 }
 function fibaTeamData(team:any,roster:any[]){
   const s=team?.Stats||{};
