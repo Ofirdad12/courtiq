@@ -475,9 +475,10 @@ async function openGameLibrary(){
     return {key:"other",label:"Other Games"};
   };
   const privilegedEmail="ofirdad12345@gmail.com";
+  const privilegedUserId="10fa3b29-4acd-4fcf-9784-1117b510332c";
   const currentEmail=String(window.CourtIQData?.user()?.email||window.CourtIQData?.user()?.user_metadata?.email||"").trim().toLowerCase();
-  const canSeeMensCompetitions=currentEmail===privilegedEmail || String(window.CourtIQData?.user()?.id||"")===""; // owner email is authoritative; empty legacy user id keeps owner workspace visible only when signed in
-  const ownerAccess=window.CourtIQData?.isSignedIn() && (currentEmail===privilegedEmail || currentEmail==="");
+  const currentUserId=String(window.CourtIQData?.user()?.id||"");
+  const ownerAccess=window.CourtIQData?.isSignedIn() && (currentUserId===privilegedUserId || currentEmail===privilegedEmail);
   const grouped=new Map([
     ["women",{label:"Israel Women · IBBA",items:[]}],
     ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
