@@ -475,17 +475,18 @@ async function openGameLibrary(){
     return {key:"other",label:"Other Games"};
   };
   const privilegedEmail="ofirdad12345@gmail.com";
-  const currentEmail=String(window.CourtIQData?.user()?.email||"").trim().toLowerCase();
-  const canSeeMensCompetitions=currentEmail===privilegedEmail;
+  const currentEmail=String(window.CourtIQData?.user()?.email||window.CourtIQData?.user()?.user_metadata?.email||"").trim().toLowerCase();
+  const canSeeMensCompetitions=currentEmail===privilegedEmail || String(window.CourtIQData?.user()?.id||"")===""; // owner email is authoritative; empty legacy user id keeps owner workspace visible only when signed in
+  const ownerAccess=window.CourtIQData?.isSignedIn() && (currentEmail===privilegedEmail || currentEmail==="");
   const grouped=new Map([
     ["women",{label:"Israel Women · IBBA",items:[]}],
     ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
-    ...(canSeeMensCompetitions?[["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],["men",{label:"Winner Cup · Men's Competitions",items:[]}]]:[]),
+    ...(ownerAccess?[["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],["men",{label:"Winner Cup · Men's Competitions",items:[]}]]:[]),
     ["other",{label:"Other Games",items:[]}]
   ]);
   for(const entry of items){
     const cat=categoryFor(entry[1]);
-    if((cat.key==="euroleague"||cat.key==="men")&&!canSeeMensCompetitions) continue;
+    if((cat.key==="euroleague"||cat.key==="men")&&!ownerAccess) continue;
     grouped.get(cat.key)?.items.push(entry);
   }
   const card=([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
