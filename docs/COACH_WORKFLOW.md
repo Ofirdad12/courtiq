@@ -14,7 +14,7 @@ Select the team, competition, season, venue and prior opponent. The three cards 
 
 ## 3. Video evidence
 
-Add only video URLs your club has permission to use. Select a saved game and a card; enter clip start/end, a possession note, and mark whether it supports or contradicts the proposed observation. A blank counterexample list means no clip was annotated, not that exceptions do not exist. The link opens the external video at the selected timestamp where the player supports timestamp parameters.
+Add only video URLs your club has permission to use. Select a saved game and a card; enter clip start/end, a possession note, an optional manually observed lineup tag, and mark whether it supports or contradicts the proposed observation. A blank counterexample list means no clip was annotated, not that exceptions do not exist. The link opens the external video at the selected timestamp where the player supports timestamp parameters. A lineup tag filters video clips only; numeric game metrics remain based on the selected games.
 
 Video clips are staff annotations. Box scores do not reveal PnR coverage, transition frequency, lineup combinations or on/off effects. These require a complete play-by-play/substitution feed or manually tagged possessions. Do not compute lineup ratings from the starter flag.
 
