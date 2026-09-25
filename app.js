@@ -284,25 +284,34 @@ function openUrlImport(){
 
 async function openCompare(){
   const modal=document.createElement("div"); modal.className="modal";
-  modal.innerHTML='<div class="modalCard compareModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ TEAM COMPARISON</small><h2>Compare imported teams</h2><p>Comparison uses saved verified games and always shows sample size.</p><div class="importFields"><input id="apiUrl2" placeholder="CourtIQ API URL" value="'+API_BASE()+'"><select id="teamA"></select><select id="teamB"></select></div><div id="compareStatus" class="impStatus"></div><div id="compareOut"></div><button id="runCompare" class="runImport">COMPARE</button></div>';
-  document.body.appendChild(modal); modal.querySelector(".modalX").onclick=()=>modal.remove();
-  const base=modal.querySelector("#apiUrl2").value.trim().replace(/\/$/,"");
-  try{
-    if(!base) throw new Error("Connect the CourtIQ backend to load saved teams.");
-    const res=await fetch(base+"/api/games"),items=await res.json(); if(!res.ok) throw new Error("Could not load game library");
-    const teams=[...new Set(items.flatMap(g=>[g.home.raw.team,g.away.raw.team]))].sort();
-    for(const id of ["teamA","teamB"]) modal.querySelector("#"+id).innerHTML=teams.map(t=>'<option>'+t+'</option>').join("");
-    if(teams.length>1) modal.querySelector("#teamB").selectedIndex=1;
-  }catch(e){modal.querySelector("#compareStatus").textContent=e.message}
-  modal.querySelector("#runCompare").onclick=async()=>{
-    const base=modal.querySelector("#apiUrl2").value.trim().replace(/\/$/,""),team_a=modal.querySelector("#teamA").value,team_b=modal.querySelector("#teamB").value,status=modal.querySelector("#compareStatus");
-    try{
-      localStorage.setItem("courtiq_api_base",base); status.textContent="Calculating verified comparison…";
-      const res=await fetch(base+"/api/compare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({team_a,team_b})});
-      const x=await res.json(); if(!res.ok) throw new Error(x.detail||"Comparison failed");
-      const keys=Object.keys(x.differences_a_minus_b);
-      modal.querySelector("#compareOut").innerHTML='<div class="compareHead"><b>'+x.team_a.team+'</b><span>'+x.team_a.games+' games</span><b>'+x.team_b.team+'</b><span>'+x.team_b.games+' games</span></div><table class="stats compareTable"><tr><th>Metric</th><th>'+x.team_a.team+'</th><th>'+x.team_b.team+'</th><th>Δ</th></tr>'+keys.map(k=>'<tr><td>'+k+'</td><td>'+x.team_a.averages[k]+'</td><td>'+x.team_b.averages[k]+'</td><td>'+x.differences_a_minus_b[k]+'</td></tr>').join("")+'</table><div class="insight">DATA CONFIRMED · Comparison is descriptive and based only on imported games.</div>'; status.textContent="";
-    }catch(e){status.textContent=e.message}
+  modal.innerHTML=`<div class="modalCard compareModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ TEAM COMPARISON</small><h2>Compare Teams</h2><p>Choose a league, then compare teams using only saved verified games.</p>
+    <div class="importFields"><label>LEAGUE</label><select id="teamLeague"></select><label>TEAM A</label><select id="teamA"></select><label>TEAM B</label><select id="teamB"></select></div>
+    <div id="compareStatus" class="impStatus"></div><div id="compareOut"></div><button id="runCompare" class="runImport">COMPARE</button></div>`;
+  document.body.appendChild(modal); modal.querySelector(".modalX").onclick=()=>modal.remove(); modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  const entries=productGameEntries();
+  const comps=[...new Set(entries.map(([,g])=>g.comp).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const league=modal.querySelector("#teamLeague"),status=modal.querySelector("#compareStatus");
+  if(!comps.length){status.textContent="No verified imported leagues are available yet.";return;}
+  league.innerHTML=comps.map(x=>`<option value="${htmlEsc(x)}">${htmlEsc(x)}</option>`).join("");
+  const gamesFor=()=>entries.filter(([,g])=>g.comp===league.value);
+  const fillTeams=()=>{
+    const teams=[...new Set(gamesFor().flatMap(([,g])=>[g.home,g.away]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    ["teamA","teamB"].forEach(id=>modal.querySelector("#"+id).innerHTML=teams.map(t=>`<option value="${htmlEsc(t)}">${htmlEsc(t)}</option>`).join(""));
+    if(teams.length>1)modal.querySelector("#teamB").selectedIndex=1;
+    status.textContent=teams.length<2?"This league needs at least two imported teams for comparison.":"";
+  };
+  league.onchange=()=>{fillTeams();modal.querySelector("#compareOut").innerHTML="";}; fillTeams();
+  const num=v=>Number(v||0), avg=(arr,k)=>arr.length?Math.round(arr.reduce((s,x)=>s+num(x[k]),0)/arr.length*10)/10:0;
+  const sample=team=>gamesFor().filter(([,g])=>g.home===team||g.away===team).map(([,g])=>{
+    const home=g.home===team, pts=home?g.hs:g.as, opp=home?g.as:g.hs;
+    const metrics=Object.fromEntries((g.metrics||[]).map(x=>[x[0],parseFloat(String(home?x[1]:x[2]).replace("%",""))||0]));
+    return {pts,opp,pace:metrics["Pace"],poss:metrics["Estimated Possessions"],efg:metrics["eFG%"],tov:metrics["TOV%"],orb:metrics["ORB%"],ftr:metrics["FTr"]};
+  });
+  modal.querySelector("#runCompare").onclick=()=>{
+    const ta=modal.querySelector("#teamA").value,tb=modal.querySelector("#teamB").value;
+    if(!ta||!tb||ta===tb){status.textContent="Choose two different teams.";return;}
+    const A=sample(ta),B=sample(tb), metrics=[["Games",A.length,B.length],["Points / Game",avg(A,"pts"),avg(B,"pts")],["Opponent PTS / Game",avg(A,"opp"),avg(B,"opp")],["Pace",avg(A,"pace"),avg(B,"pace")],["Possessions",avg(A,"poss"),avg(B,"poss")],["eFG%",avg(A,"efg"),avg(B,"efg")],["TOV%",avg(A,"tov"),avg(B,"tov")],["ORB%",avg(A,"orb"),avg(B,"orb")],["FTr",avg(A,"ftr"),avg(B,"ftr")]];
+    modal.querySelector("#compareOut").innerHTML=`<div class="compareHead"><b>${htmlEsc(ta)}</b><span>${A.length} games</span><b>${htmlEsc(tb)}</b><span>${B.length} games</span></div><table class="stats compareTable"><tr><th>Metric</th><th>${htmlEsc(ta)}</th><th>${htmlEsc(tb)}</th></tr>${metrics.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</table><div class="insight">DATA CONFIRMED · ${htmlEsc(league.value)} only · Saved imported games only.</div>`;status.textContent="";
   };
 }
 
