@@ -468,6 +468,7 @@ async function openGameLibrary(){
   const items=productGameEntries();
   const categoryFor=(g)=>{
     const provider=String(g._provider||"").toUpperCase(),comp=String(g.comp||"").toLowerCase();
+    if(provider==="EUROBASKET_POLAND"||comp.includes("poland · eurobasket")) return {key:"poland",label:"Poland · Eurobasket"};
     if(provider==="EUROCUP"||(comp.includes("eurocup")&&!comp.includes("women"))) return {key:"eurocupmen",label:"EuroCup · Euroleague Basketball"};
     if(provider==="EUROLEAGUE"||comp.includes("euroleague")) return {key:"euroleague",label:"EuroLeague · Euroleague Basketball"};
     if(provider==="FIBA"||comp.includes("eurocup women")) return {key:"eurocup",label:"EuroCup Women · FIBA"};
@@ -483,12 +484,12 @@ async function openGameLibrary(){
   const grouped=new Map([
     ["women",{label:"Israel Women · IBBA",items:[]}],
     ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
-    ...(ownerAccess?[["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],["eurocupmen",{label:"EuroCup · Euroleague Basketball",items:[]}],["men",{label:"Winner Cup · Men's Competitions",items:[]}]]:[]),
+    ...(ownerAccess?[["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],["eurocupmen",{label:"EuroCup · Euroleague Basketball",items:[]}],["poland",{label:"Poland · Eurobasket",items:[]}],["men",{label:"Winner Cup · Men's Competitions",items:[]}]]:[]),
     ["other",{label:"Other Games",items:[]}]
   ]);
   for(const entry of items){
     const cat=categoryFor(entry[1]);
-    if((cat.key==="euroleague"||cat.key==="eurocupmen"||cat.key==="men")&&!ownerAccess) continue;
+    if((cat.key==="euroleague"||cat.key==="eurocupmen"||cat.key==="poland"||cat.key==="men")&&!ownerAccess) continue;
     grouped.get(cat.key)?.items.push(entry);
   }
   const card=([key,g])=>`<button class="gameLibraryCard" data-library-game="${key}">
