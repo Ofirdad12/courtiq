@@ -72,7 +72,7 @@ function hydrateOfficialDemoGame(game,rows){
   game.leaders=[["ג'וי אוסיגוואי",20,"PTS"],["נוגה הרן",6,"REB"],["אמילי גיאת",7,"AST"]];game.awayLeaders=[["שובל כמיסה",22,"PTS"],["בריה שאנטי הולמס",9,"REB"],["שירן גוזלן",6,"AST"]];
 }
 hydrateOfficialDemoGame(games.g1,officialDemoRows);
-const menu=["▦ Dashboard","◉ Games","◉ Teams","◆ Israel Men's League D1 Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
+const menu=["▦ Dashboard","◈ Season Memory","◉ Games","◉ Teams","◆ Israel Men's League D1 Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
 try{
   const savedPilot=localStorage.getItem("courtiq_pilot_game");
   if(savedPilot) games.pilot=JSON.parse(savedPilot); const savedUrl=localStorage.getItem("courtiq_url_game"); if(savedUrl) games.url=JSON.parse(savedUrl);
@@ -518,6 +518,20 @@ function openAutoImport(){
 }
 function localTeamGames(team){return productGameEntries().map(([,g])=>g).filter(g=>g&&(g.home===team||g.away===team));}
 function oneDecimal(n){return Math.round(n*10)/10}
+function buildSeasonMemory(){
+  const all=productGameEntries().map(([,g])=>g).filter(Boolean);
+  const teams=[...new Set(all.flatMap(g=>[g.home,g.away]).filter(Boolean))].sort();
+  const memory=teams.map(team=>{const rows=all.map(g=>teamSnapshot(g,team)).filter(Boolean);const recent=rows.slice(-5),previous=rows.slice(-10,-5),delta=key=>{const a=avgFinite(recent,key),b=avgFinite(previous,key);return a!=null&&b!=null?oneDecimal(a-b):null;};return {team,games:rows.length,recent:recent.length,pf:avgFinite(recent,"pf"),pa:avgFinite(recent,"pa"),efg:avgFinite(recent,"efg"),tov:avgFinite(recent,"tov"),orb:avgFinite(recent,"orb"),net:avgFinite(recent,"net"),pace:avgFinite(recent,"pace"),delta:{pf:delta("pf"),efg:delta("efg"),tov:delta("tov"),orb:delta("orb"),net:delta("net")},rows};});
+  return {games:all.length,teams:memory};
+}
+async function openSeasonMemory(){
+  let syncError="";if(window.CourtIQData?.isSignedIn()){try{await syncProductData();}catch(e){syncError=e.message;}}
+  const memory=buildSeasonMemory(),modal=document.createElement("div");modal.className="modal";
+  const cards=memory.teams.map(t=>{const trend=(v,inverse=false)=>v==null?"—":((v>0)!==inverse?"↑ ":"↓ ")+Math.abs(v);return `<div class="card box"><h3>${htmlEsc(t.team)}</h3><div class="reportKpis"><div><small>GAMES</small><b>${t.games}</b></div><div><small>LAST 5 PTS</small><b>${t.pf??"—"}</b><span>${trend(t.delta.pf)}</span></div><div><small>eFG%</small><b>${t.efg??"—"}${t.efg!=null?"%":""}</b><span>${trend(t.delta.efg)}</span></div><div><small>TOV%</small><b>${t.tov??"—"}${t.tov!=null?"%":""}</b><span>${trend(t.delta.tov,true)}</span></div><div><small>ORB%</small><b>${t.orb??"—"}${t.orb!=null?"%":""}</b><span>${trend(t.delta.orb)}</span></div><div><small>NET</small><b>${t.net??"—"}</b><span>${trend(t.delta.net)}</span></div></div><button class="runImport" data-memory-team="${htmlEsc(t.team)}">COACH INTELLIGENCE</button></div>`;}).join("");
+  modal.innerHTML=`<div class="modalCard compareModal gameLibrary"><button class="modalX">×</button><small class="eyebrow">COURTIQ · SEASON MEMORY ENGINE</small><h2>Season Memory</h2><p>Every official imported game becomes reusable team memory. CourtIQ compares recent form with the previous sample and turns verified changes into coaching questions.</p><div class="libraryTop"><div><small>OFFICIAL GAMES</small><b>${memory.games}</b></div><div><small>TEAMS REMEMBERED</small><b>${memory.teams.length}</b></div><div><small>MEMORY WINDOW</small><b>LAST 5 vs PREVIOUS 5</b></div></div><div class="gameLibraryGrid">${cards||'<div class="productEmpty"><b>NO SEASON MEMORY YET</b><span>Import official games to start building the season memory automatically.</span></div>'}</div>${syncError?`<div class="insight warning">DATABASE · ${htmlEsc(syncError)}</div>`:""}<div id="memoryIntel"></div><div class="metricNote">Only stored official data is remembered. CourtIQ does not fill missing games or invent tactical causes.</div></div>`;
+  document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  modal.querySelectorAll("[data-memory-team]").forEach(btn=>btn.onclick=()=>{const t=memory.teams.find(x=>x.team===btn.dataset.memoryTeam);const changes=[["Scoring",t.delta.pf,false],["Shot efficiency",t.delta.efg,false],["Ball security",t.delta.tov,true],["Offensive rebounding",t.delta.orb,false],["Net Rating",t.delta.net,false]].filter(x=>x[1]!=null).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));modal.querySelector("#memoryIntel").innerHTML=`<section class="card takeaways"><div class="sectionhead"><h3>COACH INTELLIGENCE · ${htmlEsc(t.team)}</h3><small>${t.games} GAME MEMORY</small></div>${changes.length?`<div class="findings">${changes.slice(0,3).map((x,i)=>`<div class="finding"><div class="num">${i+1}</div><b>${x[0]}</b><p>${x[1]>0?"+":""}${x[1]} vs previous five-game sample</p><em>→ ${x[2]?"Check whether the reduction is stable and what possessions drove it.":"Review the possessions behind this change before treating it as a tactical tendency."}</em></div>`).join("")}</div>`:'<div class="insight warning">At least six stored games are needed for a previous-sample comparison.</div>'}<div class="videoList"><div class="videoItem"><span>1</span>Verify the largest statistical change on full-game video.</div><div class="videoItem"><span>2</span>Separate opponent/context effects from repeatable team behavior.</div><div class="videoItem"><span>3</span>Use the next game to test whether the trend persists.</div></div></section>`;});
+}
 async function openOpponentScout(){
   let syncError="";if(window.CourtIQData?.isSignedIn()){try{await syncProductData();}catch(e){syncError=e.message;}}
   const productGames=productGameEntries().map(([,g])=>g),G=productGames.find(g=>g===games[active])||productGames[0],teams=[...new Set(productGames.flatMap(g=>g&&g.home?[g.home,g.away]:[]))].filter(Boolean).sort(),defaultOpponent=G?.away||teams[0]||"";
@@ -570,7 +584,7 @@ function openMensD1Teams(){if(window.CourtIQMens?.openTeams)return window.CourtI
 document.addEventListener("click",e=>{
   const item=e.target.closest(".menu div");
   if(!item) return;
-  if(item.textContent.includes("Dashboard")) openPilotDashboard();
+  if(item.textContent.includes("Dashboard")) openPilotDashboard();\n  if(item.textContent.includes("Season Memory")) openSeasonMemory();
   if(item.textContent.includes("Games")) openGameLibrary();
   if(item.textContent.trim()==="◉ Teams" || item.textContent.trim()==="Teams") openMensD1Teams();
   if(item.textContent.includes("Israel Men")) openMensD1Teams();
