@@ -27,6 +27,7 @@ jobs:
           node --check players.js
           node --check mens.js
           node tests/test_official_demo.js
+          node tests/test_season_source.js
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
