@@ -606,6 +606,32 @@ Deno.serve(async(req:Request)=>{
     },{onConflict:"provider,external_id"}).select("id").single();
     if(gameErr) throw gameErr;
 
+    // Persist every imported player as structured season/game memory for Player Compare.
+    for(const [sideIndex,sideName] of ["home","away"].entries()){
+      const teamName=sideIndex===0?homeName:awayName, opponentName=sideIndex===0?awayName:homeName;
+      for(const player of parsedPlayers[sideIndex].players){
+        if(!player?.name) continue;
+        const stableExternal=String(player.id||"").trim()||null;
+        let playerId:number|null=null;
+        if(stableExternal){
+          const {data:existing}=await admin.from("players").select("id").eq("external_id",provider+":"+stableExternal).limit(1).maybeSingle();
+          playerId=existing?.id||null;
+        }
+        if(!playerId){
+          const {data:byName}=await admin.from("players").select("id").ilike("name",player.name).limit(1).maybeSingle();
+          playerId=byName?.id||null;
+        }
+        if(!playerId){
+          const {data:created,error:createErr}=await admin.from("players").insert({external_id:stableExternal?provider+":"+stableExternal:null,name:player.name,source_url:u.toString(),analysis:{}}).select("id").single();
+          if(createErr) throw createErr; playerId=created.id;
+        }
+        const season=gameDate?(Number(gameDate.slice(5,7))>=7?gameDate.slice(0,4)+"-"+String(Number(gameDate.slice(0,4))+1).slice(-2):String(Number(gameDate.slice(0,4))-1)+"-"+gameDate.slice(2,4)):"2026-27";
+        const calculated={efg:player.efg,ts:player.ts,pps:player.pps,points_per_40:player.points_per_40,rebounds_per_40:player.rebounds_per_40,assists_per_40:player.assists_per_40,play_end_share:player.play_end_share,box_impact_per_40:player.box_impact_per_40};
+        const {error:memoryErr}=await admin.from("game_player_stats").upsert({game_id:game.id,player_id:playerId,provider,external_game_id:id,season,competition:title,team_name:teamName,opponent_name:opponentName,side:sideName,player_external_id:stableExternal,player_name:player.name,jersey_number:player.number||null,starter:Boolean(player.starter),minutes:player.minutes||0,stats:player,calculated,source_url:u.toString(),verified:true,updated_at:new Date().toISOString()},{onConflict:"game_id,player_id"});
+        if(memoryErr) throw memoryErr;
+      }
+    }
+
     let linkedPlayerSamples=0;
     if(provider==="FIBA"){
       const ashdodSide=/ashdod/i.test(homeName)?0:/ashdod/i.test(awayName)?1:-1;
