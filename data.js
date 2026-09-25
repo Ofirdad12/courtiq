@@ -206,8 +206,38 @@
     return body;
   }
 
+  async function coachWorkspace(clubId, gameIds = []) {
+    const cid = Number(clubId);
+    const [schedule, revisions, reviews, evidence] = await Promise.all([
+      jsonFetch("/rest/v1/schedule_games?select=*&club_id=eq." + cid + "&order=game_date.asc.nullslast"),
+      jsonFetch("/rest/v1/game_revisions?select=id,game_id,previous_hash,current_hash,previous_payload,changed_at&club_id=eq." + cid + "&order=changed_at.desc&limit=100"),
+      jsonFetch("/rest/v1/report_reviews?select=*&club_id=eq." + cid + "&order=reviewed_at.desc&limit=100"),
+      jsonFetch("/rest/v1/evidence_annotations?select=*&club_id=eq." + cid + "&order=created_at.desc&limit=500")
+    ]);
+    const reports = gameIds.length ? await jsonFetch("/rest/v1/game_reports?select=id,game_id,report_version,updated_at&game_id=in.(" + gameIds.map(Number).join(",") + ")") : [];
+    return {schedule, revisions, reviews, evidence, reports};
+  }
+  async function saveScheduleGame(row) {
+    return jsonFetch("/rest/v1/schedule_games?on_conflict=club_id,source_url", {
+      method:"POST", headers:{Prefer:"resolution=merge-duplicates,return=representation"}, body:JSON.stringify(row)
+    });
+  }
+  async function addEvidence(row) {
+    return jsonFetch("/rest/v1/evidence_annotations", {
+      method:"POST", headers:{Prefer:"return=representation"}, body:JSON.stringify(row)
+    });
+  }
+  async function reviewReport(row) {
+    return jsonFetch("/rest/v1/report_reviews", {
+      method:"POST", headers:{Prefer:"return=representation"}, body:JSON.stringify(row)
+    });
+  }
+  async function reportReviewStatus(reportId) {
+    return jsonFetch("/rest/v1/report_reviews?select=decision,report_updated_at,reviewed_at&report_id=eq." + Number(reportId) + "&order=reviewed_at.desc&limit=20");
+  }
+
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, setCompetitions, chooseCompetition, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, setCompetitions, chooseCompetition, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame, coachWorkspace, saveScheduleGame, addEvidence, reviewReport, reportReviewStatus,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
