@@ -358,15 +358,15 @@ function openAccount(mode="signin"){
     }
 
     if(signed){
-      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Choose the league this account may access.</p>
-        <div class="importFields"><label>LEAGUE ACCESS</label><select id="accountLeague">
-          <option>Israel Women · IBBA</option><option>EuroCup Women · FIBA</option><option>EuroLeague 2026/27</option><option>EuroCup 2026/27</option><option>Winner League</option><option>Poland · Eurobasket</option>
-        </select></div><div id="leagueAccessNow" class="schema">Loading access…</div><div id="accountStatus" class="impStatus"></div>
-        <button id="saveLeague" class="runImport">SAVE LEAGUE ACCESS</button><button id="loadClub" class="accountSecondary">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
-      const accessBox=body.querySelector("#leagueAccessNow");
-      data.competitionAccess().then(rows=>{accessBox.textContent=rows.length?"Current access: "+rows.map(x=>x.competition).join(" · "):"No league selected yet.";}).catch(()=>{accessBox.textContent="No league selected yet.";});
-      body.querySelector("#saveLeague").onclick=async()=>{const status=body.querySelector("#accountStatus"),league=body.querySelector("#accountLeague").value;try{status.textContent="Saving league access…";const rows=await data.chooseCompetition(league);accessBox.textContent="Current access: "+rows.map(x=>x.competition).join(" · ");status.textContent="League access saved.";await syncProductData();render();}catch(e){status.textContent=e.message}};
-
+      const ownerId="10fa3b29-4acd-4fcf-9784-1117b510332c",isOwner=data.user()?.id===ownerId;
+      const leagueOptions=["Israel Women · IBBA","EuroCup Women · FIBA","EuroLeague 2026/27","EuroCup 2026/27","Winner League","Poland · Eurobasket"];
+      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. ${isOwner?"OWNER · Full league access":"Select up to 2 leagues."}</p>
+        <div class="importFields"><label>LEAGUE ACCESS</label><div id="leagueChecks">${leagueOptions.map(x=>`<label class="leagueChoice"><input type="checkbox" value="${htmlEsc(x)}" ${isOwner?"disabled":""}> ${htmlEsc(x)}</label>`).join("")}</div></div>
+        <div id="leagueAccessNow" class="schema">Loading access…</div><div id="accountStatus" class="impStatus"></div>
+        ${isOwner?"":'<button id="saveLeagues" class="runImport">SAVE LEAGUES</button>'}<button id="loadClub" class="accountSecondary">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
+      const accessBox=body.querySelector("#leagueAccessNow"),checks=[...body.querySelectorAll("#leagueChecks input")];
+      data.competitionAccess().then(rows=>{const selected=rows.map(x=>x.competition);checks.forEach(x=>x.checked=isOwner||selected.includes(x.value));accessBox.textContent=isOwner?"Full access to all leagues.":selected.length?"Current access: "+selected.join(" · "):"No league selected yet.";});
+      if(!isOwner)body.querySelector("#saveLeagues").onclick=async()=>{const status=body.querySelector("#accountStatus"),selected=checks.filter(x=>x.checked).map(x=>x.value);try{if(selected.length>2)throw new Error("Choose a maximum of 2 leagues.");status.textContent="Saving league access…";await data.setCompetitions(selected);accessBox.textContent=selected.length?"Current access: "+selected.join(" · "):"No league selected yet.";status.textContent="League access saved.";await syncProductData();render();}catch(e){status.textContent=e.message}};
       body.querySelector("#loadClub").onclick=async()=>{
         const status=body.querySelector("#accountStatus");status.textContent="Checking secure club workspace…";
         try{const x=await syncProductData(),w=x.workspace;status.textContent=`Connected · ${w.club.name} · ${w.clubPlayers.length} player records · ${w.games.length} saved games`;}
