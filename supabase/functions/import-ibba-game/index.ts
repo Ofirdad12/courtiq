@@ -8,7 +8,7 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json"
 };
-const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il","fiba.basketball","www.fiba.basketball","euroleaguebasketball.net","www.euroleaguebasketball.net"]);
+const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il","fiba.basketball","www.fiba.basketball","euroleaguebasketball.net","www.euroleaguebasketball.net","eurobasket.com","www.eurobasket.com"]);
 const j = (body: unknown, status=200) => new Response(JSON.stringify(body), {status, headers:cors});
 const clean=(s:string)=>s.replace(/\s+/g," ").trim();
 const num=(s:string)=>{const m=clean(s).replaceAll(",","").match(/-?\d+/); if(!m) throw new Error("Expected numeric value: "+s); return Number(m[0]);};
@@ -38,11 +38,13 @@ function validateUrl(raw:string){
   const isBasket=/^(www\.)?basket\.co\.il$/.test(u.hostname);
   const isFiba=/^(www\.)?fiba\.basketball$/.test(u.hostname);
   const isEuroleague=/^(www\.)?euroleaguebasketball\.net$/.test(u.hostname);
+  const isEurobasket=/^(www\.)?eurobasket\.com$/.test(u.hostname);
   if(isIbba && !/^\/match\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/i.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
   if(isBasket && (!(u.pathname.toLowerCase().endsWith("/game-zone.asp") || u.pathname.toLowerCase()==="/game-zone.asp") || !u.searchParams.get("GameId"))) throw new Error("Unsupported Winner League URL. Use basket.co.il/game-zone.asp?GameId=...");
   if(isFiba && !/^\/en\/events\/eurocup-women-\d{2}-\d{2}\/games\/\d+-[a-z0-9-]+\/?$/i.test(u.pathname)) throw new Error("Unsupported FIBA URL. Use an official EuroCup Women game page.");
   if(isEuroleague && !/^\/en\/(euroleague|eurocup)\/game-center\/\d{4}-\d{2}\/[a-z0-9-]+\/[EU]\d{4}\/\d+\/?$/i.test(u.pathname)) throw new Error("Unsupported EuroLeague Basketball URL. Use an official EuroLeague or EuroCup game-center page.");
-  return {u, provider:isEuroleague?(u.pathname.toLowerCase().includes("/eurocup/")?"EUROCUP":"EUROLEAGUE"):isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
+  if(isEurobasket && !/\/Basketball-Box-Score\.aspx$/i.test(u.pathname)) throw new Error("For Eurobasket, paste a specific Basketball-Box-Score.aspx?Game=... game URL, not the Poland league home page.");
+  return {u, provider:isEurobasket?"EUROBASKET_POLAND":isEuroleague?(u.pathname.toLowerCase().includes("/eurocup/")?"EUROCUP":"EUROLEAGUE"):isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
 }
 function tableRows($:cheerio.CheerioAPI, table:any){
   // Cheerio's map() flattens arrays returned by the callback. Use a native
@@ -335,6 +337,27 @@ function basketNames($:cheerio.CheerioAPI){
   const h=$("h1,h2,h3,h4,h5,h6").map((_:number,e:any)=>clean($(e).text())).get().filter(Boolean);
   return [h.find((x:string)=>!/cup|league|מנהלת|ליגת/i.test(x))||"Home", h.slice().reverse().find((x:string)=>!/cup|league|מנהלת|ליגת/i.test(x))||"Away"];
 }
+function eurobasketPlayerTable($:cheerio.CheerioAPI,table:any){
+  const rows=tableRows($,table).filter((r:string[])=>r.length>=8);
+  const headerIndex=rows.findIndex((r:string[])=>{const s=r.join(" ").toUpperCase();return s.includes("NAME")&&s.includes("MIN")&&s.includes("2PM-A")&&s.includes("3PM-A")&&s.includes("FTM-A");});
+  if(headerIndex<0) throw new Error("Eurobasket player table header was not found.");
+  const h=rows[headerIndex].map((x:string)=>clean(x).toUpperCase());
+  const col=(...names:string[])=>{const n=h.findIndex(x=>names.some(v=>x===v||x.includes(v)));if(n<0)throw new Error("Eurobasket missing column "+names[0]);return n;};
+  const ci={name:col("NAME"),min:col("MIN"),two:col("2PM-A"),three:col("3PM-A"),ft:col("FTM-A"),off:col("OFF"),def:col("DEF"),ast:col("AS","AST"),st:col("ST"),to:col("TO"),pts:col("PT","PTS")};
+  const players:any[]=[];
+  for(const r of rows.slice(headerIndex+1)){
+    if(r.length<=ci.pts||!/\d/.test(r[ci.pts]||"")||/TOTAL|TEAM/i.test(r[ci.name]||"")) continue;
+    try{const [two_pm,two_pa]=ma(r[ci.two]),[three_pm,three_pa]=ma(r[ci.three]),[ftm,fta]=ma(r[ci.ft]);players.push({id:"",number:Number(r[0])||0,name:clean(r[ci.name]),starter:false,minutes:minutesValue(r[ci.min]),points:num(r[ci.pts]),two_pm,two_pa,three_pm,three_pa,ftm,fta,oreb:num(r[ci.off]),dreb:num(r[ci.def]),ast:num(r[ci.ast]),steals:num(r[ci.st]),tov:num(r[ci.to]),blocks:0,value:0,plus_minus:0,has_played:true});}catch(_){}
+  }
+  if(!players.length) throw new Error("Eurobasket player rows were not found.");
+  const sum=(k:string)=>players.reduce((a,p)=>a+Number(p[k]||0),0);
+  return {total:{points:sum("points"),two_pm:sum("two_pm"),two_pa:sum("two_pa"),three_pm:sum("three_pm"),three_pa:sum("three_pa"),ftm:sum("ftm"),fta:sum("fta"),oreb:sum("oreb"),dreb:sum("dreb"),tov:sum("tov"),ast:sum("ast"),steals:sum("steals"),blocks:sum("blocks")},players};
+}
+function eurobasketMatchup($:cheerio.CheerioAPI){
+  const text=clean($.root().text());
+  const m=text.match(/(?:Round[^:]*:\s*)?([A-Za-z0-9 .ŁŚŻŹĆŃÓĘĄąćęłńóśźż-]{2,50})\s+-\s+([A-Za-z0-9 .ŁŚŻŹĆŃÓĘĄąćęłńóśźż-]{2,50})\s+(\d{2,3})-(\d{2,3})/);
+  return m?[clean(m[1]),clean(m[2]),Number(m[3]),Number(m[4])]:null;
+}
 function elNum(o:any,...keys:string[]){ for(const k of keys){ if(o?.[k]!==undefined&&o?.[k]!==null&&o?.[k]!=="") return Number(o[k])||0; } return 0; }
 function euroleagueSide(side:any){
   const t=side?.total||{};
@@ -401,7 +424,7 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
     "Review the possessions that produced the largest efficiency gap before assigning tactical causation."
   ];
   return {id:meta.id,comp:meta.competition,date:meta.date_display,home:meta.home,away:meta.away,hs:home.points,as:away.points,quarters,metrics,factors,stats,findings,videos,
-    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="EUROCUP"?"EUROCUP OFFICIAL BOX SCORE":meta.provider==="EUROLEAGUE"?"EUROLEAGUE OFFICIAL BOX SCORE":meta.provider==="FIBA"?"FIBA EUROCUP WOMEN OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
+    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="EUROBASKET_POLAND"?"EUROBASKET POLAND BOX SCORE":meta.provider==="EUROCUP"?"EUROCUP OFFICIAL BOX SCORE":meta.provider==="EUROLEAGUE"?"EUROLEAGUE OFFICIAL BOX SCORE":meta.provider==="FIBA"?"FIBA EUROCUP WOMEN OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
     ask:meta.home+" and "+meta.away+" are compared here using verified box-score totals. Tactical causation requires video verification.",
     raw:{home,away},calculated:{home:hm,away:am},formulaCatalog};
 }
@@ -487,6 +510,14 @@ Deno.serve(async(req:Request)=>{
       parsedPlayers=[basketPlayerData($,playerTables[0]),basketPlayerData($,playerTables[1])];
       splitData=[basketSplit($,splitTables[0]),basketSplit($,splitTables[1])];
       extraData=basketExtra($);
+    }else if(provider==="EUROBASKET_POLAND"){
+      $("table").each((_:number,t:any)=>{const h=tableRows($,t).slice(0,3).flat().join(" ").toUpperCase();if(h.includes("NAME")&&h.includes("MIN")&&h.includes("2PM-A")&&h.includes("3PM-A")&&h.includes("FTM-A")) playerTables.push(t);});
+      if(playerTables.length<2) throw new Error("Could not locate both Eurobasket box-score tables.");
+      const matchup=eurobasketMatchup($); if(!matchup) throw new Error("Could not read Eurobasket matchup and final score.");
+      homeName=matchup[0];awayName=matchup[1];
+      const sides=[eurobasketPlayerTable($,playerTables[0]),eurobasketPlayerTable($,playerTables[1])];
+      const a=sides[0].total.points,b=sides[1].total.points;
+      parsedPlayers=(a===matchup[2]&&b===matchup[3])?sides:(a===matchup[3]&&b===matchup[2])?[sides[1],sides[0]]:sides;
     }else if(provider==="FIBA"){
       fibaData=fibaPageData($);
       const game=fibaData.game,teams=fibaData.gameDetails.c;
@@ -518,7 +549,7 @@ Deno.serve(async(req:Request)=>{
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v5",
+      parser:provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v5",
       validated_at:new Date().toISOString()
     };
 
@@ -528,11 +559,11 @@ Deno.serve(async(req:Request)=>{
     const elDate=(provider==="EUROLEAGUE"||provider==="EUROCUP")?String(euroleagueGame?.date||euroleagueGame?.localDate||"").slice(0,10):"";
     const gameDate=elDate||fibaDate||(dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null);
     const dateDisplay=gameDate?gameDate.split("-").reverse().join("/"):"Imported game";
-    const id=(provider==="EUROLEAGUE"||provider==="EUROCUP")?`${elSeason}-${elGameCode}`:provider==="FIBA"?u.pathname.match(/\/games\/(\d+)-/)![1]:provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
+    const id=provider==="EUROBASKET_POLAND"?String(u.searchParams.get("Game")||u.searchParams.get("game")||"").slice(0,120):(provider==="EUROLEAGUE"||provider==="EUROCUP")?`${elSeason}-${elGameCode}`:provider==="FIBA"?u.pathname.match(/\/games\/(\d+)-/)![1]:provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
     auditExternalId=id;
     const eventSlug=u.pathname.match(/\/events\/([^/]+)/)?.[1]||"";
     const eventSeason=eventSlug.match(/-(\d{2})-(\d{2})$/);
-    const title=provider==="EUROCUP"?`EuroCup ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="EUROLEAGUE"?`EuroLeague ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="FIBA"?"EuroCup Women "+(eventSeason?"20"+eventSeason[1]+"/"+eventSeason[2]:""):clean($("title").text())||"IBBA";
+    const title=provider==="EUROBASKET_POLAND"?"Poland · Eurobasket":provider==="EUROCUP"?`EuroCup ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="EUROLEAGUE"?`EuroLeague ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="FIBA"?"EuroCup Women "+(eventSeason?"20"+eventSeason[1]+"/"+eventSeason[2]:""):clean($("title").text())||"IBBA";
 
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
@@ -622,7 +653,7 @@ Deno.serve(async(req:Request)=>{
       try{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
-          club_id:auditClubId,provider:auditUrl.includes("/eurocup/")?"EUROCUP":auditUrl.includes("euroleaguebasketball.net")?"EUROLEAGUE":auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
+          club_id:auditClubId,provider:auditUrl.includes("eurobasket.com")?"EUROBASKET_POLAND":auditUrl.includes("/eurocup/")?"EUROCUP":auditUrl.includes("euroleaguebasketball.net")?"EUROLEAGUE":auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
           status:"failed",error_message:message,validation:{parser:auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v4"}
         });
       }catch(_){}
