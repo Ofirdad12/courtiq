@@ -177,8 +177,7 @@ const exportActions=document.createElement("span");
 exportActions.className="exportActions";
 exportActions.innerHTML='<button id="exportJson" class="importBtn secondaryAction">EXPORT JSON</button><button id="exportCsv" class="importBtn secondaryAction">EXPORT PLAYERS CSV</button>';
 document.querySelector(".pills").appendChild(exportActions);
-installGameViews(G);
-document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.dataset.game;render();window.scrollTo(0,0)});
+installGameViews(G);\ndocument.querySelector(".tabs").insertAdjacentHTML("beforebegin",intelligenceSuite(G));\ndocument.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.dataset.game;render();window.scrollTo(0,0)});
 document.querySelector("#ask").onclick=()=>{document.querySelector("#answer").textContent=G.ask};
 document.querySelector("#importGame").onclick=openImport;
 document.querySelector("#importUrl").onclick=openUrlImport;
@@ -529,6 +528,27 @@ async function openOpponentScout(){
     modal.querySelector("#oppOut").innerHTML=`<div class="reportKpis"><div><small>SAMPLE</small><b>${sample.length} game${sample.length===1?"":"s"}</b></div><div><small>PF / PA</small><b>${pf??"—"} / ${pa??"—"}</b></div><div><small>AVG eFG%</small><b>${avg("efg")??"—"}${avg("efg")!=null?"%":""}</b></div><div><small>AVG TOV%</small><b>${avg("tov")??"—"}${avg("tov")!=null?"%":""}</b></div></div><table class="stats"><tr><th>Date</th><th>Game</th><th>PF</th><th>PA</th></tr>${rows||'<tr><td colspan="4">No stored games for this team yet.</td></tr>'}</table><h3>What Should I Watch?</h3><div class="videoList">${video.map((x,i)=>`<div class="videoItem"><span>${i+1}</span>${x}</div>`).join("")}</div><div class="insight ${sample.length<3?"warning":""}"><b>${sample.length>=3?"DATA CONFIRMED":"SMALL SAMPLE"}</b> · Trends are descriptive. Tactical causation requires video verification.</div>`;};
   modal.querySelector("#oppSelect").onchange=draw;draw();
 }
+function teamSnapshot(g,team){
+  const side=g.home===team?"home":g.away===team?"away":null;if(!side)return null;
+  const opp=side==="home"?"away":"home",calc=g.calculated?.[side]||{};
+  return {date:g.date||"—",game:g,team,opponent:g[opp],pf:Number(side==="home"?g.hs:g.as),pa:Number(side==="home"?g.as:g.hs),efg:Number(calc.efg),tov:Number(calc.tov),orb:Number(calc.orb),ftr:Number(calc.ftr),ortg:Number(calc.ortg),drtg:Number(calc.drtg),net:Number(calc.net_rating),pace:Number(calc.pace)};
+}
+function avgFinite(rows,key){const v=rows.map(x=>Number(x[key])).filter(Number.isFinite);return v.length?oneDecimal(v.reduce((a,b)=>a+b,0)/v.length):null;}
+function seasonTrendPanel(G){
+  const team=G.home,rows=localTeamGames(team).map(g=>teamSnapshot(g,team)).filter(Boolean),recent=rows.slice(-5),prev=rows.slice(-10,-5);
+  const metric=(key,label,suffix="")=>{const now=avgFinite(recent,key),before=avgFinite(prev,key),delta=now!=null&&before!=null?oneDecimal(now-before):null;return `<div class="card kpi"><label>${label} · LAST ${recent.length}</label><b>${now??"—"}${now!=null?suffix:""}</b><small>${delta==null?"Need 6+ stored games":(delta>0?"+":"")+delta+" vs previous sample"}</small></div>`;};
+  return `<section class="card takeaways seasonIntel"><div class="sectionhead"><h3><span>↗</span> SEASON TRENDS · ${htmlEsc(team)}</h3><small>${rows.length} OFFICIAL STORED GAME${rows.length===1?"":"S"}</small></div><div class="kpis">${metric("pf","Points","")}${metric("efg","eFG%","%")}${metric("tov","TOV%","%")}${metric("net","Net Rating","")}${metric("pace","Pace","")}</div><div class="metricNote">Trend calculations use only official games already stored in CourtIQ. Small samples are labeled; no missing games are estimated.</div></section>`;
+}
+function liveDataPanel(G){
+  const events=Array.isArray(G.playByPlay)?G.playByPlay:[],isFinal=String(G.status||"").toLowerCase()==="final"||!events.length;
+  return `<section class="card takeaways liveIntel"><div class="sectionhead"><h3><span>●</span> LIVE / OFFICIAL DATA</h3><small>${events.length?"OFFICIAL EVENT FEED":"SOURCE-AWARE"}</small></div><div class="insight ${events.length?"":"warning"}"><b>${events.length?"LIVE-CAPABLE FEED AVAILABLE":"NO LIVE FEED IN CURRENT SOURCE"}</b> · ${events.length?`CourtIQ has ${events.length} official play-by-play events for this game and can refresh the analysis when the source is re-imported.`:"CourtIQ will never label a final box score as real-time. Live analytics require an official live/play-by-play feed from the provider."}</div></section>`;
+}
+function aiScoutingPanel(G){
+  const opponent=G.away,sample=localTeamGames(opponent).map(g=>teamSnapshot(g,opponent)).filter(Boolean),recent=sample.slice(-5);
+  const facts=[["Sample",recent.length+" game"+(recent.length===1?"":"s")],["Points",avgFinite(recent,"pf")??"—"],["eFG%",(avgFinite(recent,"efg")??"—")+(avgFinite(recent,"efg")!=null?"%":"")],["TOV%",(avgFinite(recent,"tov")??"—")+(avgFinite(recent,"tov")!=null?"%":"")],["ORB%",(avgFinite(recent,"orb")??"—")+(avgFinite(recent,"orb")!=null?"%":"")],["Net Rating",avgFinite(recent,"net")??"—"]];
+  return `<section class="card takeaways aiScoutIntel"><div class="sectionhead"><h3><span>◆</span> AI SCOUTING · ${htmlEsc(opponent)}</h3><small>OFFICIAL DATA → COACHING QUESTIONS</small></div><div class="reportKpis">${facts.map(x=>`<div><small>${x[0]}</small><b>${x[1]}</b></div>`).join("")}</div><div class="findings"><div class="finding"><div class="num">1</div><b>Possession pressure</b><p>Opponent TOV% sample: ${avgFinite(recent,"tov")??"—"}%</p><em>→ Verify which defensive actions create turnovers on video.</em></div><div class="finding"><div class="num">2</div><b>Shot efficiency</b><p>Opponent eFG% sample: ${avgFinite(recent,"efg")??"—"}%</p><em>→ Review shot locations and creators before choosing coverage.</em></div><div class="finding"><div class="num">3</div><b>Second possessions</b><p>Opponent ORB% sample: ${avgFinite(recent,"orb")??"—"}%</p><em>→ Audit box-outs and crash personnel on film.</em></div></div><div class="metricNote">AI Scouting is evidence-first: it turns verified statistics into scouting priorities. It does not invent tactical causes that are absent from box-score/play-by-play data.</div></section>`;
+}
+function intelligenceSuite(G){return `<div class="intelligenceSuite">${seasonTrendPanel(G)}${liveDataPanel(G)}${aiScoutingPanel(G)}</div>`;}
 async function openFullReport(){
   const G=games[active];if(!G)return;let report=null,reportError="";
   if(G._dbId&&window.CourtIQData?.isSignedIn()){try{const rows=await window.CourtIQData.gameReports(G._dbId);report=rows?.[0]?.payload||null;}catch(e){reportError=e.message;}}
