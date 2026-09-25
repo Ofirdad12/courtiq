@@ -23,11 +23,13 @@ jobs:
       - name: Check browser JavaScript syntax
         run: |
           node --check data.js
+          node --check coach.js
           node --check app.js
           node --check players.js
           node --check mens.js
           node tests/test_official_demo.js
           node tests/test_season_source.js
+          node tests/test_coach_workflow.js
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
