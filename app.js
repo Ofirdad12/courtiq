@@ -358,7 +358,15 @@ function openAccount(mode="signin"){
     }
 
     if(signed){
-      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Club data is protected by Supabase Row Level Security.</p><div id="accountStatus" class="impStatus"></div><button id="loadClub" class="runImport">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
+      body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. Choose the league this account may access.</p>
+        <div class="importFields"><label>LEAGUE ACCESS</label><select id="accountLeague">
+          <option>Israel Women · IBBA</option><option>EuroCup Women · FIBA</option><option>EuroLeague 2026/27</option><option>EuroCup 2026/27</option><option>Winner League</option><option>Poland · Eurobasket</option>
+        </select></div><div id="leagueAccessNow" class="schema">Loading access…</div><div id="accountStatus" class="impStatus"></div>
+        <button id="saveLeague" class="runImport">SAVE LEAGUE ACCESS</button><button id="loadClub" class="accountSecondary">TEST CLUB ACCESS</button><button id="signOut" class="accountSecondary">SIGN OUT</button>`;
+      const accessBox=body.querySelector("#leagueAccessNow");
+      data.competitionAccess().then(rows=>{accessBox.textContent=rows.length?"Current access: "+rows.map(x=>x.competition).join(" · "):"No league selected yet.";}).catch(()=>{accessBox.textContent="No league selected yet.";});
+      body.querySelector("#saveLeague").onclick=async()=>{const status=body.querySelector("#accountStatus"),league=body.querySelector("#accountLeague").value;try{status.textContent="Saving league access…";const rows=await data.chooseCompetition(league);accessBox.textContent="Current access: "+rows.map(x=>x.competition).join(" · ");status.textContent="League access saved.";await syncProductData();render();}catch(e){status.textContent=e.message}};
+
       body.querySelector("#loadClub").onclick=async()=>{
         const status=body.querySelector("#accountStatus");status.textContent="Checking secure club workspace…";
         try{const x=await syncProductData(),w=x.workspace;status.textContent=`Connected · ${w.club.name} · ${w.clubPlayers.length} player records · ${w.games.length} saved games`;}
