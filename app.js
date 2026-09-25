@@ -618,7 +618,10 @@ function openMensD1Teams(){if(window.CourtIQMens?.openTeams)return window.CourtI
 document.addEventListener("click",e=>{
   const item=e.target.closest(".menu div");
   if(!item) return;
-  if(item.textContent.includes("Dashboard")) openPilotDashboard();\n  if(item.textContent.includes("Season Memory")) openSeasonMemory();\n  if(item.textContent.includes("Player Memory")) openPlayerMemory();\n  if(item.textContent.includes("Connected Intelligence")) openConnectedIntelligence();
+  if(item.textContent.includes("Dashboard")) openPilotDashboard();
+  if(item.textContent.includes("Season Memory")) openSeasonMemory();
+  if(item.textContent.includes("Player Memory")) openPlayerMemory();
+  if(item.textContent.includes("Connected Intelligence")) openConnectedIntelligence();
   if(item.textContent.includes("Games")) openGameLibrary();
   if(item.textContent.trim()==="◉ Teams" || item.textContent.trim()==="Teams") openMensD1Teams();
   if(item.textContent.includes("Israel Men")) openMensD1Teams();
