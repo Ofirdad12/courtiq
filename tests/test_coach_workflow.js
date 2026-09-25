@@ -1,9 +1,11 @@
 const fs=require("fs"),vm=require("vm"),assert=require("assert");
 const context={window:{},URL};vm.runInNewContext(fs.readFileSync("coach.js","utf8"),context);
 const coach=context.window.CourtIQCoach;
-const games=[{home:"A",away:"B",date:"2026-09-01"},{home:"C",away:"A",date:"2026-09-02"}];
+const games=[{home:"A",away:"B",date:"2026-09-01",competition:"Cup",season:"2026-27"},{home:"C",away:"A",date:"2026-09-02",competition:"League",season:"2026-27"}];
 assert.equal(coach.sampleGames(games,"A","home","").length,1);
 assert.equal(coach.sampleGames(games,"A","away","C").length,1);
+assert.equal(coach.sampleGames(games,"A","","","Cup","2026-27").length,1);
+assert.equal(coach.sampleGames(games,"A","","","Cup","2025-26").length,0);
 assert.equal(coach.average([{x:null},{x:20},{x:30}],"x"),25);
 assert.equal(coach.sourceKey("https://www.fiba.basketball/games/1/?tracking=x"),"www.fiba.basketball/games/1");
 const header="date,competition,season,provider,home_team,away_team,source_url,status\n";
