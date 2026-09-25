@@ -1,0 +1,13 @@
+const fs=require("fs"),vm=require("vm"),assert=require("assert");
+const context={window:{},URL};vm.runInNewContext(fs.readFileSync("coach.js","utf8"),context);
+const coach=context.window.CourtIQCoach;
+const games=[{home:"A",away:"B",date:"2026-09-01"},{home:"C",away:"A",date:"2026-09-02"}];
+assert.equal(coach.sampleGames(games,"A","home","").length,1);
+assert.equal(coach.sampleGames(games,"A","away","C").length,1);
+assert.equal(coach.average([{x:null},{x:20},{x:30}],"x"),25);
+assert.equal(coach.sourceKey("https://www.fiba.basketball/games/1/?tracking=x"),"www.fiba.basketball/games/1");
+const header="date,competition,season,provider,home_team,away_team,source_url,status\n";
+const rows=coach.csvRecords(header+'2026-09-25,"Women, Cup",2026-27,FIBA,A,B,https://www.fiba.basketball/games/1/,final\n');
+assert.equal(rows[0].competition,"Women, Cup");
+assert.throws(()=>coach.csvRecords(header+'2026-09-25,X,2026-27,FIBA,A,B,https://example.com/fake,final\n'));
+console.log("Coach source and sample tests passed");
