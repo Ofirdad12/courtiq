@@ -397,6 +397,7 @@
       <div id="pcLoading" class="piEmpty"><b>LOADING PLAYER MEMORY…</b><span>Reading verified games from CourtIQ Database.</span></div>
       <div id="pcLive" style="display:none">
         <div class="playerCompareControls">
+          <div><label>LEAGUE</label><select id="pcLeague"></select></div>
           <div><label>PLAYER A</label><select id="pcPlayerA"></select><select id="pcWindowA"><option value="season">SEASON</option><option value="5">LAST 5</option><option value="3">LAST 3</option></select></div>
           <div class="pcVs">VS</div>
           <div><label>PLAYER B</label><select id="pcPlayerB"></select><select id="pcWindowB"><option value="season">SEASON</option><option value="5">LAST 5</option><option value="3">LAST 3</option></select></div>
@@ -415,12 +416,21 @@
         if(!grouped.has(row.player_id)) grouped.set(row.player_id,{id:row.player_id,name:row.player_name,rows:[]});
         grouped.get(row.player_id).rows.push(row);
       }
-      const livePlayers=[...grouped.values()].sort((a,b)=>a.name.localeCompare(b.name));
-      if(livePlayers.length<2) throw new Error("At least two verified players are required.");
+      const allPlayers=[...grouped.values()].sort((a,b)=>a.name.localeCompare(b.name));
+      const leagues=[...new Set(memory.rows.map(r=>r.competition).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+      if(!leagues.length) throw new Error("No verified leagues are available.");
       modal.querySelector("#pcLoading").style.display="none"; modal.querySelector("#pcLive").style.display="";
-      const opts=livePlayers.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
-      modal.querySelector("#pcPlayerA").innerHTML=opts; modal.querySelector("#pcPlayerB").innerHTML=opts;
-      modal.querySelector("#pcPlayerB").selectedIndex=1;
+      const leagueSelect=modal.querySelector("#pcLeague");
+      leagueSelect.innerHTML=leagues.map(x=>`<option value="${x}">${x}</option>`).join("");
+      let livePlayers=[];
+      const loadLeague=()=>{
+        const league=leagueSelect.value;
+        livePlayers=allPlayers.map(p=>({...p,rows:p.rows.filter(r=>r.competition===league)})).filter(p=>p.rows.length).sort((a,b)=>a.name.localeCompare(b.name));
+        const opts=livePlayers.map(p=>`<option value="${p.id}">${p.name} · ${p.rows[0]?.team_name||"—"}</option>`).join("");
+        modal.querySelector("#pcPlayerA").innerHTML=opts; modal.querySelector("#pcPlayerB").innerHTML=opts;
+        if(livePlayers.length>1) modal.querySelector("#pcPlayerB").selectedIndex=1;
+      };
+      loadLeague();
       const n=v=>Number(v||0), r1=v=>Math.round(v*10)/10, r2=v=>Math.round(v*100)/100, pct=(a,b)=>b?r1(a/b*100):0;
       const aggregate=(p,win)=>{
         let rows=p.rows.slice().sort((a,b)=>Number(b.game_id)-Number(a.game_id)); if(win!=="season") rows=rows.slice(0,Number(win));
@@ -441,7 +451,9 @@
         <div class="card pcTableWrap"><table class="stats pcTable"><thead><tr><th>Metric</th><th>${pa.name}</th><th>${pb.name}</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}</td><td>${fmt(r[2],r[3])}</td></tr>`).join("")}</tbody></table></div>
         <div class="pcNotes"><div class="insight"><b>DATA CONFIRMED</b> · Aggregated only from verified imported game records.</div><div class="insight warning"><b>NO OVERALL SCORE</b> · Differences are descriptive; role and tactical fit require video/context.</div></div>`;
       };
-      ["A","B"].forEach(side=>{modal.querySelector("#pcPlayer"+side).onchange=draw;modal.querySelector("#pcWindow"+side).onchange=draw;}); draw();
+      ["A","B"].forEach(side=>{modal.querySelector("#pcPlayer"+side).onchange=draw;modal.querySelector("#pcWindow"+side).onchange=draw;});
+      leagueSelect.onchange=()=>{loadLeague(); if(livePlayers.length>=2) draw(); else modal.querySelector("#pcOutput").innerHTML='<div class="piEmpty"><b>NOT ENOUGH PLAYERS</b><span>This league needs at least two verified players for comparison.</span></div>';};
+      if(livePlayers.length>=2) draw(); else leagueSelect.onchange();
     }catch(err){modal.querySelector("#pcLoading").innerHTML=`<b>PLAYER COMPARE UNAVAILABLE</b><span>${String(err.message||err)}</span>`;}
   }
 
@@ -535,5 +547,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
-  window.COURTIQ_BUILD = "117";
+  window.COURTIQ_BUILD = "120";
 })();
