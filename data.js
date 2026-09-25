@@ -122,6 +122,18 @@
     return rows.map(row => ({...row, samples: byPlayer.get(row.players?.id) || []}));
   }
 
+
+  async function comparisonPlayers() {
+    const w = await workspace();
+    const rows = await jsonFetch("/rest/v1/game_player_stats?select=id,game_id,player_id,provider,season,competition,team_name,opponent_name,side,player_name,jersey_number,starter,minutes,stats,calculated,source_url,verified,created_at&verified=eq.true&order=created_at.desc");
+    const byPlayer = new Map();
+    for (const row of rows || []) {
+      if (!byPlayer.has(row.player_id)) byPlayer.set(row.player_id, []);
+      byPlayer.get(row.player_id).push(row);
+    }
+    return {club:w.club, rows:rows||[], byPlayer};
+  }
+
   async function gameReports(gameId) {
     return jsonFetch("/rest/v1/game_reports?select=id,game_id,report_version,payload,updated_at&game_id=eq." + Number(gameId) + "&order=updated_at.desc");
   }
@@ -180,7 +192,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, gameReports, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
