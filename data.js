@@ -130,6 +130,8 @@
   async function chooseCompetition(competition) {
     const u=user(); if(!u?.id) throw new Error("Sign in first.");
     const value=String(competition||"").trim(); if(!value) throw new Error("Choose a league.");
+    const current=await competitionAccess();
+    if(!current.some(x=>x.competition===value) && current.length>=2) throw new Error("Maximum 2 leagues per account.");
     await jsonFetch("/rest/v1/user_competition_access", {method:"POST",headers:{"Prefer":"resolution=ignore-duplicates"},body:JSON.stringify({user_id:u.id,competition:value})});
     return competitionAccess();
   }
