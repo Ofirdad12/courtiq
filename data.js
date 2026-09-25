@@ -123,6 +123,17 @@
   }
 
 
+  async function competitionAccess() {
+    const u=user(); if(!u?.id) return [];
+    return jsonFetch("/rest/v1/user_competition_access?select=competition&user_id=eq."+encodeURIComponent(u.id)+"&order=competition");
+  }
+  async function chooseCompetition(competition) {
+    const u=user(); if(!u?.id) throw new Error("Sign in first.");
+    const value=String(competition||"").trim(); if(!value) throw new Error("Choose a league.");
+    await jsonFetch("/rest/v1/user_competition_access", {method:"POST",headers:{"Prefer":"resolution=ignore-duplicates"},body:JSON.stringify({user_id:u.id,competition:value})});
+    return competitionAccess();
+  }
+
   async function comparisonPlayers() {
     const w = await workspace();
     const rows = await jsonFetch("/rest/v1/game_player_stats?select=id,game_id,player_id,provider,season,competition,team_name,opponent_name,side,player_name,jersey_number,starter,minutes,stats,calculated,source_url,verified,created_at&verified=eq.true&order=created_at.desc");
@@ -192,7 +203,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, chooseCompetition, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
