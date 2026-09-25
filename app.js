@@ -192,6 +192,7 @@ document.querySelector("#playersHub").onclick=()=>window.CourtIQPlayers?.openPla
 document.querySelector("#comparePlayers").onclick=()=>window.CourtIQPlayers?.openPlayerCompare();
 document.querySelector("#exportJson").onclick=()=>exportCurrentGame(G,"json");
 document.querySelector("#exportCsv").onclick=()=>exportCurrentGame(G,"csv");
+window.CourtIQCoach?.install();
 }
 
 function csvRows(text){
@@ -626,11 +627,11 @@ function aiScoutingPanel(G){
 }
 function intelligenceSuite(G){return `<div class="intelligenceSuite">${seasonTrendPanel(G)}${liveDataPanel(G)}${aiScoutingPanel(G)}</div>`;}
 async function openFullReport(){
-  const G=games[active];if(!G)return;let report=null,reportError="";
-  if(G._dbId&&window.CourtIQData?.isSignedIn()){try{const rows=await window.CourtIQData.gameReports(G._dbId);report=rows?.[0]?.payload||null;}catch(e){reportError=e.message;}}
+  const G=games[active];if(!G)return;let report=null,reportError="",reviewState="INTERNAL DRAFT · ANALYST REVIEW REQUIRED";
+  if(G._dbId&&window.CourtIQData?.isSignedIn()){try{const rows=await window.CourtIQData.gameReports(G._dbId),record=rows?.[0];report=record?.payload||null;if(record){const reviews=await window.CourtIQData.reportReviewStatus(record.id);const latest=reviews.find(r=>r.report_updated_at===record.updated_at);if(latest?.decision==="approved")reviewState="ANALYST REVIEWED";}}catch(e){reportError=e.message;}}
   const R=report||{metrics:G.metrics||[],four_factors:G.factors||[],findings:G.findings||[],team_stats:G.stats||[],video_investigation:G.videos||[],confidence:G.confidence||"COURTIQ DATA"},stat=name=>R.team_stats.find(x=>String(x[0]).toLowerCase().includes(name.toLowerCase()));
   const modal=document.createElement("div");modal.className="modal";
-  modal.innerHTML=`<div class="modalCard compareModal reportModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ · FULL GAME REPORT · V1</small><h2>${G.home} ${G.hs}–${G.as} ${G.away}</h2><p>${G.comp} · ${G.date} · ${G.sourceLabel||"COURTIQ DATA"}</p><div class="reportKpis">${R.metrics.map(x=>`<div><small>${x[0]}</small><b>${x[1]}</b><span>vs ${x[2]}</span></div>`).join("")}</div>
+  modal.innerHTML=`<div class="modalCard compareModal reportModal"><button class="modalX">×</button><small class="eyebrow">COURTIQ · FULL GAME REPORT · V1</small><h2>${G.home} ${G.hs}–${G.as} ${G.away}</h2><p>${G.comp} · ${G.date} · ${G.sourceLabel||"COURTIQ DATA"}</p><div class="insight ${reviewState.startsWith("ANALYST")?"":"warning"}">${reviewState}</div><div class="reportKpis">${R.metrics.map(x=>`<div><small>${x[0]}</small><b>${x[1]}</b><span>vs ${x[2]}</span></div>`).join("")}</div>
   <h3>Game Summary</h3><div class="insight"><b>${R.confidence||"DATA CONFIRMED"}</b> · ${G.home} ${G.hs}–${G.as} ${G.away}. Statistical statements come from the stored game record.</div>
   <h3>Four Factors</h3><table class="stats"><tr><th>Metric</th><th>${G.home}</th><th>${G.away}</th></tr>${R.four_factors.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}%</td><td>${x[2]}%</td></tr>`).join("")}</table>
   <h3>Efficiency & Possessions</h3><div class="reportKpis">${R.metrics.filter(x=>/Rating|Possession|eFG|TS/i.test(x[0])).map(x=>`<div><small>${x[0]}</small><b>${x[1]}</b><span>vs ${x[2]}</span></div>`).join("")||'<div><small>STATUS</small><b>—</b><span>Not available in source</span></div>'}</div>
