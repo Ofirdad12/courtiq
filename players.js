@@ -389,62 +389,60 @@
     countries();
   }
 
-  function openPlayerCompare() {
+  async function openPlayerCompare() {
     const modal = document.createElement("div");
     modal.className = "modal piModal";
-    const defaultIndex = players.length > 1 ? 1 : 0;
     modal.innerHTML = `<div class="modalCard piShell comparePlayersShell"><button class="modalX">×</button>
-      <div class="piTop"><small class="eyebrow">MACCABI BNOT ASHDOD · PILOT</small><h2>Compare Players</h2><p>Scouting comparison using verified performance samples. CourtIQ does not create an overall player score.</p></div>
-      <div class="playerCompareControls">
-        <div><label>PLAYER A</label><select id="pcPlayerA">${players.map((p,i)=>`<option value="${p.id}" ${i===0?"selected":""}>${p.name}</option>`).join("")}</select><select id="pcSampleA"></select></div>
-        <div class="pcVs">VS</div>
-        <div><label>PLAYER B</label><select id="pcPlayerB">${players.map((p,i)=>`<option value="${p.id}" ${i===defaultIndex?"selected":""}>${p.name}</option>`).join("")}</select><select id="pcSampleB"></select></div>
+      <div class="piTop"><small class="eyebrow">COURTIQ · PLAYER MEMORY</small><h2>Compare Players</h2><p>Season, Last 5 and Last 3 comparison from verified imported game box scores.</p></div>
+      <div id="pcLoading" class="piEmpty"><b>LOADING PLAYER MEMORY…</b><span>Reading verified games from CourtIQ Database.</span></div>
+      <div id="pcLive" style="display:none">
+        <div class="playerCompareControls">
+          <div><label>PLAYER A</label><select id="pcPlayerA"></select><select id="pcWindowA"><option value="season">SEASON</option><option value="5">LAST 5</option><option value="3">LAST 3</option></select></div>
+          <div class="pcVs">VS</div>
+          <div><label>PLAYER B</label><select id="pcPlayerB"></select><select id="pcWindowB"><option value="season">SEASON</option><option value="5">LAST 5</option><option value="3">LAST 3</option></select></div>
+        </div>
+        <div id="pcOutput"></div>
       </div>
-      <div id="pcOutput"></div>
     </div>`;
     document.body.appendChild(modal);
-    modal.querySelector(".modalX").onclick = () => modal.remove();
-    modal.onclick = e => { if (e.target === modal) modal.remove(); };
-
-    const playerFor = side => players.find(p => p.id === modal.querySelector("#pcPlayer"+side).value);
-    const bestSampleIndex = p => {
-      const i = p.competitions.findIndex(x => !x.summaryOnly);
-      return i >= 0 ? i : 0;
-    };
-    function fillSamples(side) {
-      const p = playerFor(side), sel = modal.querySelector("#pcSample"+side);
-      const preferred = bestSampleIndex(p);
-      sel.innerHTML = p.competitions.map((x,i)=>`<option value="${i}" ${i===preferred?"selected":""}>${x.name} · ${x.games == null ? "season summary" : x.games+" G"}</option>`).join("");
-    }
-    const fmt = (v,suffix="") => v == null ? "—" : v + suffix;
-    function draw() {
-      const pa=playerFor("A"), pb=playerFor("B");
-      const sa=pa.competitions[Number(modal.querySelector("#pcSampleA").value)||0];
-      const sb=pb.competitions[Number(modal.querySelector("#pcSampleB").value)||0];
-      const a=metrics(sa), b=metrics(sb);
-      const rows=[
-        ["PPG",a.ppg,b.ppg,""],["RPG",a.rpg,b.rpg,""],["APG",a.apg,b.apg,""],
-        ["eFG%",a.efg,b.efg,"%"],["TS%",a.ts,b.ts,"%"],["AST/TO",a.astTo,b.astTo,""],
-        ["3P Rate",a.threeRate,b.threeRate,"%"],["FT Rate",a.ftRate,b.ftRate,"%"],
-        ["PTS / 40",a.pts40,b.pts40,""],["AST / 40",a.ast40,b.ast40,""],["TOV / 40",a.tov40,b.tov40,""]
-      ];
-      const comparable=rows.filter(r=>r[1]!=null && r[2]!=null).length;
-      modal.querySelector("#pcOutput").innerHTML=`<div class="pcIdentity">
-        <div><b>${pa.name}</b><span>${pa.position}</span><small>${sa.name} · ${sa.games == null ? "season summary" : sa.games+" games"}</small></div>
-        <div class="pcConfidence"><b>${comparable}</b><span>comparable metrics</span></div>
-        <div class="right"><b>${pb.name}</b><span>${pb.position}</span><small>${sb.name} · ${sb.games == null ? "season summary" : sb.games+" games"}</small></div>
-      </div>
-      <div class="card pcTableWrap"><table class="stats pcTable"><thead><tr><th>Metric</th><th>${pa.name}</th><th>${pb.name}</th></tr></thead><tbody>
-      ${rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}</td><td>${fmt(r[2],r[3])}</td></tr>`).join("")}
-      </tbody></table></div>
-      <div class="pcNotes"><div class="insight"><b>DATA CONFIRMED</b> · Values are calculated from the selected source sample only. Missing metrics are shown as — rather than estimated.</div><div class="insight warning"><b>VIDEO VERIFICATION REQUIRED</b> · Statistical differences do not establish role, defensive quality, tactical fit or causation.</div></div>`;
-    }
-    for (const side of ["A","B"]) {
-      modal.querySelector("#pcPlayer"+side).onchange=()=>{fillSamples(side);draw();};
-      modal.querySelector("#pcSample"+side).onchange=draw;
-      fillSamples(side);
-    }
-    draw();
+    modal.querySelector(".modalX").onclick=()=>modal.remove();
+    modal.onclick=e=>{if(e.target===modal)modal.remove();};
+    try{
+      if(!window.CourtIQData?.isSignedIn()) throw new Error("Sign in to compare the verified player database.");
+      const memory=await window.CourtIQData.comparisonPlayers();
+      const grouped=new Map();
+      for(const row of memory.rows){
+        if(!grouped.has(row.player_id)) grouped.set(row.player_id,{id:row.player_id,name:row.player_name,rows:[]});
+        grouped.get(row.player_id).rows.push(row);
+      }
+      const livePlayers=[...grouped.values()].sort((a,b)=>a.name.localeCompare(b.name));
+      if(livePlayers.length<2) throw new Error("At least two verified players are required.");
+      modal.querySelector("#pcLoading").style.display="none"; modal.querySelector("#pcLive").style.display="";
+      const opts=livePlayers.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+      modal.querySelector("#pcPlayerA").innerHTML=opts; modal.querySelector("#pcPlayerB").innerHTML=opts;
+      modal.querySelector("#pcPlayerB").selectedIndex=1;
+      const n=v=>Number(v||0), r1=v=>Math.round(v*10)/10, r2=v=>Math.round(v*100)/100, pct=(a,b)=>b?r1(a/b*100):0;
+      const aggregate=(p,win)=>{
+        let rows=p.rows.slice().sort((a,b)=>Number(b.game_id)-Number(a.game_id)); if(win!=="season") rows=rows.slice(0,Number(win));
+        const s=rows.map(x=>x.stats||{}), sum=k=>s.reduce((a,x)=>a+n(x[k]),0);
+        const games=rows.length,min=sum("minutes"),pts=sum("points"),reb=s.reduce((a,x)=>a+n(x.rebounds??(n(x.oreb)+n(x.dreb))),0),ast=sum("ast"),tov=sum("tov");
+        const twoM=sum("two_pm"),twoA=sum("two_pa"),threeM=sum("three_pm"),threeA=sum("three_pa"),ftm=sum("ftm"),fta=sum("fta"),fgm=twoM+threeM,fga=twoA+threeA;
+        return {games,team:rows[0]?.team_name||"—",competition:[...new Set(rows.map(x=>x.competition).filter(Boolean))].join(" · "),
+          ppg:r1(pts/Math.max(games,1)),rpg:r1(reb/Math.max(games,1)),apg:r1(ast/Math.max(games,1)),tovpg:r1(tov/Math.max(games,1)),
+          two:pct(twoM,twoA),three:pct(threeM,threeA),ft:pct(ftm,fta),efg:pct(fgm+.5*threeM,fga),ts:pct(pts,2*(fga+.44*fta)),astTo:tov?r2(ast/tov):(ast?"∞":0),
+          pts40:min?r1(pts*40/min):0,reb40:min?r1(reb*40/min):0,ast40:min?r1(ast*40/min):0,mpg:r1(min/Math.max(games,1))};
+      };
+      const player=side=>livePlayers.find(p=>String(p.id)===modal.querySelector("#pcPlayer"+side).value);
+      const fmt=(v,s="")=>v===null||v===undefined?"—":v+s;
+      const draw=()=>{
+        const pa=player("A"),pb=player("B"),a=aggregate(pa,modal.querySelector("#pcWindowA").value),b=aggregate(pb,modal.querySelector("#pcWindowB").value);
+        const rows=[["Games",a.games,b.games,""],["MPG",a.mpg,b.mpg,""],["PPG",a.ppg,b.ppg,""],["RPG",a.rpg,b.rpg,""],["APG",a.apg,b.apg,""],["TOV/G",a.tovpg,b.tovpg,""],["2P%",a.two,b.two,"%"],["3P%",a.three,b.three,"%"],["FT%",a.ft,b.ft,"%"],["eFG%",a.efg,b.efg,"%"],["TS%",a.ts,b.ts,"%"],["AST/TO",a.astTo,b.astTo,""],["PTS/40",a.pts40,b.pts40,""],["REB/40",a.reb40,b.reb40,""],["AST/40",a.ast40,b.ast40,""]];
+        modal.querySelector("#pcOutput").innerHTML=`<div class="pcIdentity"><div><b>${pa.name}</b><span>${a.team}</span><small>${a.competition||"Verified games"}</small></div><div class="pcConfidence"><b>DB</b><span>verified memory</span></div><div class="right"><b>${pb.name}</b><span>${b.team}</span><small>${b.competition||"Verified games"}</small></div></div>
+        <div class="card pcTableWrap"><table class="stats pcTable"><thead><tr><th>Metric</th><th>${pa.name}</th><th>${pb.name}</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],r[3])}</td><td>${fmt(r[2],r[3])}</td></tr>`).join("")}</tbody></table></div>
+        <div class="pcNotes"><div class="insight"><b>DATA CONFIRMED</b> · Aggregated only from verified imported game records.</div><div class="insight warning"><b>NO OVERALL SCORE</b> · Differences are descriptive; role and tactical fit require video/context.</div></div>`;
+      };
+      ["A","B"].forEach(side=>{modal.querySelector("#pcPlayer"+side).onchange=draw;modal.querySelector("#pcWindow"+side).onchange=draw;}); draw();
+    }catch(err){modal.querySelector("#pcLoading").innerHTML=`<b>PLAYER COMPARE UNAVAILABLE</b><span>${String(err.message||err)}</span>`;}
   }
 
   function openPlayers(initialFilter = "all") {
@@ -537,5 +535,5 @@
   });
 
   window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
-  window.COURTIQ_BUILD = "090";
+  window.COURTIQ_BUILD = "117";
 })();
