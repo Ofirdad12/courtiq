@@ -10,7 +10,7 @@ Use `YYYY-MM-DD` and one official HTTPS game URL per row. Status is `scheduled`,
 
 ## 2. Coach sheet
 
-Select the team, venue and prior opponent. The three cards show TOV%, eFG% and ORB% calculated from the imported games in that exact sample. Each card displays its own available game count and a question for the coaching staff. Player rows can be narrowed by minimum minutes and starter/bench role. Do not interpret the three cards as a tactical cause or a stable tendency from a small sample.
+Select the team, competition, season, venue and prior opponent. The three cards show TOV%, eFG% and ORB% calculated from the imported games in that exact sample. Each card displays its own available game count and a question for the coaching staff. Player rows can be narrowed by minimum minutes and starter/bench role. Do not interpret the three cards as a tactical cause or a stable tendency from a small sample.
 
 ## 3. Video evidence
 
