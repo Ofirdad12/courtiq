@@ -72,7 +72,7 @@ function hydrateOfficialDemoGame(game,rows){
   game.leaders=[["ג'וי אוסיגוואי",20,"PTS"],["נוגה הרן",6,"REB"],["אמילי גיאת",7,"AST"]];game.awayLeaders=[["שובל כמיסה",22,"PTS"],["בריה שאנטי הולמס",9,"REB"],["שירן גוזלן",6,"AST"]];
 }
 hydrateOfficialDemoGame(games.g1,officialDemoRows);
-const menu=["▦ Dashboard","◈ Season Memory","♟ Player Memory","◉ Games","◉ Teams","◆ Israel Men's League D1 Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
+const menu=["▦ Dashboard","◈ Season Memory","♟ Player Memory","◆ Connected Intelligence","◉ Games","◉ Teams","◆ Israel Men's League D1 Teams","♟ Players","⇄ Compare Players","◎ Opponent Scouting","▤ Reports","▣ Video Room","? Ask CourtIQ","⚙ Settings"];
 try{
   const savedPilot=localStorage.getItem("courtiq_pilot_game");
   if(savedPilot) games.pilot=JSON.parse(savedPilot); const savedUrl=localStorage.getItem("courtiq_url_game"); if(savedUrl) games.url=JSON.parse(savedUrl);
@@ -547,6 +547,25 @@ async function openPlayerMemory(){
   document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove();};
   modal.querySelectorAll("[data-player-memory]").forEach(btn=>btn.onclick=()=>{const p=players.find(x=>x.team+"::"+x.name===btn.dataset.playerMemory),metrics=[["Minutes",p.avg.minutes,p.delta.minutes],["Points",p.avg.points,p.delta.points],["eFG%",p.avg.efg,p.delta.efg],["TS%",p.avg.ts,p.delta.ts],["Involvement",p.avg.usage,p.delta.usage],["Impact/40",p.avg.impact,p.delta.impact],["Turnovers",p.avg.tov,p.delta.tov]];modal.querySelector("#playerMemoryIntel").innerHTML=`<section class="card takeaways"><div class="sectionhead"><h3>PLAYER INTELLIGENCE · ${htmlEsc(p.name)}</h3><small>${htmlEsc(p.team)} · ${p.games.length} GAME MEMORY</small></div><table class="stats"><tr><th>Metric</th><th>Last 4</th><th>Change vs previous 4</th></tr>${metrics.map(x=>`<tr><td>${x[0]}</td><td>${x[1]??"—"}${/eFG|TS|Involvement/.test(x[0])&&x[1]!=null?"%":""}</td><td>${x[2]==null?"Need more games":(x[2]>0?"+":"")+x[2]}</td></tr>`).join("")}</table><div class="videoList"><div class="videoItem"><span>1</span>Check whether role/minutes changed before attributing efficiency movement to performance.</div><div class="videoItem"><span>2</span>Review shot quality and creation context behind eFG% / TS% changes.</div><div class="videoItem"><span>3</span>Use involvement as a possession-ending estimate, not a full tracking-based Usage Rate.</div></div><div class="metricNote">Profile-change alerts are descriptive statistical signals. They are not medical, psychological or tactical conclusions.</div></section>`;});
 }
+function buildConnectedIntelligence(){
+  const teamMemory=buildSeasonMemory().teams,players=buildPlayerMemory(),out=[];
+  players.forEach(p=>{const team=teamMemory.find(t=>t.team===p.team);if(!team)return;const pairs=[
+    {player:"Involvement",pd:p.delta.usage,team:"Net Rating",td:team.delta.net},
+    {player:"Scoring",pd:p.delta.points,team:"Scoring",td:team.delta.pf},
+    {player:"eFG%",pd:p.delta.efg,team:"Team eFG%",td:team.delta.efg},
+    {player:"Turnovers",pd:p.delta.tov,team:"Team TOV%",td:team.delta.tov,inverse:true},
+    {player:"Impact/40",pd:p.delta.impact,team:"Net Rating",td:team.delta.net}
+  ];pairs.filter(x=>x.pd!=null&&x.td!=null).forEach(x=>{const aligned=x.inverse?(Math.sign(x.pd)!==Math.sign(x.td)):(Math.sign(x.pd)===Math.sign(x.td));const magnitude=Math.abs(x.pd)+Math.abs(x.td);if(magnitude>=4)out.push({...x,name:p.name,club:p.team,aligned,magnitude,playerGames:p.games.length,teamGames:team.games});});});
+  return out.sort((a,b)=>b.magnitude-a.magnitude);
+}
+async function openConnectedIntelligence(){
+  let syncError="";if(window.CourtIQData?.isSignedIn()){try{await syncProductData();}catch(e){syncError=e.message;}}
+  const signals=buildConnectedIntelligence(),modal=document.createElement("div");modal.className="modal";
+  const cards=signals.slice(0,24).map((s,i)=>`<div class="card box"><small>${htmlEsc(s.club)} · SIGNAL ${i+1}</small><h3>${htmlEsc(s.name)}</h3><div class="reportKpis"><div><small>PLAYER · ${s.player}</small><b>${s.pd>0?"+":""}${s.pd}</b></div><div><small>TEAM · ${s.team}</small><b>${s.td>0?"+":""}${s.td}</b></div></div><div class="insight ${s.aligned?"":"warning"}"><b>${s.aligned?"MOVING TOGETHER":"DIVERGING SIGNAL"}</b> · These changes occurred in overlapping recent samples. This is correlation, not evidence that the player caused the team change.</div><button class="runImport" data-connected="${i}">INVESTIGATE</button></div>`).join("");
+  modal.innerHTML=`<div class="modalCard compareModal gameLibrary"><button class="modalX">×</button><small class="eyebrow">COURTIQ · CONNECTED INTELLIGENCE</small><h2>Player ↔ Team Intelligence</h2><p>CourtIQ connects player-memory changes with team-memory changes, then creates evidence questions for the coach. It never converts correlation into causation.</p><div class="libraryTop"><div><small>CONNECTED SIGNALS</small><b>${signals.length}</b></div><div><small>PLAYER WINDOW</small><b>4 vs 4</b></div><div><small>TEAM WINDOW</small><b>5 vs 5</b></div></div><div class="gameLibraryGrid">${cards||'<div class="productEmpty"><b>NOT ENOUGH CONNECTED HISTORY</b><span>More official games with player rows are required before player and team trends can be connected.</span></div>'}</div>${syncError?`<div class="insight warning">DATABASE · ${htmlEsc(syncError)}</div>`:""}<div id="connectedInvestigation"></div><div class="metricNote">A connected signal means two verified trends changed in the same period. Opponent strength, role, minutes, lineup context and game state may explain the relationship.</div></div>`;
+  document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  modal.querySelectorAll("[data-connected]").forEach(btn=>btn.onclick=()=>{const s=signals[Number(btn.dataset.connected)];modal.querySelector("#connectedInvestigation").innerHTML=`<section class="card takeaways"><div class="sectionhead"><h3>INVESTIGATION · ${htmlEsc(s.name)}</h3><small>${htmlEsc(s.club)}</small></div><div class="findings"><div class="finding"><div class="num">1</div><b>Verified player change</b><p>${s.player}: ${s.pd>0?"+":""}${s.pd}</p><em>→ Confirm role, minutes and shot/possession context.</em></div><div class="finding"><div class="num">2</div><b>Verified team change</b><p>${s.team}: ${s.td>0?"+":""}${s.td}</p><em>→ Check whether the team movement persists across opponents.</em></div><div class="finding"><div class="num">3</div><b>Relationship hypothesis</b><p>The two trends overlap; CourtIQ does not claim one caused the other.</p><em>→ Review shared possessions/video and lineup context before making a coaching conclusion.</em></div></div><div class="videoList"><div class="videoItem"><span>1</span>Filter possessions involving the player during the changed role.</div><div class="videoItem"><span>2</span>Compare opponent quality and game state across both samples.</div><div class="videoItem"><span>3</span>Check lineups and on/off data when an official source makes them available.</div></div></section>`;});
+}
 async function openOpponentScout(){
   let syncError="";if(window.CourtIQData?.isSignedIn()){try{await syncProductData();}catch(e){syncError=e.message;}}
   const productGames=productGameEntries().map(([,g])=>g),G=productGames.find(g=>g===games[active])||productGames[0],teams=[...new Set(productGames.flatMap(g=>g&&g.home?[g.home,g.away]:[]))].filter(Boolean).sort(),defaultOpponent=G?.away||teams[0]||"";
@@ -599,7 +618,7 @@ function openMensD1Teams(){if(window.CourtIQMens?.openTeams)return window.CourtI
 document.addEventListener("click",e=>{
   const item=e.target.closest(".menu div");
   if(!item) return;
-  if(item.textContent.includes("Dashboard")) openPilotDashboard();\n  if(item.textContent.includes("Season Memory")) openSeasonMemory();\n  if(item.textContent.includes("Player Memory")) openPlayerMemory();
+  if(item.textContent.includes("Dashboard")) openPilotDashboard();\n  if(item.textContent.includes("Season Memory")) openSeasonMemory();\n  if(item.textContent.includes("Player Memory")) openPlayerMemory();\n  if(item.textContent.includes("Connected Intelligence")) openConnectedIntelligence();
   if(item.textContent.includes("Games")) openGameLibrary();
   if(item.textContent.trim()==="◉ Teams" || item.textContent.trim()==="Teams") openMensD1Teams();
   if(item.textContent.includes("Israel Men")) openMensD1Teams();
