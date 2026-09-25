@@ -96,3 +96,16 @@ button:disabled{opacity:.48;cursor:not-allowed}.impStatus{min-height:18px;margin
 #dashboardDataStatus{line-height:1.65}
 #dashboardDataStatus b{color:#fff}
 @media(max-width:620px){.piFilters{display:grid;grid-template-columns:1fr 1fr}.piFilters button{width:100%}}
+.coachSheet {max-width:1100px;max-height:92vh;overflow:auto}
+.coachControls {display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:15px 0}
+.coachControls label {display:flex;flex-direction:column;gap:5px;font-size:12px;color:#a9bed3}
+.coachControls input,.coachControls select,.coachOps input,.coachOps select {background:#111d2e;color:#f3f7fc;border:1px solid #38506a;border-radius:8px;padding:9px;min-width:105px}
+.coachControls input[placeholder] {min-width:180px}
+.coachClaims {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}
+.coachClaim {min-width:0}.coachClaim h3 {font-size:24px}.coachClaim p {font-size:13px;line-height:1.5}
+.coachEvidence ul {margin:6px 0 12px;padding-left:20px;overflow-wrap:anywhere}
+.coachEvidence a {color:#8dd5ff}.coachEvidence li,.coachOps li {margin:7px 0;font-size:12px}
+.coachOps {margin-top:20px;border-top:1px solid #38506a;padding-top:16px}
+.coachOps summary {cursor:pointer;font-weight:700;margin-bottom:12px}
+.coachOps .stats {width:100%;margin:12px 0}.coachOps #coachStatus {margin:10px 0;color:#ffcc8a}
+@media (max-width:850px) {.coachClaims {grid-template-columns:1fr}.coachSheet {max-width:96vw}.coachControls>* {flex:1 1 180px}}
