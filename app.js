@@ -659,6 +659,24 @@ document.addEventListener("click",e=>{
 });
 
 const recoveryMode=window.CourtIQData?.recoverySessionFromUrl?.()||false;
+async function openCoachDashboard(){
+ const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ V2 · COACH DASHBOARD</small><h2>Game Preparation</h2><div id="coachV2">Loading basketball intelligence…</div></div>`;document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};
+ const box=modal.querySelector("#coachV2");
+ try{
+  const entries=productGameEntries();if(!entries.length){box.innerHTML="<b>INSUFFICIENT DATA</b><p>Import verified games to build Coach Intelligence.</p>";return}
+  const g=entries[0],opp=g.away||g.awayTeam||"Opponent",comp=g.comp||g.competition||"";
+  const mem=await window.CourtIQData.teamMemory(comp,opp),claims=await window.CourtIQData.intelligenceClaims(comp,opp);
+  const verified=(claims||[]).filter(x=>x.status==="VERIFIED"), trends=verified.slice(0,3);
+  box.innerHTML=`<div class="schema"><b>NEXT / LATEST MATCHUP</b><br>${htmlEsc(g.home||g.homeTeam||"")} vs ${htmlEsc(g.away||g.awayTeam||"")} · ${htmlEsc(comp)}</div>
+  <h3>Opponent Memory</h3><div class="schema">Season: ${mem?.season?.games||0} games · Pace ${mem?.season?.pace??"—"} · PPG ${mem?.season?.ppg??"—"}<br>Last 5: ${mem?.last5?.games||0} games · Pace ${mem?.last5?.pace??"—"} · PPG ${mem?.last5?.ppg??"—"}</div>
+  <h3>3 Evidence-backed Tendencies</h3>${trends.length?trends.map(x=>`<div class="schema"><b>${htmlEsc(x.claim_text)}</b><br>Sample: ${x.sample_games} games${x.sample_minutes?" · "+x.sample_minutes+" min":""} · Confidence: ${x.confidence==null?"—":Math.round(x.confidence*100)+"%"}<br>${x.evidence_game_ids?.length?"Evidence games: "+x.evidence_game_ids.join(", "):"Evidence pending"}</div>`).join(""):'<div class="schema"><b>INSUFFICIENT DATA</b><br>No verified tendency claims yet.</div>'}
+  <h3>Matchups / Trends / Outliers</h3><div class="schema">${verified.length?"Evidence layer is active. Open Player Compare for player-level trends.":"INSUFFICIENT DATA · CourtIQ will not invent conclusions."}</div>
+  <button id="prepareGameV2" class="runImport">PREPARE GAME</button>`;
+  box.querySelector("#prepareGameV2").onclick=()=>{const w=window.open("","_blank");w.document.write(`<title>CourtIQ Game Prep</title><h1>CourtIQ · Game Preparation</h1><h2>${htmlEsc(g.home||"")} vs ${htmlEsc(g.away||"")}</h2><p>${htmlEsc(comp)}</p><h3>Opponent memory</h3><p>Season: ${mem?.season?.games||0} games · Pace ${mem?.season?.pace??"—"} · PPG ${mem?.season?.ppg??"—"}</p><h3>Verified tendencies</h3>${trends.map(x=>"<p><b>"+htmlEsc(x.claim_text)+"</b> · "+x.sample_games+" games · Confidence "+(x.confidence==null?"—":Math.round(x.confidence*100)+"%")+"</p>").join("")||"<p>INSUFFICIENT DATA</p>"}`);w.document.close()};
+ }catch(e){box.innerHTML="<b>DATA QUALITY / ACCESS ERROR</b><p>"+htmlEsc(e.message)+"</p>"}
+}
+window.CourtIQV2={openCoachDashboard};
+
 render();
 if(recoveryMode) setTimeout(()=>openAccount("reset"),0);
 else if(new URLSearchParams(location.search).get("invite")) setTimeout(()=>openAccount("activate"),0);
