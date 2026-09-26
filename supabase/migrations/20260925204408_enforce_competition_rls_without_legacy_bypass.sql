@@ -1,0 +1,10 @@
+drop policy if exists "members_read_games" on public.games;
+drop policy if exists "club members read game player stats" on public.game_player_stats;
+drop policy if exists "members_read_game_reports" on public.game_reports;
+create policy "competition access game reports" on public.game_reports for select to authenticated using (exists (select 1 from public.games g where g.id=game_reports.game_id and public.can_access_competition(coalesce(g.competition,''))));
+drop policy if exists "members_read_import_runs" on public.import_runs;
+create policy "competition access import runs" on public.import_runs for select to authenticated using ((game_id is not null and exists (select 1 from public.games g where g.id=import_runs.game_id and public.can_access_competition(coalesce(g.competition,'')))) or (game_id is null and (select auth.uid())='10fa3b29-4acd-4fcf-9784-1117b510332c'::uuid));
+drop policy if exists "members_read_game_videos" on public.game_videos;
+create policy "competition access game videos" on public.game_videos for select to authenticated using (exists (select 1 from public.games g where g.id=game_videos.game_id and public.can_access_competition(coalesce(g.competition,''))));
+drop policy if exists "members_read_tactical_events" on public.tactical_events;
+create policy "competition access tactical events" on public.tactical_events for select to authenticated using (exists (select 1 from public.games g where g.id=tactical_events.game_id and public.can_access_competition(coalesce(g.competition,''))));
