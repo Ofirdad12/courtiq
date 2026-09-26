@@ -138,6 +138,7 @@
     return setCompetitions([...current.map(x=>x.competition),value]);
   }
 
+  async function opponentScout(competition,team){return jsonFetch("/rest/v1/rpc/opponent_scout",{method:"POST",body:JSON.stringify({p_competition:competition,p_team:team})});}
   async function coachIntelligence(competition,team){return jsonFetch("/rest/v1/rpc/coach_intelligence",{method:"POST",body:JSON.stringify({p_competition:competition,p_team:team})});}
   async function playerMemoryV2(playerId,competition=null){return jsonFetch("/rest/v1/rpc/player_memory_v2",{method:"POST",body:JSON.stringify({p_player_id:Number(playerId),p_competition:competition||null})});}
   async function teamMemory(competition,team){return jsonFetch("/rest/v1/rpc/team_memory",{method:"POST",body:JSON.stringify({comp:competition,team})});}
@@ -244,7 +245,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, setCompetitions, chooseCompetition, coachIntelligence, playerMemoryV2, teamMemory, qualityChecks, intelligenceClaims, myProfile, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame, coachWorkspace, saveScheduleGame, addEvidence, reviewReport, reportReviewStatus,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, setCompetitions, chooseCompetition, opponentScout, coachIntelligence, playerMemoryV2, teamMemory, qualityChecks, intelligenceClaims, myProfile, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame, coachWorkspace, saveScheduleGame, addEvidence, reviewReport, reportReviewStatus,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
