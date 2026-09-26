@@ -606,6 +606,26 @@ Deno.serve(async(req:Request)=>{
     },{onConflict:"provider,external_id"}).select("id").single();
     if(gameErr) throw gameErr;
 
+    // CourtIQ V2 Data Quality Gate.
+    const playerPointSum=(side:any)=>side.players.filter((p:any)=>p.has_played!==false).reduce((s:number,p:any)=>s+Number(p.points||0),0);
+    const qualityChecks=[
+      {check_name:"home_score_reconcile",status:playerPointSum(parsedPlayers[0])===Number(home.points)?"PASS":"FAIL",expected:{team_points:home.points},actual:{player_points:playerPointSum(parsedPlayers[0])}},
+      {check_name:"away_score_reconcile",status:playerPointSum(parsedPlayers[1])===Number(away.points)?"PASS":"FAIL",expected:{team_points:away.points},actual:{player_points:playerPointSum(parsedPlayers[1])}},
+      {check_name:"home_team_totals",status:validation.home?.status==="passed"?"PASS":"FAIL",expected:{validation:"passed"},actual:validation.home},
+      {check_name:"away_team_totals",status:validation.away?.status==="passed"?"PASS":"FAIL",expected:{validation:"passed"},actual:validation.away},
+      {check_name:"player_rows",status:parsedPlayers[0].players.length>0&&parsedPlayers[1].players.length>0?"PASS":"FAIL",expected:{both_teams:true},actual:{home:parsedPlayers[0].players.length,away:parsedPlayers[1].players.length}},
+      {check_name:"pace_formula",status:Number.isFinite(Number(ui.calculated?.home?.pace))&&Number.isFinite(Number(ui.calculated?.away?.pace))?"PASS":"FAIL",expected:{formula:"(team possessions + opponent possessions) / 2"},actual:{home:ui.calculated?.home?.pace,away:ui.calculated?.away?.pace}}
+    ];
+    const qualityPassed=qualityChecks.every((q:any)=>q.status==="PASS");
+    for(const q of qualityChecks){
+      const {error:qErr}=await admin.from("data_quality_checks").upsert({game_id:game.id,...q,details:q.status==="PASS"?"Automated import validation passed.":"CourtIQ blocked VERIFIED status because this check failed."},{onConflict:"game_id,check_name"});
+      if(qErr) throw qErr;
+    }
+    payload.verified=qualityPassed;
+    payload.quality={status:qualityPassed?"VERIFIED":"REVIEW",checks:qualityChecks};
+    const {error:qualityGameErr}=await admin.from("games").update({payload}).eq("id",game.id);
+    if(qualityGameErr) throw qualityGameErr;
+
     // Persist every imported player as structured season/game memory for Player Compare.
     for(const [sideIndex,sideName] of ["home","away"].entries()){
       const teamName=sideIndex===0?homeName:awayName, opponentName=sideIndex===0?awayName:homeName;
@@ -627,7 +647,7 @@ Deno.serve(async(req:Request)=>{
         }
         const season=gameDate?(Number(gameDate.slice(5,7))>=7?gameDate.slice(0,4)+"-"+String(Number(gameDate.slice(0,4))+1).slice(-2):String(Number(gameDate.slice(0,4))-1)+"-"+gameDate.slice(2,4)):"2026-27";
         const calculated={efg:player.efg,ts:player.ts,pps:player.pps,points_per_40:player.points_per_40,rebounds_per_40:player.rebounds_per_40,assists_per_40:player.assists_per_40,play_end_share:player.play_end_share,box_impact_per_40:player.box_impact_per_40};
-        const {error:memoryErr}=await admin.from("game_player_stats").upsert({game_id:game.id,player_id:playerId,provider,external_game_id:id,season,competition:title,team_name:teamName,opponent_name:opponentName,side:sideName,player_external_id:stableExternal,player_name:player.name,jersey_number:player.number||null,starter:Boolean(player.starter),minutes:player.minutes||0,stats:player,calculated,source_url:u.toString(),verified:true,updated_at:new Date().toISOString()},{onConflict:"game_id,player_id"});
+        const {error:memoryErr}=await admin.from("game_player_stats").upsert({game_id:game.id,player_id:playerId,provider,external_game_id:id,season,competition:title,team_name:teamName,opponent_name:opponentName,side:sideName,player_external_id:stableExternal,player_name:player.name,jersey_number:player.number||null,starter:Boolean(player.starter),minutes:player.minutes||0,stats:player,calculated,source_url:u.toString(),verified:qualityPassed,updated_at:new Date().toISOString()},{onConflict:"game_id,player_id"});
         if(memoryErr) throw memoryErr;
       }
     }
