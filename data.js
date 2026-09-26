@@ -138,6 +138,11 @@
     return setCompetitions([...current.map(x=>x.competition),value]);
   }
 
+  async function teamMemory(competition,team){return jsonFetch("/rest/v1/rpc/team_memory",{method:"POST",body:JSON.stringify({comp:competition,team})});}
+  async function qualityChecks(gameId){return jsonFetch("/rest/v1/data_quality_checks?select=*&game_id=eq."+Number(gameId)+"&order=created_at.desc");}
+  async function intelligenceClaims(competition,subjectName){let p="/rest/v1/intelligence_claims?select=*&competition=eq."+encodeURIComponent(competition)+"&order=confidence.desc.nullslast,created_at.desc";if(subjectName)p+="&subject_name=eq."+encodeURIComponent(subjectName);return jsonFetch(p);}
+  async function myProfile(){const u=user();if(!u?.id)return null;const x=await jsonFetch("/rest/v1/user_profiles?select=user_id,role,display_name,last_seen_at&user_id=eq."+u.id);return x?.[0]||null;}
+
   async function comparisonPlayers() {
     const w = await workspace();
     const rows = await jsonFetch("/rest/v1/game_player_stats?select=id,game_id,player_id,provider,season,competition,team_name,opponent_name,side,player_name,jersey_number,starter,minutes,stats,calculated,source_url,verified,created_at&verified=eq.true&order=created_at.desc");
@@ -237,7 +242,7 @@
   }
 
   window.CourtIQData = {
-    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, setCompetitions, chooseCompetition, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame, coachWorkspace, saveScheduleGame, addEvidence, reviewReport, reportReviewStatus,
+    createPilotAccount, requestPasswordReset, recoverySessionFromUrl, updatePassword, signIn, signOut, refreshSession, user, workspace, playerIntelligence, competitionAccess, setCompetitions, chooseCompetition, teamMemory, qualityChecks, intelligenceClaims, myProfile, comparisonPlayers, gameReports, importRuns, productHealth, importOfficialGame, coachWorkspace, saveScheduleGame, addEvidence, reviewReport, reportReviewStatus,
     isSignedIn: () => !!readSession()?.access_token
   };
 })();
