@@ -457,6 +457,21 @@
     }catch(err){modal.querySelector("#pcLoading").innerHTML=`<b>PLAYER COMPARE UNAVAILABLE</b><span>${String(err.message||err)}</span>`;}
   }
 
+  async function openPlayerMemoryV2(playerId,competition=null,playerName="Player"){
+    const modal=document.createElement("div");modal.className="modal piModal";
+    modal.innerHTML=`<div class="modalCard piShell"><button class="modalX">×</button><div class="piTop"><small class="eyebrow">COURTIQ V2 · PLAYER MEMORY</small><h2>${playerName}</h2><p>Season vs Last 5 · verified games only.</p></div><div id="pm2"><div class="piEmpty"><b>LOADING MEMORY…</b></div></div></div>`;
+    document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};
+    try{
+      const m=await window.CourtIQData.playerMemoryV2(playerId,competition),s=m?.summary||{},l=m?.last5||{},log=m?.game_log||[];
+      const flag=m?.flag||"SMALL_SAMPLE",confidence=Math.round(Number(m?.confidence||0)*100);
+      const metrics=[["MPG",s.mpg,l.mpg],["PPG",s.ppg,l.ppg],["TS%",s.ts,l.ts],["3PA/G",s.three_pa,l.three_pa]];
+      modal.querySelector("#pm2").innerHTML=`<div class="pcIdentity"><div><b>${playerName}</b><span>${competition||"All accessible competitions"}</span></div><div class="pcConfidence"><b>${flag}</b><span>Confidence ${confidence}%</span></div></div>
+      <div class="card pcTableWrap"><table class="stats pcTable"><thead><tr><th>Metric</th><th>Season</th><th>Last 5</th></tr></thead><tbody>${metrics.map(x=>`<tr><td>${x[0]}</td><td>${x[1]??"—"}</td><td>${x[2]??"—"}</td></tr>`).join("")}</tbody></table></div>
+      <h3>Game Log</h3><div class="card pcTableWrap"><table class="stats pcTable"><thead><tr><th>Date</th><th>Opponent</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>TS%</th></tr></thead><tbody>${log.map(g=>`<tr><td>${g.date||"—"}</td><td>${g.opponent||"—"}</td><td>${g.minutes??"—"}</td><td>${g.points??"—"}</td><td>${g.rebounds??"—"}</td><td>${g.assists??"—"}</td><td>${g.ts??"—"}</td></tr>`).join("")}</tbody></table></div>
+      <div class="pcNotes"><div class="insight"><b>${flag}</b> · Based on ${s.games||0} verified games / ${s.minutes||0} minutes.</div>${flag==="SMALL_SAMPLE"?'<div class="insight warning"><b>INSUFFICIENT DATA</b> · CourtIQ will not infer a trend from this sample.</div>':""}</div>`;
+    }catch(err){modal.querySelector("#pm2").innerHTML=`<div class="piEmpty"><b>PLAYER MEMORY UNAVAILABLE</b><span>${String(err.message||err)}</span></div>`}
+  }
+
   function openPlayers(initialFilter = "all") {
     const modal = document.createElement("div");
     modal.className = "modal piModal";
@@ -546,6 +561,6 @@
     if (e.target.closest("#comparePlayers")) openPlayerCompare();
   });
 
-  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, replacePlayers };
-  window.COURTIQ_BUILD = "120";
+  window.CourtIQPlayers = { players, metrics, openPlayers, openTeams, openPlayerCompare, openPlayerMemoryV2, replacePlayers };
+  window.COURTIQ_BUILD = "201";
 })();
