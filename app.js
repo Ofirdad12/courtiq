@@ -679,6 +679,26 @@ async function openCoachDashboard(){
 }
 window.CourtIQV2={openCoachDashboard};
 
+async function openOpponentScout(){
+ const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ V2 · OPPONENT SCOUT</small><h2>Scout Opponent</h2><div id="osControls"></div><div id="osReport"></div></div>`;document.body.appendChild(modal);modal.querySelector(".modalX").onclick=()=>modal.remove();modal.onclick=e=>{if(e.target===modal)modal.remove()};
+ const entries=productGameEntries(), teamsByLeague={};entries.forEach(g=>{const l=g.comp||g.competition||"";if(!l)return;(teamsByLeague[l]??=new Set()).add(g.home||g.homeTeam);teamsByLeague[l].add(g.away||g.awayTeam)});
+ const leagues=Object.keys(teamsByLeague).filter(Boolean);const controls=modal.querySelector("#osControls"),out=modal.querySelector("#osReport");
+ if(!leagues.length){out.innerHTML='<div class="schema"><b>INSUFFICIENT DATA</b> · Import verified games first.</div>';return}
+ controls.innerHTML=`<div class="playerCompareControls"><div><label>LEAGUE</label><select id="osLeague">${leagues.map(x=>`<option>${htmlEsc(x)}</option>`).join("")}</select></div><div><label>OPPONENT</label><select id="osTeam"></select></div><button id="osRun" class="runImport">SCOUT OPPONENT</button></div>`;
+ const league=controls.querySelector("#osLeague"),team=controls.querySelector("#osTeam");const fill=()=>team.innerHTML=[...teamsByLeague[league.value]].filter(Boolean).sort().map(x=>`<option>${htmlEsc(x)}</option>`).join("");fill();league.onchange=fill;
+ controls.querySelector("#osRun").onclick=async()=>{out.innerHTML='<div class="schema">Building evidence-backed scouting report…</div>';try{const s=await window.CourtIQData.opponentScout(league.value,team.value),p=s.profile||{},q=s.quality||{},sig=s.player_signals||[],claims=s.verified_claims||[],ev=s.evidence_games||[];
+ const tend=(s.tendencies||[]).filter(x=>x.season!=null&&x.last5!=null).sort((a,b)=>Math.abs(Number(b.delta||0))-Math.abs(Number(a.delta||0))).slice(0,3);
+ const watch=tend.map(x=>`${x.area}: Last 5 ${x.last5} vs season ${x.season} (${Number(x.delta)>=0?"+":""}${x.delta})`);
+ out.innerHTML=`<h2>${htmlEsc(s.team)} · Scouting Report</h2><div class="schema"><b>DATA QUALITY · ${q.status||"INSUFFICIENT_DATA"}</b><br>${q.passed||0}/${q.checks||0} checks passed · ${s.games||0} accessible games</div>
+ <h3>Team Profile</h3><div class="schema">Pace ${p.pace??"—"} · eFG% ${p.efg??"—"} · TOV% ${p.tov_pct??"—"} · ORB% ${p.orb_pct??"—"} · FTr ${p.ftr??"—"}<br>3PA/G ${p.three_pa??"—"} · OREB/G ${p.oreb??"—"} · TOV/G ${p.turnovers??"—"}</div>
+ <h3>3 Tendencies</h3>${tend.length?tend.map(x=>`<div class="schema"><b>${x.area}</b> · Last 5 ${x.last5} vs Season ${x.season} · Δ ${Number(x.delta)>=0?"+":""}${x.delta}<br>Sample: ${x.sample_games} games</div>`).join(""):'<div class="schema"><b>INSUFFICIENT DATA</b></div>'}
+ <h3>Player Signals / Matchups</h3>${sig.length?sig.slice(0,3).map(x=>`<div class="schema"><b>${htmlEsc(x.player_name)} · ${x.flag}</b><br>Season ${x.summary?.ppg??"—"} PPG / ${x.summary?.mpg??"—"} MPG · Last 5 ${x.last5?.ppg??"—"} / ${x.last5?.mpg??"—"} · Confidence ${Math.round(Number(x.confidence||0)*100)}%</div>`).join(""):'<div class="schema">No verified role/trend signal. Matchup recommendation requires sufficient player evidence.</div>'}
+ <h3>Evidence</h3><div class="schema">${claims.length?claims.slice(0,3).map(x=>`<b>${htmlEsc(x.claim)}</b> · ${x.sample_games} games · Confidence ${Math.round(Number(x.confidence||0)*100)}%`).join("<br>"):ev.map(x=>`Game #${x.game_id} · ${x.date||"—"} vs ${htmlEsc(x.opponent||"—")}`).join("<br>")||"INSUFFICIENT DATA"}</div>
+ <h3>What to Watch</h3><div class="schema">${watch.length?watch.map(x=>"• "+htmlEsc(x)).join("<br>"):"INSUFFICIENT DATA · no unsupported tactical recommendation generated."}</div>`;
+ }catch(e){out.innerHTML=`<div class="schema"><b>SCOUT UNAVAILABLE</b><br>${htmlEsc(e.message||String(e))}</div>`}};
+}
+window.CourtIQV2.openOpponentScout=openOpponentScout;
+
 render();
 if(recoveryMode) setTimeout(()=>openAccount("reset"),0);
 else if(new URLSearchParams(location.search).get("invite")) setTimeout(()=>openAccount("activate"),0);
