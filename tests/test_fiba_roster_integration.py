@@ -6,7 +6,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_eurocup_women_url_import_is_wired_to_player_analytics():
     source = (ROOT / "supabase/functions/import-ibba-game/index.ts").read_text()
-    assert 'provider:isFiba?"FIBA"' in source
+    assert 'isFiba?"FIBA"' in source
+    assert 'isPlk?"PLK"' in source
     assert '"fiba-next-v1"' in source
     assert "fibaPageData($)" in source
     assert "fibaTeamData(teams[0]" in source
