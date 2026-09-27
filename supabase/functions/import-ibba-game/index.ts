@@ -341,26 +341,19 @@ function basketNames($:cheerio.CheerioAPI){
 }
 function plkPlayerData($:cheerio.CheerioAPI,table:any){
   const rows=tableRows($,table).filter((r:string[])=>r.length);
-  const totalRow=rows.find((r:string[])=>clean(r[0]||"").toLowerCase().endsWith("suma"));
+  const totalRow=rows.find((r:string[])=>clean(r[0]||"").toLowerCase()==="suma");
   if(!totalRow||totalRow.length<22) throw new Error("PLK team total row was not found.");
   const [two_pm,two_pa]=ma(totalRow[3]),[three_pm,three_pa]=ma(totalRow[5]),[ftm,fta]=ma(totalRow[9]);
   const total={points:num(totalRow[1]),two_pm,two_pa,three_pm,three_pa,ftm,fta,oreb:num(totalRow[11]),dreb:num(totalRow[12]),tov:num(totalRow[18]),ast:num(totalRow[14])};
   const players=rows.map((r:string[])=>{
-    // PLK renders jersey + player name in one visual cell (e.g. "1 A. Luke").
-    // Keep compatibility with a possible split-cell layout as well.
     const joined=clean(r[0]||"").match(/^(\\d+)\\s+(.+)$/);
-    const split=/^\\d+$/.test(clean(r[0]||"")) && /^\\d{1,3}$/.test(clean(r[2]||"")) && /^\\d{1,3}:\\d{2}$/.test(clean(r[3]||""));
-    const compact=Boolean(joined && /^\\d{1,3}:\\d{2}$/.test(clean(r[2]||"")));
-    if(!split&&!compact) return null;
-    const shift=compact?-1:0;
-    const number=compact?Number(joined![1]):num(r[0]);
-    const name=compact?clean(joined![2]):clean(r[1]);
-    const points=num(r[2+shift]), minutes=minutesValue(r[3+shift]);
-    const [p2m,p2a]=r[4+shift]?.includes("/")?ma(r[4+shift]):[0,0];
-    const [p3m,p3a]=r[6+shift]?.includes("/")?ma(r[6+shift]):[0,0];
-    const [pm,pa]=r[10+shift]?.includes("/")?ma(r[10+shift]):[0,0];
-    return {id:"",number,name,starter:false,minutes,points,two_pm:p2m,two_pa:p2a,three_pm:p3m,three_pa:p3a,ftm:pm,fta:pa,
-      oreb:num(r[12+shift]||"0"),dreb:num(r[13+shift]||"0"),steals:num(r[18+shift]||"0"),tov:num(r[19+shift]||"0"),ast:num(r[15+shift]||"0"),blocks:num(r[20+shift]||"0"),value:num(r[22+shift]||"0"),plus_minus:num(r[23+shift]||"0"),has_played:true};
+    if(!joined || !/^\\d{1,3}:\\d{2}$/.test(clean(r[2]||""))) return null;
+    const [p2m,p2a]=r[3]?.includes("/")?ma(r[3]):[0,0];
+    const [p3m,p3a]=r[5]?.includes("/")?ma(r[5]):[0,0];
+    const [pm,pa]=r[9]?.includes("/")?ma(r[9]):[0,0];
+    return {id:"",number:Number(joined[1]),name:clean(joined[2]),starter:false,minutes:minutesValue(r[2]),points:num(r[1]),
+      two_pm:p2m,two_pa:p2a,three_pm:p3m,three_pa:p3a,ftm:pm,fta:pa,oreb:num(r[11]||"0"),dreb:num(r[12]||"0"),
+      steals:num(r[17]||"0"),tov:num(r[18]||"0"),ast:num(r[14]||"0"),blocks:num(r[19]||"0"),value:num(r[21]||"0"),plus_minus:num(r[22]||"0"),has_played:true};
   }).filter(Boolean);
   if(!players.length) throw new Error("PLK player rows were not found.");
   return {total,players};
@@ -548,18 +541,11 @@ Deno.serve(async(req:Request)=>{
     }else if(provider==="PLK"){
       $("table").each((_:number,t:any)=>{
         const rows=tableRows($,t);
-        const hasTotal=rows.some((r:string[])=>r.some((cell:string)=>clean(cell).toLowerCase().endsWith("suma")));
-        const hasPlayer=rows.some((r:string[])=>{
-          const first=clean(r[0]||"");
-          return (/^\d+\s+.+/.test(first)&&/^\d{1,3}:\d{2}$/.test(clean(r[2]||""))) ||
-                 (/^\d+$/.test(first)&&/^\d{1,3}:\d{2}$/.test(clean(r[3]||"")));
-        });
+        const hasTotal=rows.some((r:string[])=>clean(r[0]||"").toLowerCase()==="suma" && /^\\d+$/.test(clean(r[1]||"")));
+        const hasPlayer=rows.some((r:string[])=>/^\\d+\\s+.+/.test(clean(r[0]||"")) && /^\\d{1,3}:\\d{2}$/.test(clean(r[2]||"")) && /\\//.test(clean(r[3]||"")));
         if(hasTotal&&hasPlayer) playerTables.push(t);
       });
-      if(playerTables.length<2){
-        const diag=$("table").toArray().map((t:any)=>tableRows($,t).slice(-3).map((r:string[])=>r.slice(0,5))).slice(0,8);
-        throw new Error("PLK_DIAG tables="+$("table").length+" matched="+playerTables.length+" "+JSON.stringify(diag).slice(0,1800));
-      }
+      if(playerTables.length<2) throw new Error("Could not locate both PLK box-score tables.");
       [homeName,awayName]=plkNames($);
       parsedPlayers=[plkPlayerData($,playerTables[0]),plkPlayerData($,playerTables[1])];
       const text=clean($.root().text()), qm=[...text.matchAll(/(\d{1,3}):(\d{1,3})/g)].slice(0,4);
