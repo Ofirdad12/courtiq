@@ -89,6 +89,21 @@ async function syncProductData(){
     const intelligence=await window.CourtIQData.playerIntelligence();
     window.CourtIQPlayers?.replacePlayers?.(intelligence);
     const dbKeys=Object.keys(games).filter(k=>k.startsWith("db_"));
+    // A previously imported URL can remain in localStorage with stale derived
+    // fields (for example starter=false). Prefer the verified DB copy of the
+    // same official game whenever one exists.
+    if(games.url){
+      const localExternal=String(games.url._externalId||games.url.external_id||games.url.id||"").replace(/^#?/,"");
+      const match=dbKeys.find(k=>{
+        const g=games[k];
+        return localExternal && String(g?._externalId||g?.external_id||g?.id||"").replace(/^#?/,"")===localExternal;
+      });
+      if(match){
+        games.url=games[match];
+        try{localStorage.setItem("courtiq_url_game",JSON.stringify(games.url));}catch(_){}
+        if(active==="url") active=match;
+      }
+    }
     if(dbKeys.length && !String(active).startsWith("db_")) active=dbKeys[0];
     return {workspace:w,playerRows:intelligence,dbKeys};
   })().finally(()=>{productSyncPromise=null;});
