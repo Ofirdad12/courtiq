@@ -109,3 +109,11 @@ button:disabled{opacity:.48;cursor:not-allowed}.impStatus{min-height:18px;margin
 .coachOps summary {cursor:pointer;font-weight:700;margin-bottom:12px}
 .coachOps .stats {width:100%;margin:12px 0}.coachOps #coachStatus {margin:10px 0;color:#ffcc8a}
 @media (max-width:850px) {.coachClaims {grid-template-columns:1fr}.coachSheet {max-width:96vw}.coachControls>* {flex:1 1 180px}}
+
+/* Game Intelligence V2 */
+.gameIntelV2{margin:18px 0}.intelBadge{font-size:9px;font-weight:900;letter-spacing:.08em;border:1px solid #4b5d7a;border-radius:999px;padding:7px 10px}
+.intelConfidence{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.intelConfidence span{border:1px solid #2d3b55;border-radius:8px;padding:8px 10px;font-size:10px;color:#aebbd0}.intelConfidence b{color:#fff}
+.intelGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.intelGrid article,.factorIntel div{background:#0d1524;border:1px solid #283750;border-radius:10px;padding:12px}.intelGrid article{display:flex;flex-direction:column;gap:6px}.intelGrid small{font-size:8px;letter-spacing:.08em;color:#9e8cff}.intelGrid b{font-size:14px}.intelGrid p{margin:0;color:#d8e0ec;font-size:12px}.intelGrid em{font-size:10px;color:#9aabc1}
+.factorIntel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.factorIntel div{display:flex;flex-direction:column;gap:5px}.factorIntel span,.factorIntel em{font-size:10px;color:#aab7ca}
+.qaSummary{display:flex;flex-direction:column;gap:6px;background:#0d1524;border:1px solid #283750;border-radius:10px;padding:12px}.qaSummary span{font-size:10px}.qaOk{color:#b8e6c8}.qaFail{color:#ffbf8d}
+@media(max-width:850px){.intelGrid,.factorIntel{grid-template-columns:1fr}.intelConfidence{flex-direction:column}}
