@@ -349,7 +349,10 @@ function plkPlayerData($:cheerio.CheerioAPI,table:any){
     const label=clean(r[0]||"");
     let cut=0; while(cut<label.length && label[cut]>="0" && label[cut]<="9") cut++;
     const numberText=label.slice(0,cut), playerName=label.slice(cut).trim();
-    const minuteText=clean(r[2]||"");\n    const minuteParts=minuteText.split(":");\n    const validMinutes=minuteParts.length===2 && minuteParts[0].length>=1 && minuteParts[0].length<=3 && minuteParts.every((x:string)=>x.length>0 && [...x].every(ch=>ch>="0"&&ch<="9"));\n    if(!numberText || !playerName || !validMinutes) return null;
+    const minuteText=clean(r[2]||"");
+    const minuteParts=minuteText.split(":");
+    const validMinutes=minuteParts.length===2 && minuteParts[0].length>=1 && minuteParts[0].length<=3 && minuteParts.every((x:string)=>x.length>0 && [...x].every(ch=>ch>="0"&&ch<="9"));
+    if(!numberText || !playerName || !validMinutes) return null;
     const [p2m,p2a]=r[3]?.includes("/")?ma(r[3]):[0,0];
     const [p3m,p3a]=r[5]?.includes("/")?ma(r[5]):[0,0];
     const [pm,pa]=r[9]?.includes("/")?ma(r[9]):[0,0];
