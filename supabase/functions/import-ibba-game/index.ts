@@ -370,6 +370,27 @@ function plkNames($:cheerio.CheerioAPI){
   return [clean(m[1]),clean(m[2])];
 }
 
+function plkStarterNames($:cheerio.CheerioAPI, homePlayers:any[], awayPlayers:any[]){
+  const normalize=(s:string)=>clean(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const findPlayer=(label:string, players:any[])=>{
+    const n=normalize(label);
+    return players.find((p:any)=>{const pn=normalize(p.name);const parts=pn.split(/\s+/).filter(Boolean);return n.includes(pn)||parts.every((x:string)=>n.includes(x.replace(/\.$/,"")));});
+  };
+  const home=new Set<string>(), away=new Set<string>();
+  const rows=$("table").toArray().flatMap((t:any)=>tableRows($,t));
+  for(const r of rows){
+    const line=clean(r.join(" "));
+    if(!/zmian|wchodzi|schodzi|change|substitution/i.test(line)) continue;
+    const hp=findPlayer(line,homePlayers), ap=findPlayer(line,awayPlayers);
+    // In PLK play-by-play the player leaving on a team's first substitutions
+    // must have been on court at tip-off. Stop collecting after five per side.
+    if(hp&&home.size<5) home.add(hp.name);
+    if(ap&&away.size<5) away.add(ap.name);
+    if(home.size===5&&away.size===5) break;
+  }
+  return {home:[...home],away:[...away],verified:home.size===5&&away.size===5};
+}
+
 function eurobasketPlayerTable($:cheerio.CheerioAPI,table:any){
   const rows=tableRows($,table).filter((r:string[])=>r.length>=8);
   const headerIndex=rows.findIndex((r:string[])=>{const s=r.join(" ").toUpperCase();return s.includes("NAME")&&s.includes("MIN")&&s.includes("2PM-A")&&s.includes("3PM-A")&&s.includes("FTM-A");});
@@ -552,6 +573,13 @@ Deno.serve(async(req:Request)=>{
       if(playerTables.length<2) throw new Error("Could not locate both PLK box-score tables.");
       [homeName,awayName]=plkNames($);
       parsedPlayers=[plkPlayerData($,playerTables[0]),plkPlayerData($,playerTables[1])];
+      // Prefer official starter markers if PLK adds them; otherwise infer only
+      // from the first five substitution-outs in official play-by-play.
+      const starters=plkStarterNames($,parsedPlayers[0].players,parsedPlayers[1].players);
+      if(starters.verified){
+        parsedPlayers[0].players.forEach((p:any)=>p.starter=starters.home.includes(p.name));
+        parsedPlayers[1].players.forEach((p:any)=>p.starter=starters.away.includes(p.name));
+      }
       const text=clean($.root().text()), qm=[...text.matchAll(/(\d{1,3}):(\d{1,3})/g)].slice(0,4);
       quarters=qm.map((m:any)=>[Number(m[1]),Number(m[2])]);
     }else if(provider==="EUROBASKET_POLAND"){
