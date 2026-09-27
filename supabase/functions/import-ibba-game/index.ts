@@ -44,7 +44,7 @@ function validateUrl(raw:string){
   if(isFiba && !/^\/en\/events\/eurocup-women-\d{2}-\d{2}\/games\/\d+-[a-z0-9-]+\/?$/i.test(u.pathname)) throw new Error("Unsupported FIBA URL. Use an official EuroCup Women game page.");
   if(isEuroleague && !/^\/en\/(euroleague|eurocup)\/game-center\/\d{4}-\d{2}\/[a-z0-9-]+\/[EU]\d{4}\/\d+\/?$/i.test(u.pathname)) throw new Error("Unsupported EuroLeague Basketball URL. Use an official EuroLeague or EuroCup game-center page.");
   if(isEurobasket && !/\/Basketball-Box-Score\.aspx$/i.test(u.pathname)) throw new Error("For Eurobasket, paste a specific Basketball-Box-Score.aspx?Game=... game URL, not the Poland league home page.");
-  return {u, provider:isEurobasket?"EUROBASKET_POLAND":isEuroleague?(u.pathname.toLowerCase().includes("/eurocup/")?"EUROCUP":"EUROLEAGUE"):isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
+  return {u, provider:isPlk?"PLK":isEurobasket?"EUROBASKET_POLAND":isEuroleague?(u.pathname.toLowerCase().includes("/eurocup/")?"EUROCUP":"EUROLEAGUE"):isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
 }
 function tableRows($:cheerio.CheerioAPI, table:any){
   // Cheerio's map() flattens arrays returned by the callback. Use a native
