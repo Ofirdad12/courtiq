@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,HttpUrl
-from api.ibba import import_ibba_url
+from api.ibba import import_ibba_url\nfrom api.plk import import_plk_url
 from api.compare import compare_teams
 
 app=FastAPI(title="CourtIQ Pilot API",version="0.5")
