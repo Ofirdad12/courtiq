@@ -346,12 +346,14 @@ function plkPlayerData($:cheerio.CheerioAPI,table:any){
   const [two_pm,two_pa]=ma(totalRow[3]),[three_pm,three_pa]=ma(totalRow[5]),[ftm,fta]=ma(totalRow[9]);
   const total={points:num(totalRow[1]),two_pm,two_pa,three_pm,three_pa,ftm,fta,oreb:num(totalRow[11]),dreb:num(totalRow[12]),tov:num(totalRow[18]),ast:num(totalRow[14])};
   const players=rows.map((r:string[])=>{
-    const joined=clean(r[0]||"").match(/^(\\d+)\\s+(.+)$/);
-    if(!joined || !/^\\d{1,3}:\\d{2}$/.test(clean(r[2]||""))) return null;
+    const label=clean(r[0]||"");
+    let cut=0; while(cut<label.length && label[cut]>="0" && label[cut]<="9") cut++;
+    const numberText=label.slice(0,cut), playerName=label.slice(cut).trim();
+    if(!numberText || !playerName || !/^\\d{1,3}:\\d{2}$/.test(clean(r[2]||""))) return null;
     const [p2m,p2a]=r[3]?.includes("/")?ma(r[3]):[0,0];
     const [p3m,p3a]=r[5]?.includes("/")?ma(r[5]):[0,0];
     const [pm,pa]=r[9]?.includes("/")?ma(r[9]):[0,0];
-    return {id:"",number:Number(joined[1]),name:clean(joined[2]),starter:false,minutes:minutesValue(r[2]),points:num(r[1]),
+    return {id:"",number:Number(numberText),name:playerName,starter:false,minutes:minutesValue(r[2]),points:num(r[1]),
       two_pm:p2m,two_pa:p2a,three_pm:p3m,three_pa:p3a,ftm:pm,fta:pa,oreb:num(r[11]||"0"),dreb:num(r[12]||"0"),
       steals:num(r[17]||"0"),tov:num(r[18]||"0"),ast:num(r[14]||"0"),blocks:num(r[19]||"0"),value:num(r[21]||"0"),plus_minus:num(r[22]||"0"),has_played:true};
   }).filter(Boolean);
