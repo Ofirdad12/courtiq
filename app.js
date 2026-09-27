@@ -719,6 +719,12 @@ async function openOpponentScout(){
 }
 window.CourtIQV2.openOpponentScout=openOpponentScout;
 
-render();
+// Hydrate the signed-in workspace before the first meaningful render so
+// stale localStorage imports cannot win the initial screen.
+if(window.CourtIQData?.isSignedIn()){
+  syncProductData().then(()=>render()).catch(e=>{console.warn("Workspace sync failed",e);render();});
+}else{
+  render();
+}
 if(recoveryMode) setTimeout(()=>openAccount("reset"),0);
 else if(new URLSearchParams(location.search).get("invite")) setTimeout(()=>openAccount("activate"),0);
