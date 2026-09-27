@@ -542,7 +542,7 @@ Deno.serve(async(req:Request)=>{
       $("table").each((_:number,t:any)=>{
         const rows=tableRows($,t);
         const hasTotal=rows.some((r:string[])=>clean(r[0]||"").toLowerCase()==="suma" && /^\\d+$/.test(clean(r[1]||"")));
-        const hasPlayer=rows.some((r:string[])=>/^\\d+\\s+.+/.test(clean(r[0]||"")) && /^\\d{1,3}:\\d{2}$/.test(clean(r[2]||"")) && clean(r[3]||"").includes("/"));
+        const hasPlayer=rows.some((r:string[])=>/^\\d+\\s*\\D.+/.test(clean(r[0]||"")) && /^\\d{1,3}:\\d{2}$/.test(clean(r[2]||"")) && clean(r[3]||"").includes("/"));
         if(hasTotal&&hasPlayer) playerTables.push(t);
       });
       if(playerTables.length<2) throw new Error("Could not locate both PLK box-score tables.");
