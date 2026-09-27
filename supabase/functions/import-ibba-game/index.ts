@@ -556,7 +556,10 @@ Deno.serve(async(req:Request)=>{
         });
         if(hasTotal&&hasPlayer) playerTables.push(t);
       });
-      if(playerTables.length<2) throw new Error("Could not locate both PLK box-score tables.");
+      if(playerTables.length<2){
+        const diag=$("table").toArray().map((t:any)=>tableRows($,t).slice(-3).map((r:string[])=>r.slice(0,5))).slice(0,8);
+        throw new Error("PLK_DIAG tables="+$("table").length+" matched="+playerTables.length+" "+JSON.stringify(diag).slice(0,1800));
+      }
       [homeName,awayName]=plkNames($);
       parsedPlayers=[plkPlayerData($,playerTables[0]),plkPlayerData($,playerTables[1])];
       const text=clean($.root().text()), qm=[...text.matchAll(/(\d{1,3}):(\d{1,3})/g)].slice(0,4);
