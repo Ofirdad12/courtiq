@@ -601,7 +601,7 @@ Deno.serve(async(req:Request)=>{
     const dm=allText.match(/\\b(\\d{2})[-/.](\\d{2})[-/.](\\d{4})\\b/);
     const fibaDate=provider==="FIBA"?String(fibaData?.game?.gameDateTimeUTC||fibaData?.game?.gameDateTime||"").slice(0,10):"";
     const elDate=(provider==="EUROLEAGUE"||provider==="EUROCUP")?String(euroleagueGame?.date||euroleagueGame?.localDate||"").slice(0,10):"";
-    const gameDate=elDate||fibaDate||(dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null);
+    const plkDate=provider==="PLK"?(allText.match(/(?:^|\\s)(\\d{4})-(\\d{2})-(\\d{2})(?:\\s|$)/)?.slice(1,4).join("-")||""):"";\n    const gameDate=elDate||fibaDate||plkDate||(dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null);
     const dateDisplay=gameDate?gameDate.split("-").reverse().join("/"):"Imported game";
     const id=provider==="PLK"?u.pathname.split("/mecz/")[1].split("/")[0]:provider==="EUROBASKET_POLAND"?String(u.searchParams.get("Game")||u.searchParams.get("game")||"").slice(0,120):(provider==="EUROLEAGUE"||provider==="EUROCUP")?`${elSeason}-${elGameCode}`:provider==="FIBA"?u.pathname.match(/\/games\/(\d+)-/)![1]:provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
     auditExternalId=id;
