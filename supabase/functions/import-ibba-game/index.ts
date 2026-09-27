@@ -38,12 +38,12 @@ function validateUrl(raw:string){
   const isBasket=/^(www\.)?basket\.co\.il$/.test(u.hostname);
   const isFiba=/^(www\.)?fiba\.basketball$/.test(u.hostname);
   const isEuroleague=/^(www\.)?euroleaguebasketball\.net$/.test(u.hostname);
-  const isEurobasket=/^(www\.)?eurobasket\.com$/.test(u.hostname);
+  const isEurobasket=/^(www\.)?eurobasket\.com$/.test(u.hostname);\n  const isPlk=/^(www\.)?plk\.pl$/.test(u.hostname);
   if(isIbba && !/^\/match\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/i.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
   if(isBasket && (!(u.pathname.toLowerCase().endsWith("/game-zone.asp") || u.pathname.toLowerCase()==="/game-zone.asp") || !u.searchParams.get("GameId"))) throw new Error("Unsupported Winner League URL. Use basket.co.il/game-zone.asp?GameId=...");
   if(isFiba && !/^\/en\/events\/eurocup-women-\d{2}-\d{2}\/games\/\d+-[a-z0-9-]+\/?$/i.test(u.pathname)) throw new Error("Unsupported FIBA URL. Use an official EuroCup Women game page.");
   if(isEuroleague && !/^\/en\/(euroleague|eurocup)\/game-center\/\d{4}-\d{2}\/[a-z0-9-]+\/[EU]\d{4}\/\d+\/?$/i.test(u.pathname)) throw new Error("Unsupported EuroLeague Basketball URL. Use an official EuroLeague or EuroCup game-center page.");
-  if(isEurobasket && !/\/Basketball-Box-Score\.aspx$/i.test(u.pathname)) throw new Error("For Eurobasket, paste a specific Basketball-Box-Score.aspx?Game=... game URL, not the Poland league home page.");
+  if(isEurobasket && !/\/Basketball-Box-Score\.aspx$/i.test(u.pathname)) throw new Error("For Eurobasket, paste a specific Basketball-Box-Score.aspx?Game=... game URL, not the Poland league home page.");\n  if(isPlk && !/^\/mecz\/\d+(?:\/[^?#]*)?\/?$/i.test(u.pathname)) throw new Error("Unsupported PLK URL. Use an official plk.pl/mecz/... game page.");
   return {u, provider:isPlk?"PLK":isEurobasket?"EUROBASKET_POLAND":isEuroleague?(u.pathname.toLowerCase().includes("/eurocup/")?"EUROCUP":"EUROLEAGUE"):isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
 }
 function tableRows($:cheerio.CheerioAPI, table:any){
