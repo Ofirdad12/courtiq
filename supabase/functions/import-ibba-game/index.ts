@@ -509,6 +509,14 @@ Deno.serve(async(req:Request)=>{
     const u=parsed.u, provider=parsed.provider;
     auditUrl=u.toString();
     const fetchUrl=new URL(u.toString());
+    // PLK's base matchup URL does not contain the box-score tables.
+    // Normalize every accepted PLK matchup URL to its official statistics tab
+    // so users can paste either the base URL or /statystyki.
+    if(provider==="PLK"){
+      fetchUrl.search="";
+      fetchUrl.hash="";
+      fetchUrl.pathname=fetchUrl.pathname.replace(/\/$/,"").replace(/\/(?:statystyki|akcja-po-akcji)$/i,"")+"/statystyki";
+    }
     const elMatch=(provider==="EUROLEAGUE"||provider==="EUROCUP")?u.pathname.match(/\/([EU]\d{4})\/(\d+)\/?$/i):null;
     const elSeason=elMatch?.[1]?.toUpperCase()||""; const elGameCode=elMatch?.[2]||"";
 
