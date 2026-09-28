@@ -1,0 +1,3 @@
+# CourtIQ Vision Worker v1
+# ffmpeg/ffprobe are system dependencies.
+# Add pinned detector/tracker packages only when a selected model adapter is implemented.
