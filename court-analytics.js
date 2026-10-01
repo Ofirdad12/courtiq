@@ -19,10 +19,10 @@
     const checkId=(r,type)=>{if(typeof r.id!=="string"||!r.id.trim()||ids.has(type+r.id))throw Error(type+": unique nonempty id required.");ids.add(type+r.id);};
     const stints=data.lineupStints.map(r=>{
       checkId(r,"Stint");
-      if(!["home","away"].includes(r.side)||!five(r.players)||!num(r.seconds)||r.seconds<=0||!count(r.pointsFor)||!count(r.pointsAgainst))throw Error("Stint "+r.id+": require side, five unique players, positive seconds, and nonnegative integer pointsFor/pointsAgainst.");
+      if(!["home","away"].includes(r.side)||!five(r.players)||!num(r.seconds)||r.seconds<0||!count(r.pointsFor)||!count(r.pointsAgainst)||(r.seconds===0&&!r.pointsFor&&!r.pointsAgainst&&!r.fga&&!r.tov))throw Error("Stint "+r.id+": require side, five unique players, nonnegative seconds, a nonempty sample, and nonnegative integer pointsFor/pointsAgainst.");
       optional.forEach(k=>{if(r[k]!=null&&!count(r[k]))throw Error("Stint "+r.id+": invalid "+k);});
       if((r.fgm!=null&&r.fga!=null&&r.fgm>r.fga)||(r.threePm!=null&&r.fgm!=null&&r.threePm>r.fgm))throw Error("Stint "+r.id+": shooting totals do not reconcile.");
-      return {id:r.id,side:r.side,players:r.players.map(p=>p.trim()),seconds:r.seconds,pointsFor:r.pointsFor,pointsAgainst:r.pointsAgainst,...Object.fromEntries(optional.map(k=>[k,r[k]??null]))};
+      return {id:r.id,side:r.side,players:r.players.map(p=>p.trim()),seconds:r.seconds,pointsFor:r.pointsFor,pointsAgainst:r.pointsAgainst,...Object.fromEntries(optional.map(k=>[k,r[k]??null])),...(r.period!=null?{period:r.period,startClock:String(r.startClock||""),endClock:String(r.endClock||"")}:{})};
     });
     const shots=data.shots.map(r=>{
       checkId(r,"Shot");
@@ -58,14 +58,16 @@
   function dataset(G){
     let tagged=null,error="";
     try{const raw=root.localStorage?.getItem(storageKey(G));if(raw)tagged=validate(JSON.parse(raw));}catch(e){error="Saved tagged data could not be loaded: "+e.message;}
+    const derived=root.CourtIQLineupEngine?.derive(G);
     const candidate=G.courtAnalytics||{...blank(),coordinateSystem:G.coordinateSystem||"FIBA_METERS_HALF",lineupStints:G.lineupStints||[],shots:G.shots||[]};
+    if(derived&&(!candidate.lineupStints?.length||G.courtAnalytics?.quality?.source==="PLAY_BY_PLAY"))candidate.lineupStints=derived.lineupStints;
     let official=blank();
     try{
       // Raw coordinates from a provider must carry their coordinate system.
       if(candidate.shots.length&&!G.courtAnalytics&&!G.coordinateSystem)throw Error("Source shot coordinates need an explicit FIBA_METERS_HALF coordinate system.");
       official=validate(candidate);
     }catch(e){error+=(error?" ":"")+"Source analytics unavailable: "+e.message;}
-    return {data:tagged||official,tagged:!!tagged,error};
+    return {data:tagged||official,tagged:!!tagged,error,quality:!tagged&&derived?derived.quality:null};
   }
   function uploadBox(){
     return '<details class="caImport"><summary>Import / export tagged analytics (JSON)</summary><p>Tagged data is stored in this browser for this game. Import replaces the previous tagged dataset. Export lets you keep a copy.</p><p>Coordinates: meters; x from the left sideline (0–15), y from the attacking baseline (0–14); basket at (7.5, 1.575). Rotate second-half/opposite-basket shots before importing. Field goals only; exclude free throws. Each stint is one measured segment without substitutions; do not upload overlapping segments for the same team.</p><pre>{"version":1,"coordinateSystem":"FIBA_METERS_HALF","lineupStints":[{"id":"s1","side":"home","players":["A","B","C","D","E"],"seconds":120,"pointsFor":5,"pointsAgainst":4,"possessions":4,"opponentPossessions":4}],"shots":[{"id":"f1","side":"home","player":"A","period":1,"clock":"08:30","x":7.5,"y":2,"made":true,"value":2,"lineup":["A","B","C","D","E"]}]}</pre><p>This is a format example, not game data. Optional stint fields: possessions, opponentPossessions, fgm, fga, threePm, tov. Shot lineup is optional.</p><input class="caFile" type="file" accept=".json,application/json" aria-label="Import tagged analytics JSON"><button class="importBtn caExport" type="button">EXPORT JSON</button> <button class="importBtn caClear" type="button">CLEAR TAGGED DATA</button><div class="caStatus" role="status"></div></details>';
@@ -87,12 +89,15 @@
   function mount(G){
     const lineupRoot=root.document?.querySelector('[data-ca="lineups"]'),shotRoot=root.document?.querySelector('[data-ca="shots"]');
     if(!lineupRoot||!shotRoot)return;
-    const loaded=dataset(G),data=loaded.data,rows=aggregate(data.lineupStints);
+    const loaded=dataset(G),data=loaded.data,rows=aggregate(data.lineupStints),quality=loaded.quality;
     const name=s=>s==="home"?G.home:G.away;
-    const provenance='<p class="metricNote">'+(loaded.tagged?"BROWSER TAGGED DATA · User-supplied sample":"SOURCE DATA · Available measured sample")+' · '+data.lineupStints.length+' stints · '+data.shots.length+' located field-goal attempts. '+esc(loaded.error)+'</p>';
+    const provenance='<p class="metricNote">'+(loaded.tagged?"BROWSER TAGGED DATA · User-supplied sample":quality?.events?"PLAY-BY-PLAY · Automatic lineup reconstruction":"SOURCE DATA · Available measured sample")+' · '+data.lineupStints.length+' stints · '+data.shots.length+' located field-goal attempts. '+esc(loaded.error)+'</p>';
+    const qa=quality?.events?'<div class="schema"><b>PBP LINEUPS · '+esc(quality.status)+'</b> · '+quality.events+' events<br>Coverage: '+esc(G.home)+' '+fmt(quality.coverageSeconds.home/60)+' / '+fmt(quality.expectedSeconds/60)+' min · '+esc(G.away)+' '+fmt(quality.coverageSeconds.away/60)+' / '+fmt(quality.expectedSeconds/60)+' min<br>Scoring: '+esc(quality.scoringMode||"Unavailable")+'. Unknown intervals are excluded. Possession ratings need verified possession boundaries.'+(quality.warnings.length?'<details><summary>Data gaps / review ('+quality.warnings.length+')</summary>'+quality.warnings.map(w=>'<p>'+esc(w)+'</p>').join("")+'</details>':"")+'</div>':"";
+    const timeline=data.lineupStints.some(r=>r.period)?'<details class="caImport"><summary>הרכבים במהלך המשחק · PBP stint timeline</summary><div class="playerScroll"><table class="stats"><tr><th>Team / five players</th><th>Period</th><th>From</th><th>To</th><th>MIN</th><th>PF</th><th>PA</th><th>+/-</th></tr>'+data.lineupStints.map(r=>'<tr><td>'+esc(name(r.side))+'<br>'+esc(r.players.join(" · "))+'</td><td>'+esc(r.period<=4?"Q"+r.period:"OT"+(r.period-4))+'</td><td>'+esc(r.startClock)+'</td><td>'+esc(r.endClock)+'</td><td>'+fmt(r.seconds/60)+'</td><td>'+r.pointsFor+'</td><td>'+r.pointsAgainst+'</td><td>'+(r.pointsFor-r.pointsAgainst)+'</td></tr>').join("")+'</table></div></details>':"";
+    const audit=quality?.playerMinutes?.length?'<details class="caImport"><summary>Player minutes · PBP vs imported box score</summary><div class="playerScroll"><table class="stats"><tr><th>Player</th><th>Team</th><th>PBP MIN</th><th>Box MIN</th><th>Difference</th></tr>'+quality.playerMinutes.map(p=>'<tr><td>'+esc(p.player)+'</td><td>'+esc(name(p.side))+'</td><td>'+fmt(p.pbp,2)+'</td><td>'+fmt(p.box,2)+'</td><td>'+fmt(p.delta,2)+'</td></tr>').join("")+'</table></div></details>':"";
     const options=list=>list.map(r=>'<option value="'+esc(r.id)+'">'+esc(name(r.side)+" · "+r.players.join(" / ")+" · "+fmt(r.minutes)+" min")+'</option>').join("");
     const controls='<div class="caControls"><label>Team<select class="caTeam"><option value="">Both teams</option><option value="home">'+esc(G.home)+'</option><option value="away">'+esc(G.away)+'</option></select></label><label>Minimum minutes<input class="caMin" type="number" min="0" step="0.5" value="0"></label><label>Lineup A<select class="caA"></select></label><label>Lineup B<select class="caB"></select></label></div>';
-    lineupRoot.innerHTML=provenance+controls+'<div class="caComparison"></div><div class="caLineupTable"></div><p class="metricNote">+/- = points scored minus points allowed during measured shared minutes. ORtg / DRtg use supplied offensive / defensive possessions; eFG% uses supplied field-goal totals. Missing denominators remain —. Samples are descriptive; small samples can be unstable.</p>'+uploadBox();
+    lineupRoot.innerHTML=provenance+qa+controls+'<div class="caComparison"></div><div class="caLineupTable"></div><p class="metricNote">+/- = points scored minus points allowed during measured shared minutes. ORtg / DRtg use supplied offensive / defensive possessions; eFG% uses supplied field-goal totals. Missing denominators remain —. Samples are descriptive; small samples can be unstable.</p>'+timeline+audit+uploadBox();
     const drawLineups=()=>{
       const side=lineupRoot.querySelector(".caTeam").value,min=Math.max(0,Number(lineupRoot.querySelector(".caMin").value)||0),list=rows.filter(r=>(!side||r.side===side)&&r.minutes>=min);
       const a=lineupRoot.querySelector(".caA"),b=lineupRoot.querySelector(".caB"),oldA=a.value,oldB=b.value;
