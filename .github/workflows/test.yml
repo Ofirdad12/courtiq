@@ -27,6 +27,8 @@ jobs:
           node --check app.js
           node --check players.js
           node --check mens.js
+          node --check court-analytics.js
+          node tests/test_court_analytics.js
           node tests/test_official_demo.js
           node tests/test_season_source.js
           node tests/test_coach_workflow.js

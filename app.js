@@ -163,8 +163,9 @@ function installGameViews(G){
   const tabs=document.querySelector(".tabs");
   const overview=document.querySelector(".kpis");
   if(!tabs||!overview)return;
-  tabs.innerHTML=[["overview","Overview"],["team","Team Stats"],["player","Player Stats"],["play","Play-by-Play"]].map(([key,label],i)=>`<button type="button" data-game-tab="${key}" class="${i===0?"active":""}">${label}</button>`).join("");
-  overview.insertAdjacentHTML("beforebegin",teamStatsModule(G)+playerStatsView(G)+playByPlayModule(G));
+  tabs.innerHTML=[["overview","Overview"],["team","Team Stats"],["player","Player Stats"],["play","Play-by-Play"],["lineups","Lineups"],["shots","Shot Chart"]].map(([key,label],i)=>`<button type="button" data-game-tab="${key}" class="${i===0?"active":""}">${label}</button>`).join("");
+  overview.insertAdjacentHTML("beforebegin",teamStatsModule(G)+playerStatsView(G)+playByPlayModule(G)+(window.CourtIQCourtAnalytics?.render(G)||""));
+  window.CourtIQCourtAnalytics?.mount(G);
   [".kpis",".takeaways",".grid",".pgrid",".ask"].forEach(selector=>document.querySelectorAll(selector).forEach(el=>el.dataset.gameView="overview"));
   const activate=view=>{
     document.querySelectorAll("[data-game-view]").forEach(el=>{el.hidden=el.dataset.gameView!==view;});
