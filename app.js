@@ -194,7 +194,7 @@ exportActions.className="exportActions";
 exportActions.innerHTML='<button id="exportJson" class="importBtn secondaryAction">EXPORT JSON</button><button id="exportCsv" class="importBtn secondaryAction">EXPORT PLAYERS CSV</button>';
 document.querySelector(".pills").appendChild(exportActions);
 installGameViews(G);
-document.querySelector(".tabs").insertAdjacentHTML("beforebegin",intelligenceSuite(G));
+document.querySelector(".ask").insertAdjacentHTML("beforebegin",intelligenceSuite(G));
 document.querySelectorAll("[data-game]").forEach(b=>b.onclick=()=>{active=b.dataset.game;render();window.scrollTo(0,0)});
 document.querySelector("#ask").onclick=()=>{document.querySelector("#answer").textContent=G.ask};
 document.querySelector("#importGame").onclick=openImport;
@@ -209,7 +209,31 @@ document.querySelector("#comparePlayers").onclick=()=>window.CourtIQPlayers?.ope
 document.querySelector("#exportJson").onclick=()=>exportCurrentGame(G,"json");
 document.querySelector("#exportCsv").onclick=()=>exportCurrentGame(G,"csv");
 window.CourtIQCoach?.install();
+organizeWorkspace();
 }
+
+function organizeWorkspace(){
+  const bar=document.querySelector(".pills");
+  const status=document.createElement("div");
+  status.className="workspaceStatus";
+  bar.querySelectorAll(".pill").forEach(node=>status.appendChild(node));
+  document.querySelector(".v2bar>div").appendChild(status);
+  const more=document.createElement("details");
+  more.className="workspaceMore";
+  more.innerHTML='<summary>More tools</summary><div class="workspaceTools"></div>';
+  const tools=more.querySelector(".workspaceTools");
+  ["playersHub","comparePlayers","opponentScout","importUrl","compareTeams","importGame","exportJson","exportCsv"].forEach(id=>{
+    const node=document.getElementById(id);if(node)tools.appendChild(node);
+  });
+  bar.appendChild(more);
+  document.querySelectorAll(".menu div").forEach(item=>{
+    item.setAttribute("role","button");item.tabIndex=0;
+    item.setAttribute("aria-label",item.textContent.trim());
+    item.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();item.click();}};
+  });
+  document.querySelector(".menu").setAttribute("aria-label","Workspace navigation");
+}
+
 
 function csvRows(text){
   const lines=text.trim().split(/\r?\n/).filter(Boolean);

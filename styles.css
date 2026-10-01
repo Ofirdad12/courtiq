@@ -109,3 +109,83 @@ button:disabled{opacity:.48;cursor:not-allowed}.impStatus{min-height:18px;margin
 .coachOps summary {cursor:pointer;font-weight:700;margin-bottom:12px}
 .coachOps .stats {width:100%;margin:12px 0}.coachOps #coachStatus {margin:10px 0;color:#ffcc8a}
 @media (max-width:850px) {.coachClaims {grid-template-columns:1fr}.coachSheet {max-width:96vw}.coachControls>* {flex:1 1 180px}}
+
+/* Workspace presentation: readable analytics and responsive navigation. */
+:root{--muted:#a7b6cb}
+body{line-height:1.5}
+.app{grid-template-columns:210px minmax(0,1fr)}
+.side{display:flex;flex-direction:column;overflow-y:auto;padding:24px 14px;scrollbar-width:thin}
+.logo{flex-shrink:0;margin-bottom:24px}
+.menu{gap:4px}.menu div{cursor:pointer;min-height:42px;font-size:13px}
+.menu div:hover{background:#17243a;color:#fff}
+.quote{position:static;margin-top:28px;font-size:12px;flex-shrink:0}
+.content{padding:24px 28px 48px;max-width:1440px}
+.top{padding:0 28px}.accountBtn{max-width:300px;overflow-wrap:anywhere}
+.v2bar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;padding:20px;gap:20px;background:linear-gradient(120deg,#191735,#101b2b);border-color:#393254}
+.v2bar>div:first-child>b{display:block;font-size:14px;letter-spacing:.03em}
+.v2bar>div:first-child>span{display:block;margin-top:4px;font-size:12px}
+.workspaceStatus{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pill{font-style:normal;font-size:10px;letter-spacing:.02em}
+.pills{align-items:start;justify-content:flex-end;max-width:440px;gap:8px}
+.importBtn{font-size:11px;min-height:40px;padding:10px 14px;letter-spacing:.02em}
+.pills>.importBtn{background:#242039;border-color:#524677}
+.pills>#autoImport{background:#7954ea;border-color:#9c7cf8;order:-2}
+.pills>#coachSheet{order:-1}
+.workspaceMore{flex-basis:100%;min-width:0}
+.workspaceMore summary{cursor:pointer;color:#c5b5ff;font-size:12px;padding:7px 2px;text-align:right}
+.workspaceTools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-top:8px}
+.workspaceTools .importBtn{width:100%;background:#111c2d;border-color:#33445d;font-size:11px}
+.game-switch{flex-wrap:wrap;gap:8px}.game-switch button{font-size:12px;min-height:40px}
+.clubbar{gap:12px;flex-wrap:wrap}.clubbar span{overflow-wrap:anywhere}
+.crumb{font-size:12px;overflow-wrap:anywhere}
+.gamehead{padding:22px 20px;border:1px solid var(--line);border-radius:14px;background:#101b2bcc}
+.team{min-width:0}.team h2{font-size:clamp(14px,1.6vw,22px);overflow-wrap:anywhere}
+.badge{flex-shrink:0}.score{font-size:clamp(30px,4vw,52px);white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.tabs{gap:24px;scrollbar-width:thin;margin-top:20px}
+.tabs button{font-size:13px;min-height:48px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{padding:18px;min-width:0}.kpi b{font-size:28px;font-variant-numeric:tabular-nums}.kpi small{font-size:12px}
+.sectionhead{gap:12px;flex-wrap:wrap}.sectionhead small{font-size:12px}
+.findings{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.finding{padding:16px}.finding b{font-size:13px}.finding p{font-size:13px}.finding em{font-size:12px}
+.box{padding:18px;min-width:0;overflow-x:auto}.box h3{font-size:15px}
+.stats{font-size:12px;font-variant-numeric:tabular-nums}.stats th,.stats td{padding:9px 7px}
+.factor label,.videoItem{font-size:12px}.videoItem{padding:12px}.bar i,.qname{font-size:11px}
+.intelligenceSuite{margin-top:24px;padding-top:8px;border-top:1px solid var(--line)}
+.insight,.metricNote{font-size:12px;line-height:1.65}
+.ask{flex-wrap:wrap}.ask p,.answer{font-size:13px}.ask input{flex:1;min-width:180px}.ask button{min-height:44px}
+.modalCard{max-height:calc(100dvh - 40px);overflow:auto}.modalX{min-width:40px;min-height:40px}
+button,input,select,summary,[role=button]{-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,[role=button]:focus-visible{outline:2px solid #b99cff;outline-offset:3px}
+@media(min-width:681px) and (max-width:1100px){
+ .app{grid-template-columns:170px minmax(0,1fr)}
+ .menu div span,.tagline{display:initial}.tagline{display:block}.menu div{text-align:left}.logo{font-size:23px}
+ .content{padding:20px}.v2bar{grid-template-columns:1fr}.pills{justify-content:flex-start;max-width:none}.workspaceMore{flex-basis:auto}.workspaceMore summary{text-align:left}
+ .workspaceTools{min-width:300px}.grid{grid-template-columns:1fr 1fr}.grid .last{grid-column:1/-1}
+ .team{gap:8px}.badge{width:44px;height:44px}.gamehead{gap:12px;padding:16px}
+}
+@media(max-width:680px){
+ .app{display:block}.side{position:relative;height:auto;padding:16px 12px 8px;display:block;overflow:visible}
+ .side .logo{margin:0 4px 12px;font-size:25px}.tagline{display:block;font-size:9px}
+ .menu{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+ .menu div{flex:0 0 auto;white-space:nowrap;font-size:12px;min-height:44px;text-align:left;padding:11px}
+ .menu div span{display:inline}.quote{display:none}
+ .top{display:flex;position:static;height:auto;min-height:56px;padding:8px 16px}.top .search{display:none}.user{margin-left:0;width:100%;max-width:none}
+ .content{padding:16px 12px 32px}.v2bar{grid-template-columns:1fr;padding:16px;gap:14px}
+ .pills{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:none;width:100%}
+ .pills .importBtn{width:100%;margin:0;font-size:10px;padding:10px 8px}
+ .workspaceMore{grid-column:1/-1}.workspaceMore summary{text-align:left;min-height:40px;padding-top:10px}
+ .workspaceTools{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .clubbar{align-items:flex-start}.clubbar span{font-size:10px}.crumb{font-size:11px;margin-bottom:12px}
+ .gamehead{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;padding:16px 10px}
+ .team,.team.right{display:flex;flex-direction:column;text-align:center;justify-content:center;gap:8px}
+ .team.right .badge{order:-1}.team h2{font-size:13px;margin:0}.badge{width:38px;height:38px}.score{font-size:30px}
+ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis .kpi:last-child{grid-column:auto}.kpi{padding:14px}.kpi label{font-size:11px}.kpi b{font-size:24px}
+ .findings,.grid,.pgrid{grid-template-columns:minmax(0,1fr)}.grid .last{grid-column:auto}
+ .takeaways{padding:16px}.box{padding:16px}.tabs{gap:20px}.tabs button{font-size:12px}
+ .ask input{width:100%;margin:12px 0 8px}.ask button{width:100%}
+ .modal{padding:12px}.modalCard{max-height:calc(100dvh - 24px);padding:24px 16px}.modalCard h2{font-size:22px;padding-right:28px}
+ .gameLibraryGrid{grid-template-columns:minmax(0,1fr)}.coachControls input[placeholder]{min-width:0}
+ .coverage{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
