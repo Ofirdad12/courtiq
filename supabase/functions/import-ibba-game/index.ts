@@ -417,7 +417,7 @@ function euroleagueSide(side:any){
   const t=side?.total||{};
   const players=(side?.players||[]).map((row:any)=>{const s=row?.stats||{},p=row?.player||{},person=p?.person||{};const min=elNum(s,"timePlayed")/60;return {
     id:String(person?.code||person?.id||""),number:Number(p?.dorsal||0),name:clean(person?.name||person?.displayName||[person?.firstName,person?.lastName].filter(Boolean).join(" ")||""),
-    starter:Boolean(s?.isStarter||s?.starter),minutes:r1(min),points:elNum(s,"points"),two_pm:elNum(s,"fieldGoalsMade2","twoPointersMade"),two_pa:elNum(s,"fieldGoalsAttempted2","twoPointersAttempted"),
+    starter:Boolean(s?.startFive??s?.isStarter??s?.starter??false),minutes:r1(min),points:elNum(s,"points"),two_pm:elNum(s,"fieldGoalsMade2","twoPointersMade"),two_pa:elNum(s,"fieldGoalsAttempted2","twoPointersAttempted"),
     three_pm:elNum(s,"fieldGoalsMade3","threePointersMade"),three_pa:elNum(s,"fieldGoalsAttempted3","threePointersAttempted"),ftm:elNum(s,"freeThrowsMade"),fta:elNum(s,"freeThrowsAttempted"),
     oreb:elNum(s,"offensiveRebounds"),dreb:elNum(s,"defensiveRebounds"),tov:elNum(s,"turnovers"),ast:elNum(s,"assistances","assists"),steals:elNum(s,"steals"),blocks:elNum(s,"blocksFavour","blocks"),value:elNum(s,"valuation"),plus_minus:elNum(s,"plusMinus"),has_played:min>0
   };});
@@ -522,7 +522,9 @@ Deno.serve(async(req:Request)=>{
 
     const elCompetition=provider==="EUROCUP"?"U":"E";
     if(provider==="EUROLEAGUE"||provider==="EUROCUP") fetchUrl.href=`https://api-live.euroleague.net/v2/competitions/${elCompetition}/seasons/${elSeason}/games/${elGameCode}/stats`;
-    const res=await fetch(fetchUrl.toString(),{headers:{
+    const isEl=provider==="EUROLEAGUE"||provider==="EUROCUP";
+    const elHeaders={"Accept":"application/json"};
+    const res=await fetch(fetchUrl.toString(),{headers:isEl?elHeaders:{
       // FIBA serves materially different Next/RSC payloads to generic bots.
       // Request the same document variant a normal browser receives.
       "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
@@ -535,10 +537,10 @@ Deno.serve(async(req:Request)=>{
     const sourceText=await res.text();
     let euroleagueStats:any=null, euroleagueGame:any=null;
     if(provider==="EUROLEAGUE"||provider==="EUROCUP"){
-      try{euroleagueStats=JSON.parse(sourceText);}catch(_){throw new Error("EuroLeague stats feed did not return JSON.");}
-      const gr=await fetch(`https://api-live.euroleague.net/v2/competitions/${elCompetition}/seasons/${elSeason}/games/${elGameCode}`);
+      try{euroleagueStats=JSON.parse(sourceText.replace(/^\uFEFF/,""));}catch(_){throw new Error("EuroLeague stats feed returned an unreadable response ("+(res.headers.get("content-type")||"unknown content type")+"). Please retry later.");}
+      const gr=await fetch(`https://api-live.euroleague.net/v2/competitions/${elCompetition}/seasons/${elSeason}/games/${elGameCode}`,{headers:elHeaders});
       if(!gr.ok) throw new Error("EuroLeague game header returned HTTP "+gr.status);
-      euroleagueGame=await gr.json();
+      try{euroleagueGame=await gr.json();}catch(_){throw new Error("EuroLeague game header returned an unreadable response.");}
     }
     const $=cheerio.load(provider==="EUROLEAGUE"?"":sourceText);
 
