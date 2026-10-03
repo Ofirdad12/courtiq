@@ -17,3 +17,13 @@ g=game();g.players.home.forEach(p=>p.starter=false);g.playByPlay=[];
 for(const side of ['home','away'])for(const p of g.players[side])g.playByPlay.push({period:1,clock:'10:00',side,player:p.name,type:'ast',score:'0-0'});
 g.playByPlay.push({period:1,clock:'09:00',side:'home',player:'H0',type:'ast',score:'0-0'});g.scoreOrder='home-away';assert.equal(api.starters(g,'home').source,'PLAY-BY-PLAY');assert.equal(api.role(g,'home',g.players.home[0]),'Starter');
 console.log('Game intelligence: score QA, missing data, overtime, unknown roles, PBP starters, provenance and escaping passed.');
+
+// A team perspective orders disadvantages before advantages and reverses wording correctly.
+g=game();let home=api.insights(g,'home'),away=api.insights(g,'away');
+assert.equal(home[0].key,'FTr');assert.match(home[0].finding,/H trailed/);assert.equal(home[0].signal,'REVIEW PRIORITY');
+assert.match(away.find(x=>x.key==='TOV%').finding,/A trailed/);
+g.players.home[0].points=20;assert.match(api.insights(g)[0].confidence,/DATA REVIEW REQUIRED/);
+const output=api.printable({...game(),home:'<script>bad()</script>'},'away');
+assert.ok(!output.includes('<script>'));assert.ok(!output.includes('briefExport'));assert.match(output,/Focus: A/);assert.match(output,/save it as PDF/);
+assert.match(api.render(game(),'away'),/value="away" selected/);
+assert.match(api.render(game()),/data-factor="TOV%"/);

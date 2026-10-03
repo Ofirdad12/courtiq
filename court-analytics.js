@@ -60,14 +60,24 @@
     try{const raw=root.localStorage?.getItem(storageKey(G));if(raw)tagged=validate(JSON.parse(raw));}catch(e){error="Saved tagged data could not be loaded: "+e.message;}
     const derived=root.CourtIQLineupEngine?.derive(G);
     const candidate=G.courtAnalytics||{...blank(),coordinateSystem:G.coordinateSystem||"FIBA_METERS_HALF",lineupStints:G.lineupStints||[],shots:G.shots||[]};
-    if(derived&&(!candidate.lineupStints?.length||G.courtAnalytics?.quality?.source==="PLAY_BY_PLAY"))candidate.lineupStints=derived.lineupStints;
+    const usesDerived=!!derived&&(!candidate.lineupStints?.length||G.courtAnalytics?.quality?.source==="PLAY_BY_PLAY");
+    if(usesDerived)candidate.lineupStints=derived.lineupStints;
     let official=blank();
     try{
       // Raw coordinates from a provider must carry their coordinate system.
       if(candidate.shots.length&&!G.courtAnalytics&&!G.coordinateSystem)throw Error("Source shot coordinates need an explicit FIBA_METERS_HALF coordinate system.");
       official=validate(candidate);
     }catch(e){error+=(error?" ":"")+"Source analytics unavailable: "+e.message;}
-    return {data:tagged||official,tagged:!!tagged,error,quality:!tagged&&derived?derived.quality:null};
+    return {data:tagged||official,tagged:!!tagged,error,quality:!tagged&&usesDerived?derived.quality:null};
+  }
+  function sampleCoverage(data,quality,period=""){
+    const rows=data.lineupStints.filter(r=>!period||r.period===Number(period));
+    const expected=period?(Number(period)<=4?600:300):quality?.expectedSeconds||0;
+    const certified=quality?.source==="PLAY_BY_PLAY"&&["COMPLETE","PARTIAL"].includes(quality.status)&&expected>0;
+    return ["home","away"].map(side=>{
+      const seconds=rows.filter(r=>r.side===side).reduce((s,r)=>s+r.seconds,0);
+      return {side,seconds,expectedSeconds:certified?expected:null,percent:certified&&seconds<=expected?100*seconds/expected:null};
+    });
   }
   function uploadBox(){
     return '<details class="caImport"><summary>Import / export tagged analytics (JSON)</summary><p>Tagged data is stored in this browser for this game. Import replaces the previous tagged dataset. Export lets you keep a copy.</p><p>Coordinates: meters; x from the left sideline (0–15), y from the attacking baseline (0–14); basket at (7.5, 1.575). Rotate second-half/opposite-basket shots before importing. Field goals only; exclude free throws. Each stint is one measured segment without substitutions; do not upload overlapping segments for the same team.</p><pre>{"version":1,"coordinateSystem":"FIBA_METERS_HALF","lineupStints":[{"id":"s1","side":"home","players":["A","B","C","D","E"],"seconds":120,"pointsFor":5,"pointsAgainst":4,"possessions":4,"opponentPossessions":4}],"shots":[{"id":"f1","side":"home","player":"A","period":1,"clock":"08:30","x":7.5,"y":2,"made":true,"value":2,"lineup":["A","B","C","D","E"]}]}</pre><p>This is a format example, not game data. Optional stint fields: possessions, opponentPossessions, fgm, fga, threePm, tov. Shot lineup is optional.</p><input class="caFile" type="file" accept=".json,application/json" aria-label="Import tagged analytics JSON"><button class="importBtn caExport" type="button">EXPORT JSON</button> <button class="importBtn caClear" type="button">CLEAR TAGGED DATA</button><div class="caStatus" role="status"></div></details>';
@@ -97,9 +107,10 @@
     const audit=quality?.playerMinutes?.length?'<details class="caImport"><summary>Player minutes · PBP vs imported box score</summary><div class="playerScroll"><table class="stats"><tr><th>Player</th><th>Team</th><th>PBP MIN</th><th>Box MIN</th><th>Difference</th></tr>'+quality.playerMinutes.map(p=>'<tr><td>'+esc(p.player)+'</td><td>'+esc(name(p.side))+'</td><td>'+fmt(p.pbp,2)+'</td><td>'+fmt(p.box,2)+'</td><td>'+fmt(p.delta,2)+'</td></tr>').join("")+'</table></div></details>':"";
     const options=list=>list.map(r=>'<option value="'+esc(r.id)+'">'+esc(name(r.side)+" · "+r.players.join(" / ")+" · "+fmt(r.minutes)+" min")+'</option>').join("");
     const controls='<div class="caControls"><label>Team<select class="caTeam"><option value="">Both teams</option><option value="home">'+esc(G.home)+'</option><option value="away">'+esc(G.away)+'</option></select></label><label>Period<select class="caLineupPeriod"><option value="">All periods</option>'+[...new Set(data.lineupStints.map(r=>r.period).filter(Boolean))].sort((a,b)=>a-b).map(p=>'<option value="'+p+'">'+(p<=4?"Q"+p:"OT"+(p-4))+'</option>').join("")+'</select></label><label>Minimum minutes<input class="caMin" type="number" min="0" step="0.5" value="0"></label><label>Lineup A<select class="caA"></select></label><label>Lineup B<select class="caB"></select></label></div>';
-    lineupRoot.innerHTML=provenance+qa+controls+'<div class="caComparison"></div><div class="caLineupTable"></div><p class="metricNote">+/- = points scored minus points allowed during measured shared minutes. ORtg / DRtg use supplied offensive / defensive possessions; eFG% uses supplied field-goal totals. Missing denominators remain —. Samples are descriptive; small samples can be unstable.</p>'+timeline+audit+uploadBox();
+    lineupRoot.innerHTML=provenance+qa+controls+'<div class="caCoverage"></div><div class="caComparison"></div><div class="caLineupTable"></div><p class="metricNote">+/- = points scored minus points allowed during measured shared minutes. ORtg / DRtg use supplied offensive / defensive possessions; eFG% uses supplied field-goal totals. Missing denominators remain —. Samples are descriptive; small samples can be unstable.</p>'+timeline+audit+uploadBox();
     const drawLineups=()=>{
       const side=lineupRoot.querySelector(".caTeam").value,min=Math.max(0,Number(lineupRoot.querySelector(".caMin").value)||0),period=lineupRoot.querySelector(".caLineupPeriod").value,list=aggregate(data.lineupStints.filter(r=>!period||r.period===Number(period))).filter(r=>(!side||r.side===side)&&r.minutes>=min);
+      lineupRoot.querySelector(".caCoverage").innerHTML=sampleCoverage(data,quality,period).filter(c=>!side||c.side===side).map(c=>'<span>'+esc(name(c.side))+'<b>'+fmt(c.seconds/60)+' measured min'+(c.percent==null?'':' · '+fmt(c.percent)+'% coverage')+'</b>'+(c.percent==null?'Coverage is not certified for this sample.':fmt(c.expectedSeconds/60)+' min timeline · gaps excluded')+'</span>').join("");
       const a=lineupRoot.querySelector(".caA"),b=lineupRoot.querySelector(".caB"),oldA=a.value,oldB=b.value;
       a.innerHTML=options(list);b.innerHTML=options(list);if(list.some(r=>r.id===oldA))a.value=oldA;if(list.some(r=>r.id===oldB))b.value=oldB;else if(list.length>1)b.selectedIndex=1;
       const table=lineupRoot.querySelector(".caLineupTable");
@@ -131,7 +142,7 @@
       el.querySelector(".caClear").onclick=()=>{try{root.localStorage.removeItem(storageKey(G));mount(G);}catch(e){el.querySelector(".caStatus").textContent=e.message;}};
     });
   }
-  const api={validate,aggregate,filterShots,summary,render,mount,dataset,court};
+  const api={validate,aggregate,filterShots,summary,render,mount,dataset,court,sampleCoverage};
   root.CourtIQCourtAnalytics=api;
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
 })(typeof window!=="undefined"?window:globalThis);

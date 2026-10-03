@@ -204,3 +204,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .playerScroll{max-width:100%;overscroll-behavior-x:contain}
 @media(max-width:850px){.intelGrid{grid-template-columns:1fr}.qaSummary ul{grid-template-columns:1fr}}
 @media(max-width:680px){.tabs{position:sticky;top:0;z-index:5;background:#070d18;padding:0 8px}.tabs button{min-height:48px}.caControls label{min-width:0;flex-basis:calc(50% - 12px)}.caControls select{font-size:16px}.gameIntelV2{padding:14px}.intelGrid article{padding:14px}}
+
+.briefControls{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:18px 0}
+.briefControls label{display:grid;gap:6px;flex:1;min-width:160px;font-size:12px;color:var(--muted)}
+.briefControls select{min-height:44px;border:1px solid var(--line);border-radius:8px;padding:9px;background:#07101c;color:#fff;font-size:14px}
+.briefControls .briefStatus{flex-basis:100%;font-size:12px;color:#b8d7ec}
+.briefEvidence{margin-top:8px;min-height:44px}.evidenceHighlight{outline:2px solid #bfa5ff;outline-offset:4px}
+.caCoverage{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.caCoverage>span{flex:1;min-width:160px;background:#101b2b;border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px}.caCoverage b{display:block;font-size:18px;color:#bfa5ff}
+@media(max-width:680px){.briefControls select{font-size:16px;min-width:0;max-width:100%}.briefExport{width:100%}.briefEvidence{width:100%}}
