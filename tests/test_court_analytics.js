@@ -35,3 +35,10 @@ const markup=api.court([shot("1",{player:'<img src=x onerror=alert(1)>'})]);
 assert.ok(!markup.includes("<img"));assert.ok(markup.includes("&lt;img"));
 assert.match(api.render(),/data-game-view="lineups"/);assert.match(api.render(),/data-game-view="shots"/);
 console.log("Court analytics: aggregation, denominators, validation, filters and escaping passed.");
+
+const measured=data([stint('h',{seconds:120,period:1}),stint('a',{side:'away',seconds:300,period:1})]);
+const quality={source:'PLAY_BY_PLAY',status:'PARTIAL',expectedSeconds:2400};
+assert.equal(api.sampleCoverage(measured,quality)[0].percent,5);
+assert.equal(api.sampleCoverage(measured,quality,'1')[0].percent,20);
+assert.equal(api.sampleCoverage(measured,null)[0].percent,null);
+assert.equal(api.sampleCoverage(measured,{...quality,status:'UNRELIABLE_SCORE'})[0].percent,null);
