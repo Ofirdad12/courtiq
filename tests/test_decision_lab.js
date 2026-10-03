@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),api=require('../decision-lab');
+const game={home:'H',away:'A',hs:90,as:66,date:'Today',raw:{home:{two_pm:26,two_pa:44,three_pm:9,three_pa:26,ftm:11,fta:13},away:{two_pm:14,two_pa:32,three_pm:11,three_pa:26,ftm:5,fta:9}}};
+const original=JSON.stringify(game);let r=api.simulate(game,'away',{two:2,three:1,ft:3});assert.equal(r.score,76);assert.equal(r.swing,10);assert.equal(r.margin,-14);assert.equal(r.neededToLead,15);assert.equal(r.shots.ft.made,8);assert.ok(Math.abs(r.efg-100*(16+1.5*12)/58)<1e-10);assert.ok(Math.abs(r.ts-100*76/(2*(58+.44*9)))<1e-10);
+r=api.simulate(game,'home',{two:-2,three:-1,ft:-3});assert.equal(r.score,80);assert.equal(r.swing,-10);assert.equal(r.margin,14);assert.equal(r.neededToLead,0);
+assert.deepEqual(api.preset(game,'away','ft80'),{two:0,three:0,ft:3});assert.deepEqual(api.preset(game,'home','ft80'),{two:0,three:0,ft:0});
+assert.throws(()=>api.simulate(game,'home',{three:18}),/exceeds/);assert.throws(()=>api.simulate(game,'home',{ft:-12}),/exceeds/);assert.throws(()=>api.simulate(game,'home',{two:1.5}),/exceeds/);assert.throws(()=>api.simulate(game,'home',{two:'1'}),/exceeds/);
+assert.throws(()=>api.baseline({...game,hs:91}),/reconcile/);assert.throws(()=>api.baseline({...game,raw:{}}),/complete/);assert.throws(()=>api.baseline(game,'both'),/focus/);
+const bad=structuredClone(game);bad.raw.home.ftm=null;assert.throws(()=>api.baseline(bad),/invalid/);bad.raw.home.ftm=14;assert.throws(()=>api.baseline(bad),/invalid/);
+const zero={home:'H',away:'A',hs:0,as:0,raw:{home:{two_pm:0,two_pa:0,three_pm:0,three_pa:0,ftm:0,fta:0}}};r=api.simulate(zero);assert.equal(r.efg,null);assert.equal(r.ts,null);assert.equal(r.neededToLead,1);assert.deepEqual(api.preset(zero,'home','oneThree'),{two:0,three:0,ft:0});
+const tied={...game,as:90};r=api.simulate(tied,'home');assert.equal(r.margin,0);assert.equal(r.neededToLead,1);
+assert.equal(JSON.stringify(game),original,'scenario never modifies official game data');assert.match(api.summary(game,'away',{two:0,three:1,ft:0}),/not a forecast/);assert.match(api.render({...game,home:'<script>bad</script>'}),/&lt;script&gt;/);assert.ok(!api.render({...game,home:'<script>bad</script>'}).includes('<script>'));
+console.log('Decision Lab: shot bounds, weighted scoring, side perspective, efficiency formulas, presets, missing/reconciled data, zero denominators, ties and immutable source passed.');
