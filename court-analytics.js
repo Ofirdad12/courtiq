@@ -11,6 +11,20 @@
   const five=ps=>Array.isArray(ps)&&ps.length===5&&ps.every(p=>typeof p==="string"&&p.trim())&&new Set(ps.map(p=>p.trim())).size===5;
   const key=ps=>JSON.stringify([...ps].map(p=>p.trim()).sort());
   const fmt=(v,d=1)=>v==null?"—":Number(v).toFixed(d);
+  function clockSeconds(period,clock){
+    if(!count(period)||period<1||!/^\d{1,2}:[0-5]\d$/.test(String(clock||"")))return null;
+    const [m,sec]=String(clock).split(":").map(Number),n=m*60+sec;return n<=(period<=4?600:300)?n:null;
+  }
+  function interval(r){const start=clockSeconds(r.period,r.startClock),end=clockSeconds(r.period,r.endClock);return start!=null&&end!=null&&start>=end?{period:r.period,startClock:r.startClock,endClock:r.endClock,side:r.side}:null;}
+  function comparison(A,B){
+    const warnings=[];
+    if(A.id===B.id)warnings.push("The same lineup is selected twice.");
+    if(Math.min(A.minutes,B.minutes)<5)warnings.push("SMALL TIME SAMPLE: at least one lineup has fewer than 5 measured minutes. Five minutes is a review threshold, not a statistical confidence level.");
+    if(Math.max(A.minutes,B.minutes)>Math.min(A.minutes,B.minutes)*2)warnings.push("Unequal exposure: one lineup has more than twice the measured time. Compare per-minute rates alongside totals.");
+    if(A.possessions==null||B.possessions==null||A.opponentPossessions==null||B.opponentPossessions==null)warnings.push("Possession counts are incomplete; possession-based ratings remain unavailable where their denominator is missing.");
+    warnings.push("Different opponents, game states and roles can explain differences. This comparison does not establish a better lineup or a substitution effect.");
+    return {warnings,shared:A.side===B.side?A.players.filter(p=>B.players.includes(p)):[],onlyA:A.side===B.side?A.players.filter(p=>!B.players.includes(p)):[],onlyB:A.side===B.side?B.players.filter(p=>!A.players.includes(p)):[]};
+  }
   function validate(data){
     if(!data||data.version!==1||data.coordinateSystem!=="FIBA_METERS_HALF") throw Error("Expected version 1 and coordinateSystem FIBA_METERS_HALF.");
     if(!Array.isArray(data.lineupStints)||!Array.isArray(data.shots))throw Error("lineupStints and shots must be arrays.");
@@ -20,10 +34,14 @@
     const stints=data.lineupStints.map(r=>{
       checkId(r,"Stint");
       if(!["home","away"].includes(r.side)||!five(r.players)||!num(r.seconds)||r.seconds<0||!count(r.pointsFor)||!count(r.pointsAgainst)||(r.seconds===0&&!r.pointsFor&&!r.pointsAgainst&&!r.fga&&!r.tov))throw Error("Stint "+r.id+": require side, five unique players, nonnegative seconds, a nonempty sample, and nonnegative integer pointsFor/pointsAgainst.");
+      if(r.period!=null&&(!count(r.period)||r.period<1))throw Error("Stint "+r.id+": period must be a positive integer.");
+      if(r.startClock||r.endClock){const window=interval(r);if(!window)throw Error("Stint "+r.id+": valid period and descending start/end clocks required.");if(Math.abs(clockSeconds(r.period,r.startClock)-clockSeconds(r.period,r.endClock)-r.seconds)>1)throw Error("Stint "+r.id+": seconds must match the clock interval.");}
       optional.forEach(k=>{if(r[k]!=null&&!count(r[k]))throw Error("Stint "+r.id+": invalid "+k);});
       if((r.fgm!=null&&r.fga!=null&&r.fgm>r.fga)||(r.threePm!=null&&r.fgm!=null&&r.threePm>r.fgm))throw Error("Stint "+r.id+": shooting totals do not reconcile.");
       return {id:r.id,side:r.side,players:r.players.map(p=>p.trim()),seconds:r.seconds,pointsFor:r.pointsFor,pointsAgainst:r.pointsAgainst,...Object.fromEntries(optional.map(k=>[k,r[k]??null])),...(r.period!=null?{period:r.period,startClock:String(r.startClock||""),endClock:String(r.endClock||"")}:{})};
     });
+    const timed=stints.filter(r=>interval(r)&&r.seconds>0).sort((a,b)=>a.side.localeCompare(b.side)||a.period-b.period||clockSeconds(b.period,b.startClock)-clockSeconds(a.period,a.startClock));
+    for(let i=1;i<timed.length;i++){const a=timed[i-1],b=timed[i];if(a.side===b.side&&a.period===b.period&&clockSeconds(b.period,b.startClock)>clockSeconds(a.period,a.endClock))throw Error("Stint "+b.id+": overlaps another interval for this team and period.");}
     const shots=data.shots.map(r=>{
       checkId(r,"Shot");
       if(!["home","away"].includes(r.side)||typeof r.player!=="string"||!r.player.trim()||!count(r.period)||r.period<1||typeof r.made!=="boolean"||![2,3].includes(r.value)||!num(r.x)||!num(r.y)||r.x<0||r.x>15||r.y<0||r.y>14)throw Error("Shot "+r.id+": invalid side/player/period/made/value or coordinates (x 0–15 m, y 0–14 m).");
@@ -43,7 +61,7 @@
     });
     return [...rows.values()].map(r=>{
       const ortg=r.possessions>0?100*r.pointsFor/r.possessions:null,drtg=r.opponentPossessions>0?100*r.pointsAgainst/r.opponentPossessions:null;
-      return {...r,minutes:r.seconds/60,plusMinus:r.pointsFor-r.pointsAgainst,ortg,drtg,net:ortg!=null&&drtg!=null?ortg-drtg:null,efg:r.fga>0&&r.fgm!=null&&r.threePm!=null?100*(r.fgm+.5*r.threePm)/r.fga:null};
+      return {...r,minutes:r.seconds/60,plusMinus:r.pointsFor-r.pointsAgainst,pointsForPerMinute:r.seconds>0?60*r.pointsFor/r.seconds:null,pointsAgainstPerMinute:r.seconds>0?60*r.pointsAgainst/r.seconds:null,plusMinusPerMinute:r.seconds>0?60*(r.pointsFor-r.pointsAgainst)/r.seconds:null,ortg,drtg,net:ortg!=null&&drtg!=null?ortg-drtg:null,efg:r.fga>0&&r.fgm!=null&&r.threePm!=null?100*(r.fgm+.5*r.threePm)/r.fga:null};
     }).sort((a,b)=>b.seconds-a.seconds);
   }
   function filterShots(shots,f={}){
@@ -80,7 +98,7 @@
     });
   }
   function uploadBox(){
-    return '<details class="caImport"><summary>Import / export tagged analytics (JSON)</summary><p>Tagged data is stored in this browser for this game. Import replaces the previous tagged dataset. Export lets you keep a copy.</p><p>Coordinates: meters; x from the left sideline (0–15), y from the attacking baseline (0–14); basket at (7.5, 1.575). Rotate second-half/opposite-basket shots before importing. Field goals only; exclude free throws. Each stint is one measured segment without substitutions; do not upload overlapping segments for the same team.</p><pre>{"version":1,"coordinateSystem":"FIBA_METERS_HALF","lineupStints":[{"id":"s1","side":"home","players":["A","B","C","D","E"],"seconds":120,"pointsFor":5,"pointsAgainst":4,"possessions":4,"opponentPossessions":4}],"shots":[{"id":"f1","side":"home","player":"A","period":1,"clock":"08:30","x":7.5,"y":2,"made":true,"value":2,"lineup":["A","B","C","D","E"]}]}</pre><p>This is a format example, not game data. Optional stint fields: possessions, opponentPossessions, fgm, fga, threePm, tov. Shot lineup is optional.</p><input class="caFile" type="file" accept=".json,application/json" aria-label="Import tagged analytics JSON"><button class="importBtn caExport" type="button">EXPORT JSON</button> <button class="importBtn caClear" type="button">CLEAR TAGGED DATA</button><div class="caStatus" role="status"></div></details>';
+    return '<details class="caImport"><summary>Import / export tagged analytics (JSON)</summary><p>Tagged data is stored in this browser for this game. Import replaces the previous tagged dataset. Export lets you keep a copy.</p><p>Coordinates: meters; x from the left sideline (0–15), y from the attacking baseline (0–14); basket at (7.5, 1.575). Rotate second-half/opposite-basket shots before importing. Field goals only; exclude free throws. Each stint is one measured segment without substitutions; do not upload overlapping segments for the same team.</p><pre>{"version":1,"coordinateSystem":"FIBA_METERS_HALF","lineupStints":[{"id":"s1","side":"home","players":["A","B","C","D","E"],"seconds":120,"pointsFor":5,"pointsAgainst":4,"possessions":4,"opponentPossessions":4}],"shots":[{"id":"f1","side":"home","player":"A","period":1,"clock":"08:30","x":7.5,"y":2,"made":true,"value":2,"lineup":["A","B","C","D","E"]}]}</pre><p>This is a format example, not game data. Optional clock evidence: period, startClock, endClock; seconds must match the window. Overlapping timed segments for the same team are rejected. Other optional stint fields: possessions, opponentPossessions, fgm, fga, threePm, tov. Shot lineup is optional.</p><input class="caFile" type="file" accept=".json,application/json" aria-label="Import tagged analytics JSON"><button class="importBtn caExport" type="button">EXPORT JSON</button> <button class="importBtn caClear" type="button">CLEAR TAGGED DATA</button><div class="caStatus" role="status"></div></details>';
   }
   function render(){
     return '<section class="gameViewPanel" data-game-view="lineups"><div class="viewTitle"><div><small>ON-COURT COMPARISON</small><h3>Lineups · השוואת הרכבים</h3></div></div><div class="card box caRoot" data-ca="lineups"></div></section><section class="gameViewPanel" data-game-view="shots"><div class="viewTitle"><div><small>SHOT LOCATIONS</small><h3>Shot Chart · מפת זריקות</h3></div></div><div class="card box caRoot" data-ca="shots"></div></section>';
@@ -96,8 +114,8 @@
     }).join("");
     return '<svg viewBox="-8 -8 466 436" role="img" aria-label="Shot chart: green circles are makes, pink crosses are misses" class="caCourt"><rect x="0" y="0" width="450" height="420" fill="#101f32" stroke="#a2b5cd" stroke-width="2"/><g fill="none" stroke="#a2b5cd" stroke-width="2"><rect x="151.5" y="0" width="147" height="174"/><circle cx="225" cy="174" r="54"/><path d="M 27 0 V 89.9 A 202.5 202.5 0 0 0 423 89.9 V 0"/><path d="M 171 420 A 54 54 0 0 1 279 420"/><path d="M 198 36 H 252"/><circle cx="225" cy="47.25" r="6.75"/></g>'+marks+'</svg>';
   }
-  function mount(G){
-    const lineupRoot=root.document?.querySelector('[data-ca="lineups"]'),shotRoot=root.document?.querySelector('[data-ca="shots"]');
+  function mount(G,scope=root.document,onInterval){
+    const lineupRoot=scope?.querySelector('[data-ca="lineups"]'),shotRoot=scope?.querySelector('[data-ca="shots"]');
     if(!lineupRoot||!shotRoot)return;
     const loaded=dataset(G),data=loaded.data,rows=aggregate(data.lineupStints),quality=loaded.quality;
     const name=s=>s==="home"?G.home:G.away;
@@ -119,8 +137,15 @@
       const compare=()=>{
         const A=list.find(r=>r.id===a.value),B=list.find(r=>r.id===b.value),out=lineupRoot.querySelector(".caComparison");
         if(!A||!B){out.innerHTML="";return;}
-        const metrics=[["Minutes","minutes"],["Stints","stints"],["Points for","pointsFor"],["Points against","pointsAgainst"],["+/-","plusMinus"],["ORtg","ortg"],["DRtg","drtg"],["Net Rating","net"],["eFG%","efg"]];
-        out.innerHTML='<h3>Lineup A vs Lineup B</h3><p class="metricNote">'+esc(name(A.side))+' · A: '+fmt(A.minutes)+' min / '+A.stints+' stints · '+esc(name(B.side))+' · B: '+fmt(B.minutes)+' min / '+B.stints+' stints'+(Math.min(A.minutes,B.minutes)<5?' · SMALL SAMPLE: at least one lineup has fewer than 5 measured minutes.':'')+'</p>'+(A.id===B.id?'<p>Select a different Lineup B to compare two lineups.</p>':'')+'<div class="playerScroll"><table class="stats"><tr><th>Metric</th><th>A · '+esc(A.players.join(" / "))+'</th><th>B · '+esc(B.players.join(" / "))+'</th><th>A − B</th></tr>'+metrics.map(([label,k])=>'<tr><td>'+label+'</td><td>'+fmt(A[k])+'</td><td>'+fmt(B[k])+'</td><td>'+fmt(A[k]!=null&&B[k]!=null?A[k]-B[k]:null)+'</td></tr>').join("")+'</table></div>';
+        const metrics=[["Minutes","minutes"],["Stints","stints"],["Points for","pointsFor"],["Points against","pointsAgainst"],["+/-","plusMinus"],["Points for / min","pointsForPerMinute"],["Points against / min","pointsAgainstPerMinute"],["+/- / min","plusMinusPerMinute"],["ORtg","ortg"],["DRtg","drtg"],["Net Rating","net"],["eFG%","efg"]];
+        const assessment=comparison(A,B);
+        out.innerHTML='<h3>Lineup A vs Lineup B</h3><p class="metricNote">'+esc(name(A.side))+' · A: '+fmt(A.minutes)+' min / '+A.stints+' stints · '+esc(name(B.side))+' · B: '+fmt(B.minutes)+' min / '+B.stints+' stints'+(Math.min(A.minutes,B.minutes)<5?' · SMALL SAMPLE: at least one lineup has fewer than 5 measured minutes.':'')+'</p>'+(A.id===B.id?'<p>Select a different Lineup B to compare two lineups.</p>':'')+'<div class="playerScroll"><table class="stats"><tr><th>Metric</th><th>A · '+esc(A.players.join(" / "))+'</th><th>B · '+esc(B.players.join(" / "))+'</th><th>A − B</th></tr>'+metrics.map(([label,k])=>'<tr><td>'+label+'</td><td>'+fmt(A[k])+'</td><td>'+fmt(B[k])+'</td><td>'+fmt(A[k]!=null&&B[k]!=null?A[k]-B[k]:null)+'</td></tr>').join("")+'</table></div><div class="caCompareNotes">'+assessment.warnings.map(w=>'<p>'+esc(w)+'</p>').join('')+'</div>'+(A.side===B.side?'<p class="metricNote">Shared players: '+esc(assessment.shared.join(' · ')||'None')+'<br>A only: '+esc(assessment.onlyA.join(' · ')||'None')+'<br>B only: '+esc(assessment.onlyB.join(' · ')||'None')+'</p>':'')+'<div class="caSelectedStints"></div>';
+        const evidence=out.querySelector('.caSelectedStints');
+        [A,B].forEach((lineup,index)=>{const segments=data.lineupStints.filter(r=>r.side===lineup.side&&key(r.players)===key(lineup.players)&&(!period||r.period===Number(period)));
+          const block=scope.createElement?scope.createElement('details'):root.document.createElement('details');block.className='caImport';
+          block.innerHTML='<summary>REVIEW LINEUP '+(index?'B':'A')+' SEGMENTS · '+segments.length+'</summary><div class="playerScroll"><table class="stats"><tr><th>Period / clock window</th><th>MIN</th><th>PF / PA</th><th>Evidence</th></tr>'+segments.map((r,i)=>'<tr><td>'+esc(r.period?(r.period<=4?'Q'+r.period:'OT'+(r.period-4)):'Period unknown')+' · '+esc(r.startClock||'—')+' – '+esc(r.endClock||'—')+'</td><td>'+fmt(r.seconds/60)+'</td><td>'+r.pointsFor+' / '+r.pointsAgainst+'</td><td>'+(interval(r)?'<button type="button" class="importBtn caReviewInterval" data-segment="'+i+'">REVIEW EVENTS</button>':'Clock window unavailable')+'</td></tr>').join('')+'</table></div><p class="metricNote">Events at interval boundaries and opponent actions require review. A clock window does not certify which lineup caused an outcome.</p>';evidence.appendChild(block);
+          block.querySelectorAll('.caReviewInterval').forEach(button=>button.onclick=()=>{const window=interval(segments[Number(button.dataset.segment)]);if(onInterval)onInterval(window);else root.CourtIQPlayByPlay?.focusInterval(scope,window);});
+        });
       };a.onchange=b.onchange=compare;compare();
     };
     lineupRoot.querySelector(".caTeam").onchange=lineupRoot.querySelector(".caLineupPeriod").onchange=lineupRoot.querySelector(".caMin").oninput=drawLineups;drawLineups();
@@ -136,13 +161,13 @@
     [lineupRoot,shotRoot].forEach(el=>{
       el.querySelector(".caFile").onchange=async e=>{
         const file=e.target.files[0],status=el.querySelector(".caStatus");if(!file)return;
-        try{if(file.size>4*1024*1024)throw Error("Choose JSON smaller than 4 MB.");const next=validate(JSON.parse(await file.text()));root.localStorage.setItem(storageKey(G),JSON.stringify(next));mount(G);}catch(err){status.textContent="Import failed: "+err.message;}
+        try{if(file.size>4*1024*1024)throw Error("Choose JSON smaller than 4 MB.");const next=validate(JSON.parse(await file.text()));root.localStorage.setItem(storageKey(G),JSON.stringify(next));mount(G,scope,onInterval);}catch(err){status.textContent="Import failed: "+err.message;}
       };
       el.querySelector(".caExport").onclick=()=>saveFile(G,data);
-      el.querySelector(".caClear").onclick=()=>{try{root.localStorage.removeItem(storageKey(G));mount(G);}catch(e){el.querySelector(".caStatus").textContent=e.message;}};
+      el.querySelector(".caClear").onclick=()=>{try{root.localStorage.removeItem(storageKey(G));mount(G,scope,onInterval);}catch(e){el.querySelector(".caStatus").textContent=e.message;}};
     });
   }
-  const api={validate,aggregate,filterShots,summary,render,mount,dataset,court,sampleCoverage};
+  const api={validate,aggregate,filterShots,summary,render,mount,dataset,court,sampleCoverage,clockSeconds,interval,comparison};
   root.CourtIQCourtAnalytics=api;
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
 })(typeof window!=="undefined"?window:globalThis);
