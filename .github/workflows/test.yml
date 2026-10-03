@@ -33,6 +33,8 @@ jobs:
           node tests/test_decision_lab.js
           node --check analytics-engine.js
           node tests/test_analytics_engine.js
+          node --check player-scan.js
+          node tests/test_player_scan.js
           node --check video.js
           node tests/test_video.js
           node --check game-intelligence.js
