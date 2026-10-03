@@ -27,6 +27,8 @@ jobs:
           node --check app.js
           node --check players.js
           node --check mens.js
+          node --check pbp-explorer.js
+          node tests/test_pbp_explorer.js
           node --check video.js
           node tests/test_video.js
           node --check game-intelligence.js
