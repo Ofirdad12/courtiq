@@ -1,59 +1,41 @@
-/*
- * CourtIQ Game Intelligence V2
- * Deterministic, evidence-first interpretation of verified game data.
- * No tactical cause is invented from box-score data.
- */
-(function(){
-  const n=v=>{const x=parseFloat(String(v??"").replace("%",""));return Number.isFinite(x)?x:null};
+/* Deterministic game checks and a three-point coaching brief. */
+(function(root){
+  "use strict";
+  const n=v=>{if(v==null||String(v).trim()==="")return null;const x=Number(String(v).replace(/%$/, ""));return Number.isFinite(x)?x:null;};
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const factorMeta={
-    "eFG%":{better:"high",label:"Shot efficiency"},
-    "TOV%":{better:"low",label:"Ball security"},
-    "ORB%":{better:"high",label:"Offensive rebounding"},
-    "FTr":{better:"high",label:"Free-throw pressure"}
-  };
-  function factorRows(G){
-    return (G.factors||[]).map(r=>{
-      const key=String(r[0]),a=n(r[1]),b=n(r[2]),meta=factorMeta[key]||{better:"high",label:key};
-      if(a==null||b==null)return {key,label:meta.label,a,b,winner:null,gap:null};
-      const homeWins=meta.better==="low"?a<b:a>b;
-      const tied=a===b;
-      return {key,label:meta.label,a,b,winner:tied?"Even":(homeWins?G.home:G.away),gap:Math.abs(a-b)};
-    });
+  const meta={"eFG%":{label:"Shot efficiency",low:false,action:"Review shot selection and the quality of contested attempts."},"TOV%":{label:"Ball security",low:true,action:"Review turnover types and ball-handling decisions under pressure."},"ORB%":{label:"Offensive rebounding",low:false,action:"Review box-outs and the balance between crashing and getting back."},"FTr":{label:"Free-throw rate",low:false,action:"Review foul-drawing attempts and defensive discipline."}};
+  function factorRows(G){return (G.factors||[]).filter(r=>meta[r[0]]).map(r=>{const key=r[0],a=n(r[1]),b=n(r[2]),m=meta[key];return {key,...m,a,b,gap:a==null||b==null?null:Math.abs(a-b),winner:a==null||b==null?null:a===b?"Even":(m.low?a<b:a>b)?G.home:G.away};});}
+  function starters(G,side){
+    const ps=G.players?.[side]||[],marked=ps.filter(p=>p.starter===true).map(p=>p.name);
+    if(marked.length===5&&new Set(marked).size===5)return {names:marked,source:"BOX SCORE"};
+    const stint=root.CourtIQLineupEngine?.derive(G)?.lineupStints.find(r=>r.side===side&&r.period===1&&r.startClock==="10:00");
+    return stint?{names:stint.players,source:"PLAY-BY-PLAY"}:{names:[],source:"UNKNOWN"};
   }
+  function role(G,side,p){const s=starters(G,side);return s.names.length===5?(s.names.includes(p.name)?"Starter":"Bench"):"Unknown";}
   function qa(G){
-    const checks=[];
-    const players=[...(G.players?.home||[]),...(G.players?.away||[])];
+    const checks=[],add=(label,ok,detail="")=>checks.push({label,ok,detail});
+    const periods=Math.max(4,Array.isArray(G.quarters)?G.quarters.length:0,...(G.playByPlay||G.play_by_play||[]).map(e=>Number(e.period)||0));
+    const expectedMinutes=200+Math.max(0,periods-4)*25;
     for(const side of ["home","away"]){
-      const ps=G.players?.[side]||[],team=G[side],score=side==="home"?G.hs:G.as;
-      if(ps.length){
-        checks.push({label:team+" player points = team score",ok:ps.reduce((s,p)=>s+Number(p.points||0),0)===Number(score)});
-        checks.push({label:team+" has exactly 5 starters",ok:ps.filter(p=>p.starter&&Number(p.minutes||0)>0).length===5});
-        const mins=ps.reduce((s,p)=>s+Number(p.minutes||0),0);
-        checks.push({label:team+" player minutes ≈ 200",ok:mins>=198&&mins<=202,detail:mins.toFixed(1)});
-      }
+      const ps=G.players?.[side]||[],team=G[side]||side,score=n(side==="home"?G.hs:G.as),s=starters(G,side);
+      const complete=ps.length>0&&ps.every(p=>n(p.points)!=null);
+      const total=complete?ps.reduce((sum,p)=>sum+n(p.points),0):null;
+      add(team+" · player points reconcile",total==null||score==null?null:total===score,total==null?"Player points unavailable":total+" / "+score);
+      add(team+" · starting five",s.names.length===5?true:null,s.source);
+      const minutes=ps.length&&ps.every(p=>n(p.minutes)!=null)?ps.reduce((sum,p)=>sum+n(p.minutes),0):null;
+      add(team+" · player minutes",minutes==null?null:Math.abs(minutes-expectedMinutes)<=2,minutes==null?"Minutes unavailable":minutes.toFixed(2)+" / "+expectedMinutes+" (includes overtime)");
     }
-    checks.push({label:"Four Factors available",ok:(G.factors||[]).length===4});
-    return {checks,passed:checks.filter(x=>x.ok).length,total:checks.length};
+    const factors=factorRows(G);add("Four Factors available",factors.length===4&&factors.every(f=>f.a!=null&&f.b!=null));
+    if(Array.isArray(G.quarters)&&G.quarters.length){const valid=G.quarters.every(q=>Array.isArray(q)&&n(q[0])!=null&&n(q[1])!=null);add("Period scores reconcile",valid&&n(G.hs)!=null&&n(G.as)!=null?G.quarters.reduce((s,q)=>s+n(q[0]),0)===n(G.hs)&&G.quarters.reduce((s,q)=>s+n(q[1]),0)===n(G.as):null);}
+    return {checks,passed:checks.filter(x=>x.ok===true).length,failed:checks.filter(x=>x.ok===false).length,unknown:checks.filter(x=>x.ok==null).length,total:checks.length};
   }
-  function insights(G){
-    const f=factorRows(G),out=[];
-    f.filter(x=>x.winner&&x.winner!=="Even").sort((a,b)=>b.gap-a.gap).slice(0,3).forEach(x=>{
-      out.push({title:x.label,evidence:x.key+" "+x.a+"% vs "+x.b+"%",finding:x.winner+" held the statistical edge ("+x.gap.toFixed(1)+" pp).",confidence:"CALCULATED"});
-    });
-    const homeTs=n(G.calculated?.home?.ts),awayTs=n(G.calculated?.away?.ts);
-    if(homeTs!=null&&awayTs!=null)out.push({title:"Scoring efficiency",evidence:"TS% "+homeTs+"% vs "+awayTs+"%",finding:(homeTs===awayTs?"Efficiency was even.":(homeTs>awayTs?G.home:G.away)+" finished with the higher true-shooting rate."),confidence:"CALCULATED"});
-    return out.slice(0,4);
-  }
+  function insights(G){return factorRows(G).filter(f=>f.winner&&f.winner!=="Even").sort((a,b)=>b.gap-a.gap).slice(0,3).map(f=>({title:f.label,evidence:f.key+" · "+G.home+" "+f.a+"% · "+G.away+" "+f.b+"%",finding:f.winner+" has the statistical edge: "+f.gap.toFixed(1)+" percentage points.",action:f.action,confidence:"CALCULATED · 1 GAME"}));}
+  function safeSource(G){const s=G.sourceUrl||G.source_url;try{const u=new URL(s);return ["http:","https:"].includes(u.protocol)?u.href:null;}catch(_){return null;}}
   function render(G){
-    if(!G)return "";
-    const intel=insights(G),f=factorRows(G),q=qa(G);
-    return '<section class="card box gameIntelV2"><div class="sectionhead"><div><small>COURTIQ · GAME INTELLIGENCE V2</small><h3>Coach Intelligence</h3></div><span class="intelBadge">EVIDENCE FIRST</span></div>'+
-      '<div class="intelConfidence"><span><b>OFFICIAL</b> source box score</span><span><b>CALCULATED</b> transparent formulas</span><span><b>ESTIMATED</b> clearly marked</span></div>'+
-      '<h4>What decided the numbers?</h4><div class="intelGrid">'+(intel.length?intel.map((x,i)=>'<article><small>KEY '+(i+1)+' · '+x.confidence+'</small><b>'+esc(x.title)+'</b><p>'+esc(x.finding)+'</p><em>'+esc(x.evidence)+'</em></article>').join(""):'<article><b>INSUFFICIENT DATA</b><p>No unsupported conclusion generated.</p></article>')+'</div>'+
-      '<h4>Four Factors interpretation</h4><div class="factorIntel">'+f.map(x=>'<div><b>'+esc(x.key)+'</b><span>'+esc(x.a==null?"—":x.a+"%")+' · '+esc(x.b==null?"—":x.b+"%")+'</span><em>'+(x.winner?esc(x.winner==="Even"?"Even":x.winner+" edge"):"Insufficient data")+'</em></div>').join("")+'</div>'+
-      '<h4>Automated QA</h4><div class="qaSummary"><b>'+q.passed+'/'+q.total+' checks passed</b>'+q.checks.map(x=>'<span class="'+(x.ok?"qaOk":"qaFail")+'">'+(x.ok?"✓":"! ")+' '+esc(x.label)+(x.detail?" · "+esc(x.detail):"")+'</span>').join("")+'</div>'+
-      '<div class="metricNote"><b>Coach note:</b> CourtIQ describes what the verified data shows. Tactical cause, coverage quality and decision-making require play-by-play or video evidence.</div></section>';
+    if(!G)return "";const q=qa(G),intel=insights(G),source=safeSource(G);
+    const checks=q.checks.map(c=>'<li class="'+(c.ok===true?"qaOk":c.ok===false?"qaFail":"qaUnknown")+'">'+(c.ok===true?"✓ ":c.ok===false?"! ":"— ")+esc(c.label)+' <span>'+esc(c.detail)+'</span></li>').join("");
+    return '<section class="card box gameIntelV2"><div class="sectionhead"><div><small>GAME DATA → COACHING PRIORITIES</small><h3>Coach Brief · דוח למאמן</h3></div><span class="intelBadge">'+(G._dbId?"SAVED GAME":G.sourceUrl||G.source_url?"LOCAL GAME":"DEMO")+'</span></div><p>One-game descriptive sample. These differences guide video review; they do not establish tactical causes.</p><div class="intelGrid">'+(intel.length?intel.map((x,i)=>'<article><small>PRIORITY '+(i+1)+' · '+x.confidence+'</small><h4>'+esc(x.title)+'</h4><p>'+esc(x.finding)+'</p><em>'+esc(x.evidence)+'</em><p><b>Coach check:</b> '+esc(x.action)+'</p></article>').join(""):'<article><h4>Insufficient data</h4><p>No measurable factor advantage is available. Check Team Stats before drawing a conclusion.</p></article>')+'</div><details class="qaSummary" open><summary>Data checks · '+q.passed+' passed · '+q.failed+' need review · '+q.unknown+' unavailable</summary><ul>'+checks+'</ul></details><p class="metricNote">'+(G._dbId?'Saved to the club workspace.':'This view is a demo or local preview; database saving is confirmed only for imported games with a saved game ID.')+' '+(source?'<a href="'+esc(source)+'" target="_blank" rel="noopener">Open game source ↗</a>':'No official source link supplied.')+'</p></section>';
   }
-  window.CourtIQGameIntelligence={render,qa,insights,factorRows};
-})();
+  const api={render,qa,insights,factorRows,starters,role};root.CourtIQGameIntelligence=api;
+  if(typeof module!=="undefined"&&module.exports)module.exports=api;
+})(typeof window!=="undefined"?window:globalThis);
