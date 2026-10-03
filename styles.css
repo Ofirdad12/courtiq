@@ -212,3 +212,5 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .briefEvidence{margin-top:8px;min-height:44px}.evidenceHighlight{outline:2px solid #bfa5ff;outline-offset:4px}
 .caCoverage{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.caCoverage>span{flex:1;min-width:160px;background:#101b2b;border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px}.caCoverage b{display:block;font-size:18px;color:#bfa5ff}
 @media(max-width:680px){.briefControls select{font-size:16px;min-width:0;max-width:100%}.briefExport{width:100%}.briefEvidence{width:100%}}
+
+.briefPreview{margin-top:20px;border:1px solid #36465e;border-radius:12px;padding:14px}.briefPreview summary{cursor:pointer;font-size:16px}.briefPrintActions{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}.briefPrintActions a{display:inline-flex;align-items:center;text-decoration:none;min-height:44px}.briefPreview iframe{width:100%;height:560px;border:0;background:white;border-radius:8px}.videoGameContext{border-left:3px solid #8057ed;padding-left:14px}
