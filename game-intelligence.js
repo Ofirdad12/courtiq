@@ -55,12 +55,17 @@
       let side=card.querySelector('.briefFocus')?.value||"";
       const bind=()=>{
         const focus=card.querySelector('.briefFocus');if(!focus)return;
-        focus.onchange=()=>{side=focus.value;const template=root.document.createElement('template');template.innerHTML=render(G,side);card.innerHTML=template.content.firstElementChild.innerHTML;bind();};
+        focus.onchange=()=>{const preview=card.querySelector('.briefPreview');if(preview)root.URL.revokeObjectURL(preview.dataset.url);side=focus.value;const template=root.document.createElement('template');template.innerHTML=render(G,side);card.innerHTML=template.content.firstElementChild.innerHTML;bind();};
         card.querySelectorAll('.briefEvidence').forEach(btn=>btn.onclick=()=>{if(onEvidence)onEvidence(btn.dataset.factor);else card.querySelector('.briefStatus').textContent='Open Team Stats for '+btn.dataset.factor+' in the game workspace.';});
         card.querySelector('.briefExport').onclick=()=>{
           const url=root.URL.createObjectURL(new root.Blob([printable(G,side)],{type:'text/html;charset=utf-8'})),a=root.document.createElement('a');
-          a.href=url;a.download='courtiq-'+String(G.id||'game').replace(/[^a-z0-9_-]/gi,'-')+'-'+(side||'overview')+'-coach-brief.html';a.click();root.setTimeout(()=>root.URL.revokeObjectURL(url),1000);
-          card.querySelector('.briefStatus').textContent='Brief exported. Open the HTML file and choose Print / Save as PDF.';
+          a.href=url;a.download='courtiq-'+String(G.id||'game').replace(/[^a-z0-9_-]/gi,'-')+'-'+(side||'overview')+'-coach-brief.html';const old=card.querySelector('.briefPreview');if(old){root.URL.revokeObjectURL(old.dataset.url);old.remove();}
+          const preview=root.document.createElement('details');preview.className='briefPreview';preview.dataset.url=url;preview.open=true;
+          preview.innerHTML='<summary>Printable brief preview</summary><div class="briefPrintActions"><button type="button" class="importBtn briefPrint">PRINT / SAVE AS PDF</button></div><iframe title="Printable coach brief"></iframe>';
+          a.textContent='DOWNLOAD HTML';a.className='importBtn';preview.querySelector('.briefPrintActions').appendChild(a);
+          preview.querySelector('iframe').srcdoc=printable(G,side);card.appendChild(preview);
+          preview.querySelector('.briefPrint').onclick=()=>{const frame=preview.querySelector('iframe');frame.contentWindow.focus();frame.contentWindow.print();};a.click();
+          card.querySelector('.briefStatus').textContent='Download requested. You can also print the preview below or use DOWNLOAD HTML.';
         };
       };bind();
     });
