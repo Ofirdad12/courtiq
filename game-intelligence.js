@@ -36,11 +36,38 @@
       return b.gap-a.gap;
     }).slice(0,3).map(f=>({key:f.key,title:f.label,evidence:f.key+" · "+G.home+" "+f.a+"% · "+G.away+" "+f.b+"%",finding:team?team+(f.winner===team?" led":" trailed")+" by "+f.gap.toFixed(1)+" percentage points.":f.winner+" has the statistical edge: "+f.gap.toFixed(1)+" percentage points.",action:f.action,signal:team?(f.winner===team?"ADVANTAGE":"REVIEW PRIORITY"):"STATISTICAL GAP",confidence:(q.failed?"DATA REVIEW REQUIRED":"CALCULATED")+" · 1 GAME"}));
   }
+  function reviewKey(G,side,key){
+    let id=G.sourceUrl||G.source_url;
+    if(id){try{const u=new URL(id);u.hash="";for(const k of [...u.searchParams.keys()])if(k.startsWith("utm_"))u.searchParams.delete(k);u.searchParams.sort();id=u.href.replace(/\/$/,"");}catch(_){}}
+    id=id||G._dbId||[G.comp,G.date,G.home,G.away,G.id];
+    return "courtiq_brief_review_v1:"+JSON.stringify([id,side||"overview",key]);
+  }
+  function fingerprint(G,key){const f=factorRows(G).find(x=>x.key===key);return JSON.stringify([G.home,G.away,G.hs,G.as,f?.a,f?.b]);}
+  function readReview(G,side,key){
+    try{const x=JSON.parse(root.localStorage?.getItem(reviewKey(G,side,key))||"null");if(!x||typeof x!=="object")return {};
+      const stale=x.fingerprint!==fingerprint(G,key);return {...x,stale,reviewed:x.reviewed===true&&!stale};
+    }catch(_){return {};}
+  }
+  function videoUrl(value){const v=String(value||"").trim();if(!v)return "";try{const u=new URL(v);if(u.protocol==="https:")return u.href;}catch(_){}throw new Error("Use an HTTPS video link.");}
+  function saveReview(G,side,key,values){
+    if(!meta[key])throw new Error("Unknown factor.");
+    const note=String(values.note||"").trim().slice(0,3000),support=videoUrl(values.support),counter=videoUrl(values.counter),reviewed=values.reviewed===true;
+    if(reviewed&&(note.length<5||!support))throw new Error("Add a supporting video link and a review note before marking video reviewed.");
+    if(!root.localStorage)throw new Error("Browser storage is unavailable.");
+    const record={note,support,counter,reviewed,fingerprint:fingerprint(G,key),updatedAt:new Date().toISOString()};
+    root.localStorage.setItem(reviewKey(G,side,key),JSON.stringify(record));return record;
+  }
+  function reviewPanel(G,side,key,interactive){
+    const r=readReview(G,side,key),state=r.stale?"STATS CHANGED · RE-REVIEW":r.reviewed?"REVIEWED LOCALLY":"DRAFT";
+    const link=(url,label)=>{try{const clean=videoUrl(url);return clean?'<p><a href="'+esc(clean)+'" target="_blank" rel="noopener">'+label+'</a></p>':"";}catch(_){return "";}};
+    if(!interactive)return r.note||r.support||r.counter?'<div class="briefSavedReview"><b>Video review · '+state+'</b><p>'+esc(r.note)+'</p>'+link(r.support,'Supporting clip')+link(r.counter,'Counterexample')+'<small>Analyst note saved in this browser. Links and tactical interpretation require human review.</small></div>':"";
+    return '<details class="briefReview" data-factor="'+esc(key)+'"><summary>VIDEO REVIEW · '+state+'</summary><p class="metricNote">Saved for this game and focus team in this browser.</p><label>Review note<textarea class="briefReviewNote" maxlength="3000" placeholder="What does the video show? What remains uncertain?">'+esc(r.note||"")+'</textarea></label><label>Supporting clip<input class="briefReviewSupport" type="url" placeholder="https://..." value="'+esc(r.support||"")+'"></label><label>Counterexample (optional)<input class="briefReviewCounter" type="url" placeholder="https://..." value="'+esc(r.counter||"")+'"></label><label class="briefReviewCheck"><input type="checkbox" class="briefReviewDone" '+(r.reviewed?'checked':'')+'>Video reviewed by me</label><button type="button" class="importBtn briefReviewSave">SAVE REVIEW</button><p class="briefReviewStatus" role="status">'+(r.stale?'Statistics changed since this note was saved. Review again.':'No counterexample recorded does not mean none exists.')+'</p></details>';
+  }
   function safeSource(G){const s=G.sourceUrl||G.source_url;try{const u=new URL(s);return ["http:","https:"].includes(u.protocol)?u.href:null;}catch(_){return null;}}
   function render(G,side="",interactive=true){
     if(!G)return "";const q=qa(G),intel=insights(G,side),source=safeSource(G);
     const checks=q.checks.map(c=>'<li class="'+(c.ok===true?"qaOk":c.ok===false?"qaFail":"qaUnknown")+'">'+(c.ok===true?"✓ ":c.ok===false?"! ":"— ")+esc(c.label)+' <span>'+esc(c.detail)+'</span></li>').join("");
-    return '<section class="card box gameIntelV2"><div class="sectionhead"><div><small>GAME DATA → COACHING PRIORITIES</small><h3>Coach Brief · דוח למאמן</h3></div><span class="intelBadge">'+(G._dbId?"SAVED GAME":G.sourceUrl||G.source_url?"LOCAL GAME":"DEMO")+'</span></div>'+(interactive?controls(G,side):'')+'<p>One-game descriptive sample. These differences guide video review; they do not establish tactical causes.</p><div class="intelGrid">'+(intel.length?intel.map((x,i)=>'<article><small>'+esc(x.signal)+' · PRIORITY '+(i+1)+' · '+x.confidence+'</small><h4>'+esc(x.title)+'</h4><p>'+esc(x.finding)+'</p><em>'+esc(x.evidence)+'</em><p><b>Coach check:</b> '+esc(x.action)+'</p>'+(interactive?'<button type="button" class="importBtn briefEvidence" data-factor="'+esc(x.key)+'">VIEW SUPPORTING DATA ↗</button>':'')+'</article>').join(""):'<article><h4>Insufficient data</h4><p>No measurable factor advantage is available. Check Team Stats before drawing a conclusion.</p></article>')+'</div><details class="qaSummary" open><summary>Data checks · '+q.passed+' passed · '+q.failed+' need review · '+q.unknown+' unavailable</summary><ul>'+checks+'</ul></details><p class="metricNote">'+(G._dbId?'Saved to the club workspace.':'This view is a demo or local preview; database saving is confirmed only for imported games with a saved game ID.')+' '+(source?'<a href="'+esc(source)+'" target="_blank" rel="noopener">Open game source ↗</a>':'No official source link supplied.')+'</p></section>';
+    return '<section class="card box gameIntelV2"><div class="sectionhead"><div><small>GAME DATA → COACHING PRIORITIES</small><h3>Coach Brief · דוח למאמן</h3></div><span class="intelBadge">'+(G._dbId?"SAVED GAME":G.sourceUrl||G.source_url?"LOCAL GAME":"DEMO")+'</span></div>'+(interactive?controls(G,side):'')+'<p>One-game descriptive sample. These differences guide video review; they do not establish tactical causes.</p><div class="intelGrid">'+(intel.length?intel.map((x,i)=>'<article><small>'+esc(x.signal)+' · PRIORITY '+(i+1)+' · '+x.confidence+'</small><h4>'+esc(x.title)+'</h4><p>'+esc(x.finding)+'</p><em>'+esc(x.evidence)+'</em><p><b>Coach check:</b> '+esc(x.action)+'</p>'+reviewPanel(G,side,x.key,interactive)+(interactive?'<button type="button" class="importBtn briefEvidence" data-factor="'+esc(x.key)+'">VIEW SUPPORTING DATA ↗</button>':'')+'</article>').join(""):'<article><h4>Insufficient data</h4><p>No measurable factor advantage is available. Check Team Stats before drawing a conclusion.</p></article>')+'</div><details class="qaSummary" open><summary>Data checks · '+q.passed+' passed · '+q.failed+' need review · '+q.unknown+' unavailable</summary><ul>'+checks+'</ul></details><p class="metricNote">'+(G._dbId?'Saved to the club workspace.':'This view is a demo or local preview; database saving is confirmed only for imported games with a saved game ID.')+' '+(source?'<a href="'+esc(source)+'" target="_blank" rel="noopener">Open game source ↗</a>':'No official source link supplied.')+'</p></section>';
   }
   function controls(G,side){
     return '<div class="briefControls"><label>Focus team<select class="briefFocus"><option value="">Game overview</option>'+["home","away"].map(s=>'<option value="'+s+'"'+(side===s?' selected':'')+'>'+esc(G[s])+'</option>').join("")+'</select></label><button type="button" class="importBtn briefExport">EXPORT PRINTABLE BRIEF</button><span class="briefStatus" role="status"></span></div>';
@@ -57,6 +84,12 @@
         const focus=card.querySelector('.briefFocus');if(!focus)return;
         focus.onchange=()=>{const preview=card.querySelector('.briefPreview');if(preview)root.URL.revokeObjectURL(preview.dataset.url);side=focus.value;const template=root.document.createElement('template');template.innerHTML=render(G,side);card.innerHTML=template.content.firstElementChild.innerHTML;bind();};
         card.querySelectorAll('.briefEvidence').forEach(btn=>btn.onclick=()=>{if(onEvidence)onEvidence(btn.dataset.factor);else card.querySelector('.briefStatus').textContent='Open Team Stats for '+btn.dataset.factor+' in the game workspace.';});
+        card.querySelectorAll('.briefReview').forEach(panel=>{
+          panel.querySelector('.briefReviewSave').onclick=()=>{const status=panel.querySelector('.briefReviewStatus');try{
+            const r=saveReview(G,side,panel.dataset.factor,{note:panel.querySelector('.briefReviewNote').value,support:panel.querySelector('.briefReviewSupport').value,counter:panel.querySelector('.briefReviewCounter').value,reviewed:panel.querySelector('.briefReviewDone').checked});
+            panel.querySelector('summary').textContent='VIDEO REVIEW · '+(r.reviewed?'REVIEWED LOCALLY':'DRAFT');status.textContent='Saved in this browser. Export again to include this review.';
+          }catch(err){status.textContent=err.message;}};
+        });
         card.querySelector('.briefExport').onclick=()=>{
           const url=root.URL.createObjectURL(new root.Blob([printable(G,side)],{type:'text/html;charset=utf-8'})),a=root.document.createElement('a');
           a.href=url;a.download='courtiq-'+String(G.id||'game').replace(/[^a-z0-9_-]/gi,'-')+'-'+(side||'overview')+'-coach-brief.html';const old=card.querySelector('.briefPreview');if(old){root.URL.revokeObjectURL(old.dataset.url);old.remove();}
@@ -70,6 +103,6 @@
       };bind();
     });
   }
-  const api={render,qa,insights,factorRows,starters,role,mount,printable};root.CourtIQGameIntelligence=api;
+  const api={render,qa,insights,factorRows,starters,role,mount,printable,reviewKey,readReview,saveReview};root.CourtIQGameIntelligence=api;
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
 })(typeof window!=="undefined"?window:globalThis);
