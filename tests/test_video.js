@@ -35,3 +35,23 @@ assert.equal(api.filterEvidence(evidence,{search:'p1'}).length,1);assert.equal(a
 assert.equal(api.filterEvidence(evidence,{search:'absent'}).length,0);assert.equal(api.filterEvidence(evidence).length,4);
 assert.equal(evidenceState.events[0].videoSeconds,undefined,'presentation does not mutate saved records');
 console.log('Video evidence: combined filters, clip links, unknown sync, zero timestamps and immutable source records passed.');
+storage.set(key,JSON.stringify(evidenceState));
+// Back up a source sample with valid timestamps; unknown PBP sync remains unknown.
+const backupState={...evidenceState,events:evidenceState.events.slice(0,3).map(e=>e.kind==='possession'?{...e,points:2}:e)};
+storage.set(key,JSON.stringify(backupState));const snapshot=api.backup(),snapshotJson=JSON.stringify(snapshot);
+assert.equal(snapshot.gameKey,api.identity(game));assert.equal(snapshot.workspace.events.length,3);
+assert.equal(snapshot.workspace.events[1].source,'official-pbp');assert.equal(snapshot.workspace.events[1].kind,'evidence');
+api.restoreBackup(snapshotJson);assert.equal(api.state().events.length,3);assert.equal(api.videoForPbp(1,'09:00').seconds,160);
+assert.equal(api.evidenceRows(api.state())[1].clipUrl,null,'roundtrip does not invent a missing anchor');
+const before=storage.get(key);const reject=b=>{assert.throws(()=>api.restoreBackup(b));assert.equal(storage.get(key),before,'invalid restore never overwrites existing work');};
+reject({...snapshot,gameKey:'other-game'});reject('{broken');reject({...snapshot,version:2});
+reject({...snapshot,workspace:{...snapshot.workspace,videoId:'bad/video'}});
+reject({...snapshot,workspace:{...snapshot.workspace,anchors:{1:{period:2,clock:'10:00',videoSeconds:10}}}});
+reject({...snapshot,workspace:{...snapshot.workspace,events:[{source:'official-pbp',kind:'possession',period:1,gameClock:'09:00',points:2}]}});
+reject({...snapshot,workspace:{...snapshot.workspace,events:[{source:'analyst-video',kind:'possession',time:'00:01',points:null}]}});
+reject({...snapshot,workspace:{...snapshot.workspace,events:[{source:'analyst-video',kind:'evidence',time:'99:99'}]}});
+reject(' '.repeat(2*1024*1024+1));
+const sanitized=api.validateBackup(JSON.stringify({...snapshot,workspace:{...snapshot.workspace,url:'javascript:bad',untrusted:'discard'}}));
+assert.ok(sanitized.workspace.url.startsWith('https://youtu.be/'));assert.equal(sanitized.workspace.untrusted,undefined);
+api.setGame({...game,sourceUrl:'https://example.com/game/2/'});assert.throws(()=>api.restoreBackup(snapshotJson),/different game/);api.setGame(game);
+assert.equal(storage.get(key),before);console.log('Video backup: roundtrip, clocks, provenance, strict validation, game isolation, safe URLs, size limits and no overwrite on failure passed.');
