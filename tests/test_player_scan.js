@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict');global.CourtIQDecisionLab=require('../decision-lab');const api=require('../player-scan');
+const row=(name,points,two_pm,two_pa,three_pm,three_pa,ftm,fta)=>({name,points,two_pm,two_pa,three_pm,three_pa,ftm,fta});
+const G={home:'H',away:'A',hs:13,as:0,raw:{home:{two_pm:1,two_pa:2,three_pm:3,three_pa:4,ftm:2,fta:2}},players:{home:[row('P1',7,1,2,1,2,2,2),row('P2',6,0,0,2,2,0,0),row('P3',0,0,0,0,0,0,0)]}};
+const original=JSON.stringify(G);let r=api.analyze(G,'home',0);assert.equal(r.rows.length,3);assert.equal(r.reconciled,true);assert.equal(r.plotted.length,2);assert.equal(r.teamFga,6);assert.ok(Math.abs(r.teamEfg-100*5.5/6)<1e-10);assert.equal(r.rows[0].efg,62.5);assert.equal(r.rows[1].efg,150);assert.equal(r.rows[2].efg,null);assert.equal(r.rows[2].ts,null);assert.ok(Math.abs(r.rows[0].share-100*4/6)<1e-10);assert.ok(Math.abs(r.rows[0].ts-100*7/(2*(4+.44*2)))<1e-10);
+r=api.analyze(G,'home',5);assert.equal(r.visible.length,0);assert.equal(r.below,3);r=api.analyze(G,'home',0,'efg');assert.equal(r.visible[0].name,'P2');assert.equal(r.visible.at(-1).name,'P3');
+const bad=structuredClone(G);bad.players.home[0].points=8;r=api.analyze(bad,'home',0);assert.equal(r.issues.length,1);assert.equal(r.reconciled,false);assert.equal(r.rows.length,2);
+const duplicate={...G,players:{home:[G.players.home[0],G.players.home[0]]}};assert.equal(api.analyze(duplicate).issues.length,2);assert.equal(api.analyze(duplicate).rows.length,0);
+const partial=structuredClone(G);delete partial.players.home[0].three_pa;assert.equal(api.analyze(partial).issues.length,1);
+const missingTeam={...G,raw:undefined};r=api.analyze(missingTeam,'home',0);assert.equal(r.rows.length,3);assert.equal(r.teamEfg,null);assert.equal(r.rows[0].share,null);assert.equal(r.reconciled,false);
+assert.equal(api.analyze({...G,players:{}}).sourceCount,0);assert.equal(api.analyze(G,'away').rows.length,0);assert.throws(()=>api.analyze(G,'home',-1),/nonnegative/);assert.throws(()=>api.analyze(G,'both'),/team/);
+const ftOnly={...G,players:{home:[row('FT',2,0,0,0,0,2,2)]}};r=api.analyze(ftOnly,'home',0);assert.equal(r.rows[0].efg,null);assert.ok(r.rows[0].ts>100);assert.equal(r.plotted.length,0);
+assert.equal(JSON.stringify(G),original);assert.match(api.summary(G,'home'),/not Usage/);assert.match(api.summary(G,'home'),/not confidence/i);
+console.log('Player scan: raw shooting metrics, eFG above 100%, FT-only/zero denominators, sample filtering, sorting, reconciliation, invalid/duplicate rows, missing team data and immutability passed.');
