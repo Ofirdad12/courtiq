@@ -45,6 +45,8 @@ jobs:
           node tests/test_lineup_engine.js
           node tests/test_official_demo.js
           node tests/test_season_source.js
+          node --check season-workbench.js
+          node tests/test_season_workbench.js
           node tests/test_coach_workflow.js
           node tests/test_euroleague_import.js
       - name: Check Supabase Edge Function contract
