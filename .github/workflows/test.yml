@@ -27,6 +27,8 @@ jobs:
           node --check app.js
           node --check players.js
           node --check mens.js
+          node --check video.js
+          node tests/test_video.js
           node --check game-intelligence.js
           node tests/test_game_intelligence.js
           node --check court-analytics.js
