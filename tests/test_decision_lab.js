@@ -10,3 +10,10 @@ const zero={home:'H',away:'A',hs:0,as:0,raw:{home:{two_pm:0,two_pa:0,three_pm:0,
 const tied={...game,as:90};r=api.simulate(tied,'home');assert.equal(r.margin,0);assert.equal(r.neededToLead,1);
 assert.equal(JSON.stringify(game),original,'scenario never modifies official game data');assert.match(api.summary(game,'away',{two:0,three:1,ft:0}),/not a forecast/);assert.match(api.render({...game,home:'<script>bad</script>'}),/&lt;script&gt;/);assert.ok(!api.render({...game,home:'<script>bad</script>'}).includes('<script>'));
 console.log('Decision Lab: shot bounds, weighted scoring, side perspective, efficiency formulas, presets, missing/reconciled data, zero denominators, ties and immutable source passed.');
+const tableOnly={home:'H',away:'A',hs:101,as:83,stats:[['2P','25/45','18/31'],['3P','10/27','12/30'],['FT','21/24','11/15']]};
+assert.equal(api.simulate(tableOnly,'away',{three:1}).score,86);assert.equal(api.simulate(tableOnly,'home').score,101);
+assert.throws(()=>api.simulate({...tableOnly,stats:tableOnly.stats.slice(0,2)}),/complete/);
+assert.throws(()=>api.simulate({...tableOnly,stats:[...tableOnly.stats,['FT','21/24','11/15']]}),/complete/);
+assert.throws(()=>api.simulate({...tableOnly,hs:100}),/reconcile/);
+assert.throws(()=>api.simulate({...tableOnly,raw:{home:{}}}),/invalid/,'invalid raw values cannot be silently replaced with table data');
+console.log('Decision Lab: exact team-stat shooting rows, reconciliation, duplicate/missing row rejection and raw-data precedence passed.');

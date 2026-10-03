@@ -5,9 +5,10 @@
  const integer=v=>['number','string'].includes(typeof v)&&String(v).trim()!==''&&Number.isInteger(Number(v))&&Number(v)>=0?Number(v):null;
  const types=[{key:'two',made:'two_pm',attempts:'two_pa',label:'2-point makes',weight:2},{key:'three',made:'three_pm',attempts:'three_pa',label:'3-point makes',weight:3},{key:'ft',made:'ftm',attempts:'fta',label:'Free throws made',weight:1}];
  const pct=(a,b)=>b>0?100*a/b:null;
+ function shootingData(G,side){if(G.raw?.[side]!=null)return G.raw[side];const out={};for(const [label,t] of [['2P',types[0]],['3P',types[1]],['FT',types[2]]]){const rows=(G.stats||[]).filter(row=>Array.isArray(row)&&row[0]===label);if(rows.length!==1)return null;const text=String(rows[0][side==='home'?1:2]??'').trim();if(!/^\d+\s*\/\s*\d+$/.test(text))return null;const [made,attempts]=text.split('/').map(Number);out[t.made]=made;out[t.attempts]=attempts;}return out;}
  function baseline(G,side='home'){
   if(!['home','away'].includes(side))throw new Error('Choose a focus team.');
-  const r=G.raw?.[side],points=integer(side==='home'?G.hs:G.as),opponent=integer(side==='home'?G.as:G.hs);
+  const r=shootingData(G,side),points=integer(side==='home'?G.hs:G.as),opponent=integer(side==='home'?G.as:G.hs);
   if(!r||points==null||opponent==null)throw new Error('A complete team shooting box score and both final scores are required.');
   const shots={};for(const t of types){const made=integer(r[t.made]),attempts=integer(r[t.attempts]);if(made==null||attempts==null||made>attempts)throw new Error('Missing or invalid '+t.label.toLowerCase()+' totals.');shots[t.key]={made,attempts,weight:t.weight};}
   if(types.reduce((n,t)=>n+shots[t.key].made*t.weight,0)!==points)throw new Error('Shooting totals do not reconcile with this team’s final score. Review the source before exploring scenarios.');
