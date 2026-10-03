@@ -27,6 +27,8 @@ jobs:
           node --check app.js
           node --check players.js
           node --check mens.js
+          node --check game-intelligence.js
+          node tests/test_game_intelligence.js
           node --check court-analytics.js
           node tests/test_court_analytics.js
           node --check lineup-engine.js
