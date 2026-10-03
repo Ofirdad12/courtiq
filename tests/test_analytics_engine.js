@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');global.CourtIQDecisionLab=require('../decision-lab');const api=require('../analytics-engine');
+const G={home:'H',away:'A',hs:101,as:83,date:'Today',stats:[['2P','25/45','18/31'],['3P','10/27','12/30'],['FT','21/24','11/15']],quarters:[[28,26],[26,16],[25,14],[22,27]]};
+let r=api.report(G);assert.equal(r.margin,18);assert.deepEqual(r.components.map(c=>c.difference),[14,-6,10]);assert.equal(r.components.reduce((n,c)=>n+c.difference,0),r.margin);
+for(const c of r.components)assert.ok(Math.abs(c.volume+c.conversion-c.difference)<1e-10,'symmetric decomposition equals point difference');
+assert.deepEqual(r.periods.map(p=>p.cumulative),[2,12,23,18]);assert.match(r.questions[0].fact,/3-point/);assert.match(r.questions[1].fact,/Q4/);assert.equal(r.leaders,null);
+const away=api.report(G,'away');assert.equal(away.margin,-18);for(let i=0;i<3;i++){assert.equal(away.components[i].difference,-r.components[i].difference);assert.ok(Math.abs(away.components[i].volume+r.components[i].volume)<1e-10);assert.ok(Math.abs(away.components[i].conversion+r.components[i].conversion)<1e-10);}assert.equal(away.periods.at(-1).cumulative,-18);
+const bad={...G,hs:100};r=api.report(bad);assert.equal(r.components.length,0);assert.equal(r.periods,null);assert.ok(r.review>0);
+r=api.report({home:'H',away:'A'});assert.equal(r.margin,null);assert.equal(r.questions.length,0);assert.equal(r.ready,0);assert.ok(r.missing>0);
+const zero={home:'H',away:'A',hs:0,as:2,stats:[['2P','0/0','1/1'],['3P','0/0','0/0'],['FT','0/0','0/0']]};r=api.report(zero);assert.equal(r.components[0].difference,-2);assert.equal(r.components[0].volume,null);assert.equal(r.components[1].volume,0);
+const overtime={...G,hs:103,stats:[['2P','26/46','18/31'],['3P','10/27','12/30'],['FT','21/24','11/15']],quarters:[...G.quarters,[2,0]]};assert.equal(api.report(overtime).periods.at(-1).label,'OT1');
+const players={...G,players:{home:[{name:'P1',points:60},{name:'P2',points:41}]}};r=api.report(players);assert.equal(r.leaders[0].points,60);assert.match(r.questions.at(-1).fact,/100.0%/);assert.match(r.questions.at(-1).question,/not Usage/);
+assert.equal(api.report({...players,players:{home:[{name:'P1',points:60},{name:'P1',points:41}]}}).leaders,null);
+assert.equal(api.report({...players,players:{home:[{name:'P1',points:60},{name:'P2',points:40}]}}).leaders,null);
+assert.throws(()=>api.report(G,'both'),/focus/);assert.match(api.text(G,'home'),/not causal attribution/);assert.match(api.text(G,'home'),/not an established trend/);
+const original=JSON.stringify(G);api.report(G);assert.equal(JSON.stringify(G),original);assert.ok(!api.render({...G,home:'<script>bad</script>'}).includes('<script>'));
+console.log('Analytics Engine: reconciled scoring, symmetric decomposition, side reversal, periods/OT, missing/zero data, player reconciliation, safe text and source immutability passed.');
