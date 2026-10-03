@@ -31,6 +31,8 @@ jobs:
           node tests/test_pbp_explorer.js
           node --check decision-lab.js
           node tests/test_decision_lab.js
+          node --check analytics-engine.js
+          node tests/test_analytics_engine.js
           node --check video.js
           node tests/test_video.js
           node --check game-intelligence.js
