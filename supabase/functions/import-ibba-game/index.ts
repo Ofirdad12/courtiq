@@ -69,7 +69,7 @@ function teamTotal($:cheerio.CheerioAPI, table:any){
     return h.includes("2 נק")&&h.includes("3 נק")&&h.includes("מהקו")&&(h.includes("נק'")||h.includes("נק׳"));
   });
   const headers=(headerIndex>=0?rows[headerIndex]:rows[0])||[];
-  const total=rows.find((r:string[])=>r.some(c=>c.includes("סך הכל")||/סה.?כ/.test(c)));
+  const total=rows.find((r:string[])=>r.some(c=>/^(?:סך\s*הכל|סה["׳']?כ)$/i.test(clean(c))));
   if(!total) throw new Error("IBBA player table has no total row.");
   const [two_pm,two_pa]=ma(total[idx(headers,["2 נק"])]);
   const [three_pm,three_pa]=ma(total[idx(headers,["3 נק"])]);
@@ -810,7 +810,7 @@ Deno.serve(async(req:Request)=>{
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="GENIUS_LIVESTATS"?"genius-livestats-json-v1":provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v6",
+      parser:provider==="GENIUS_LIVESTATS"?"genius-livestats-json-v1":provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v7",
       validated_at:new Date().toISOString()
     };
 
@@ -964,7 +964,7 @@ Deno.serve(async(req:Request)=>{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
           club_id:auditClubId,provider:auditUrl.includes("geniussports.com")?"GENIUS_LIVESTATS":auditUrl.includes("plk.pl")?"PLK":auditUrl.includes("eurobasket.com")?"EUROBASKET_POLAND":auditUrl.includes("/eurocup/")?"EUROCUP":auditUrl.includes("euroleaguebasketball.net")?"EUROLEAGUE":auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:auditUrl.includes("geniussports.com")?"genius-livestats-json-v1":auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v6"}
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("geniussports.com")?"genius-livestats-json-v1":auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v7"}
         });
       }catch(_){}
     }
