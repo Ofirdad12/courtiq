@@ -61,8 +61,13 @@ function idx(headers:string[], needles:string[]){
   return i;
 }
 function teamTotal($:cheerio.CheerioAPI, table:any){
-  const rows=tableRows($,table), headers=rows[0]||[];
-  const total=rows.find((r:string[])=>r.some(c=>c.includes("סך הכל")));
+  const rows=tableRows($,table).filter((r:string[])=>r.some(Boolean));
+  const headerIndex=rows.findIndex((r:string[])=>{
+    const h=r.join(" | ");
+    return h.includes("2 נק")&&h.includes("3 נק")&&h.includes("מהקו")&&(h.includes("נק'")||h.includes("נק׳"));
+  });
+  const headers=(headerIndex>=0?rows[headerIndex]:rows[0])||[];
+  const total=rows.find((r:string[])=>r.some(c=>c.includes("סך הכל")||/סה.?כ/.test(c)));
   if(!total) throw new Error("IBBA player table has no total row.");
   const [two_pm,two_pa]=ma(total[idx(headers,["2 נק"])]);
   const [three_pm,three_pa]=ma(total[idx(headers,["3 נק"])]);
@@ -157,6 +162,68 @@ function ibbaPlayByPlay($:cheerio.CheerioAPI,homeName:string,awayName:string){
   const seconds=(clock:string)=>{const m=clock.match(/(\d+):(\d{2})/);return m?Number(m[1])*60+Number(m[2]):0;};
   events.sort((a,b)=>a.period-b.period||seconds(b.clock)-seconds(a.clock)||b._sourceOrder-a._sourceOrder);
   return events.map(({_sourceOrder,...event})=>event);
+}
+
+function ibbaQuarterTable($:cheerio.CheerioAPI){
+  let best:any=null;
+  $("table").each((_:number,t:any)=>{
+    if(best) return;
+    const rows=tableRows($,t).filter((r:string[])=>r.some(Boolean));
+    const headerIndex=rows.findIndex((r:string[])=>{
+      const h=r.join(" | ");
+      return (/רבע\s*1|Q1/i.test(h))&&(/רבע\s*4|Q4/i.test(h));
+    });
+    if(headerIndex<0) return;
+    const headers=rows[headerIndex];
+    const teamCol=Math.max(0,headers.findIndex((h:string)=>/קבוצה|team/i.test(h)));
+    let periodCols=headers.map((h:string,i:number)=>({h,i}))
+      .filter((x:any)=>/רבע\s*[1-9]|רבע\s*(ראשון|שני|שלישי|רביעי)|הארכה|(?:^|\s)OT(?:\s|$)/i.test(x.h))
+      .map((x:any)=>x.i);
+    if(periodCols.length<4){
+      const scoreCol=headers.findIndex((h:string)=>/תוצאה|score/i.test(h));
+      const end=scoreCol>teamCol?scoreCol:headers.length;
+      periodCols=Array.from({length:Math.max(0,end-teamCol-1)},(_,i)=>teamCol+1+i).slice(0,8);
+    }
+    const data=rows.slice(headerIndex+1).filter((r:string[])=>{
+      const name=clean(r[teamCol]||"");
+      return name&&periodCols.some((i:number)=>/\d/.test(clean(r[i]||"")));
+    });
+    if(data.length<2) return;
+    const count=Math.min(periodCols.length,Math.max(4,periodCols.length));
+    const quarters=periodCols.slice(0,count).map((i:number)=>[num(data[0][i]),num(data[1][i])]);
+    best={homeName:clean(data[0][teamCol]),awayName:clean(data[1][teamCol]),quarters};
+  });
+  return best||{homeName:"",awayName:"",quarters:[]};
+}
+function ibbaTeamNames($:cheerio.CheerioAPI){
+  const names:string[]=[];
+  $("a[href*='/team/']").each((_:number,a:any)=>{
+    const name=clean($(a).text());
+    if(name&&name.length>1&&!names.includes(name)) names.push(name);
+  });
+  if(names.length>=2) return [names[0],names[1]];
+  const title=clean($("title").first().text()).replace(/\s*-\s*IBBA.*$/i,"");
+  const dash=title.split(/\s+[—–]\s+/).map(clean).filter(Boolean);
+  if(dash.length>=2) return [dash[0],dash[1]];
+  return ["",""];
+}
+function ibbaQuartersFromPlayByPlay(events:any[]){
+  const endByPeriod=new Map<number,{seconds:number,home:number,away:number}>();
+  for(const event of events){
+    const period=Number(event?.period||0);
+    const score=String(event?.score||"").match(/(\d{1,3})\s*[-:]\s*(\d{1,3})/);
+    const clock=String(event?.clock||"").match(/(\d+):(\d{2})/);
+    if(!period||!score) continue;
+    const seconds=clock?Number(clock[1])*60+Number(clock[2]):9999;
+    const prev=endByPeriod.get(period);
+    if(!prev||seconds<prev.seconds) endByPeriod.set(period,{seconds,home:Number(score[1]),away:Number(score[2])});
+  }
+  let prevHome=0,prevAway=0;
+  return [...endByPeriod.entries()].sort((a,b)=>a[0]-b[0]).map(([,s])=>{
+    const q=[Math.max(0,s.home-prevHome),Math.max(0,s.away-prevAway)];
+    prevHome=s.home; prevAway=s.away;
+    return q;
+  });
 }
 
 function balancedJsonObject(text:string,start:number){
@@ -547,15 +614,16 @@ Deno.serve(async(req:Request)=>{
     let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null, parsedPlayers:any=null, playByPlay:any[]=[], fibaData:any=null;
     const playerTables:any[]=[];
     if(provider==="IBBA"){
-      let quarter:any=null;
-      $("table").each((_:number,t:any)=>{ if(quarter)return; const h=tableRows($,t)[0]?.join(" | ")||""; if(h.includes("רבע 1")&&h.includes("רבע 4")) quarter=t; });
-      if(!quarter) throw new Error("Could not locate the IBBA quarter table.");
-      const qrows=tableRows($,quarter).slice(1).filter((r:string[])=>r.length>=6&&r[0]);
-      if(qrows.length<2) throw new Error("Could not read both teams.");
-      homeName=qrows[0][0]; awayName=qrows[1][0];
-      const quarterCount=Math.max(4,Math.min(qrows[0].length-2,qrows[1].length-2));
-      quarters=Array.from({length:quarterCount},(_,i)=>[num(qrows[0][i+1]),num(qrows[1][i+1])]);
-      $("table").each((_:number,t:any)=>{const h=(tableRows($,t)[0]||[]).join(" | ");if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס"))playerTables.push(t);});
+      const q=ibbaQuarterTable($);
+      homeName=q.homeName; awayName=q.awayName; quarters=q.quarters;
+      $("table").each((_:number,t:any)=>{
+        const h=tableRows($,t).slice(0,8).flat().join(" | ");
+        if(h.includes("2 נק")&&h.includes("3 נק")&&h.includes("איב")&&h.includes("אס")) playerTables.push(t);
+      });
+      if(!homeName||!awayName){
+        const names=ibbaTeamNames($);
+        homeName=homeName||names[0]; awayName=awayName||names[1];
+      }
     }else if(provider==="WINNER_LEAGUE"){
       const splitTables:any[]=[];
       $("table.stats_tbl").each((_:number,t:any)=>{
@@ -623,7 +691,10 @@ Deno.serve(async(req:Request)=>{
     if(!homeName||!awayName||homeName===awayName) throw new Error("Could not validate both team names.");
     if(provider==="IBBA"&&playerTables.length<2) throw new Error("Could not locate both IBBA box-score tables.");
     if(provider==="IBBA") parsedPlayers=[ibbaPlayerData($,playerTables[0]),ibbaPlayerData($,playerTables[1])];
-    if(provider==="IBBA") playByPlay=ibbaPlayByPlay($,homeName,awayName);
+    if(provider==="IBBA"){
+      playByPlay=ibbaPlayByPlay($,homeName,awayName);
+      if(!quarters.length) quarters=ibbaQuartersFromPlayByPlay(playByPlay);
+    }
     const home=parsedPlayers[0].total;
     const away=parsedPlayers[1].total;
     parsedPlayers[0].players=parsedPlayers[0].players.map((p:any)=>advancedPlayer(p,home,away));
@@ -631,7 +702,7 @@ Deno.serve(async(req:Request)=>{
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v5",
+      parser:provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v6",
       validated_at:new Date().toISOString()
     };
 
@@ -783,7 +854,7 @@ Deno.serve(async(req:Request)=>{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
           club_id:auditClubId,provider:auditUrl.includes("plk.pl")?"PLK":auditUrl.includes("eurobasket.com")?"EUROBASKET_POLAND":auditUrl.includes("/eurocup/")?"EUROCUP":auditUrl.includes("euroleaguebasketball.net")?"EUROLEAGUE":auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v4"}
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v6"}
         });
       }catch(_){}
     }
