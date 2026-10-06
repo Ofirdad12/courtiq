@@ -59,6 +59,8 @@ jobs:
           node --check live-bench.js
           node tests/test_live_bench.js
           node --check live-source-support.js
+          node --check decision-intelligence.js
+          node tests/test_decision_intelligence.js
           node --check nav-cleanup.js
       - name: Check Supabase Edge Function contract
         run: |
