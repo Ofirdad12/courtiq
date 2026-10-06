@@ -59,15 +59,15 @@ alter table public.club_member_scopes enable row level security;
 
 drop policy if exists "members_read_club_seasons" on public.club_seasons;
 create policy "members_read_club_seasons" on public.club_seasons
-for select to authenticated using (public.is_club_member(club_id));
+for select to authenticated using (private.is_club_member(club_id));
 
 drop policy if exists "members_read_club_teams" on public.club_teams;
 create policy "members_read_club_teams" on public.club_teams
-for select to authenticated using (public.is_club_member(club_id));
+for select to authenticated using (private.is_club_member(club_id));
 
 drop policy if exists "members_read_own_scopes" on public.club_member_scopes;
 create policy "members_read_own_scopes" on public.club_member_scopes
-for select to authenticated using (user_id = auth.uid() and public.is_club_member(club_id));
+for select to authenticated using (user_id = auth.uid() and private.is_club_member(club_id));
 
 create or replace function public.club_role_permissions(p_role text)
 returns jsonb language sql immutable as $$
@@ -90,7 +90,7 @@ grant execute on function public.club_role_permissions(text) to authenticated;
 
 create or replace function public.my_club_os_context()
 returns jsonb
-language sql stable security definer set search_path=public
+language sql stable security definer set search_path=public,private
 as $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'club', jsonb_build_object(
