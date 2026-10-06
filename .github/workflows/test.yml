@@ -64,6 +64,10 @@ jobs:
           node --check club-os-data.js
           node --check club-os.js
           node tests/test_club_os.js
+          node --check basketball-ops-data.js
+          node --check basketball-ops.js
+          node tests/test_basketball_ops.js
+          node --check club-os-ops-extension.js
           node --check nav-cleanup.js
       - name: Check Supabase Edge Function contract
         run: |
@@ -88,6 +92,14 @@ jobs:
           grep -q 'my_club_os_context' supabase/migrations/20261006_club_os_v186.sql
           grep -q "'gm'" supabase/migrations/20261006_club_os_v186.sql
           grep -q "'scout'" supabase/migrations/20261006_club_os_v186.sql
+      - name: Check Basketball Operations contract
+        run: |
+          grep -q 'player_identity_links' supabase/migrations/20261006_player360_gm_recruitment_v187.sql
+          grep -q 'player_360_snapshot' supabase/migrations/20261006_player360_gm_recruitment_v187.sql
+          grep -q 'basketball_ops_snapshot' supabase/migrations/20261006_player360_gm_recruitment_v187.sql
+          grep -q 'club_roster_needs' supabase/migrations/20261006_player360_gm_recruitment_v187.sql
+          grep -q 'recruitment_shortlist' supabase/migrations/20261006_player360_gm_recruitment_v187.sql
+          grep -q 'verified roster alias' supabase/migrations/20261006_player360_gm_recruitment_v187.sql
       - name: Check pilot activation contract
         run: |
           grep -q 'createUser' supabase/functions/create-pilot-account/index.ts
