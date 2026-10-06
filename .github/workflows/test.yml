@@ -58,6 +58,7 @@ jobs:
           node tests/test_live_coach_intelligence.js
           node --check live-bench.js
           node tests/test_live_bench.js
+          node --check nav-cleanup.js
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
