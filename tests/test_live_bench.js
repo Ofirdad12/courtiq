@@ -24,4 +24,16 @@ const changes=live.compareSnapshots(a,b);
 assert(changes.some(x=>x.kind==='score'));
 assert(changes.some(x=>x.kind==='events'));
 assert(changes.some(x=>x.factor==='eFG%'));
+
+const pbp=require('../pbp-explorer.js');
+global.CourtIQPlayByPlay=pbp;
+const livePbp=live.renderLivePbp(G);
+assert.match(livePbp,/LIVE PBP · AUTO-SYNC/);
+assert.match(livePbp,/Play-by-Play Command Center/);
+assert.match(livePbp,/4 events · recalculated every valid refresh/);
+assert.match(livePbp,/SCORING RUNS/);
+const emptyPbp=live.renderLivePbp({home:'Home',away:'Away',playByPlay:[]});
+assert.match(emptyPbp,/No live PBP events yet/);
+assert.equal(live.mountLivePbp(G,null),null);
+delete global.CourtIQPlayByPlay;
 console.log('live bench tests passed');
