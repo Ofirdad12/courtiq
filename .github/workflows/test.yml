@@ -54,6 +54,8 @@ jobs:
           node tests/test_coach_workflow.js
           node tests/test_euroleague_import.js
           node --check basketball-intelligence.js
+          node --check live-coach-intelligence.js
+          node tests/test_live_coach_intelligence.js
           node --check live-bench.js
           node tests/test_live_bench.js
       - name: Check Supabase Edge Function contract
