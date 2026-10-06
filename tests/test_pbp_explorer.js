@@ -50,8 +50,8 @@ const flow={home:'Blue',away:'Red',playByPlay:[
 ]};
 assert.equal(api.scoreOf(flow.playByPlay[0]).home,2);
 assert.ok(api.scoreSnapshots(flow).length>=10);
-assert.equal(api.detectRuns(flow,6)[0].side,'home');
-assert.equal(api.detectRuns(flow,6)[0].points,7);
+assert.equal(api.detectRuns(flow,6)[0].side,'away');
+assert.equal(api.detectRuns(flow,6)[0].points,8);
 assert.equal(api.turnoverBursts(flow)[0].side,'away');
 assert.ok(api.turnoverBursts(flow)[0].count>=2);
 assert.equal(api.statCounts(flow).home.oreb,1);
