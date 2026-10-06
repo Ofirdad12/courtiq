@@ -27,6 +27,8 @@ jobs:
           node --check data.js
           node --check coach.js
           node --check app.js
+          node --check app-actions-v194.js
+          node --check ui-router-v194.js
           node --check players.js
           node --check mens.js
           node --check pbp-explorer.js
@@ -73,6 +75,7 @@ jobs:
           node tests/test_league_intelligence.js
           node --check club-os-league-extension.js
           node --check nav-cleanup.js
+          node tests/test_ui_router_contract.js
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
