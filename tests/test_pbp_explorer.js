@@ -31,3 +31,40 @@ assert.equal(api.filter(g,{window:{...window,startClock:'09:00'}}).length,0);
 assert.equal(api.filter(g,{window:{...window,endClock:'09:99'}}).length,0);
 assert.equal(api.filter(g,{window:{period:5,startClock:'05:00',endClock:'04:00'}}).length,1);
 console.log('PBP clock windows: period isolation, inclusive boundary review, combined filters, invalid ranges and overtime passed.');
+
+const flow={home:'Blue',away:'Red',playByPlay:[
+ {period:1,clock:'09:50',side:'home',player:'Alpha',type:'2pm',description:'Made layup',score:'2-0'},
+ {period:1,clock:'09:30',side:'home',player:'Alpha',type:'3pm',description:'Made three',score:'5-0'},
+ {period:1,clock:'09:10',side:'home',player:'Gamma',type:'2pm',description:'Made layup',score:'7-0'},
+ {period:1,clock:'08:50',side:'away',player:'Beta',type:'tov',description:'Bad pass',score:'7-0'},
+ {period:1,clock:'08:30',side:'away',player:'Beta',type:'tov',description:'Travel',score:'7-0'},
+ {period:1,clock:'08:20',side:'home',player:'Gamma',type:'oreb',description:'Offensive rebound',score:'7-0'},
+ {period:1,clock:'08:10',side:'away',player:'Delta',type:'2pm',description:'Made jumper',score:'7-2'},
+ {period:1,clock:'07:50',side:'home',player:'Alpha',type:'tov',description:'Lost ball',score:'7-2'},
+ {period:1,clock:'07:30',side:'away',player:'Delta',type:'3pm',description:'Made three',score:'7-5'},
+ {period:1,clock:'07:00',side:'away',player:'Delta',type:'3pm',description:'Made three',score:'7-8'},
+ {period:1,clock:'06:40',side:'home',player:'Alpha',type:'2pm',description:'Made layup',score:'9-8'},
+ {period:1,clock:'06:20',side:'away',player:'Delta',type:'2pm',description:'Made jumper',score:'9-10'},
+ {period:4,clock:'01:30',side:'home',player:'Alpha',type:'2pm',description:'Made layup',score:'75-76'},
+ {period:4,clock:'01:00',side:'away',player:'Delta',type:'tov',description:'Bad pass',score:'75-76'}
+]};
+assert.equal(api.scoreOf(flow.playByPlay[0]).home,2);
+assert.ok(api.scoreSnapshots(flow).length>=10);
+assert.equal(api.detectRuns(flow,6)[0].side,'home');
+assert.equal(api.detectRuns(flow,6)[0].points,7);
+assert.equal(api.turnoverBursts(flow)[0].side,'away');
+assert.ok(api.turnoverBursts(flow)[0].count>=2);
+assert.equal(api.statCounts(flow).home.oreb,1);
+assert.equal(api.leadChanges(flow).count,3);
+assert.ok(api.pressureWindow(flow).counts.events>=2);
+assert.equal(api.playerPulse(flow)[0].player,'Delta');
+assert.ok(api.turningPoints(flow).some(x=>x.kind==='run'));
+assert.ok(api.coachInsights(flow).some(x=>x.intent==='run'));
+assert.match(api.brief(flow),/Largest verified run/);
+assert.match(api.render(flow),/Play-by-Play Command Center/);
+assert.match(api.render(flow),/COACH SIGNALS/);
+assert.equal(api.filter(flow,{quick:'turnover'}).filter(e=>api.category(e)==='turnover').length,4);
+assert.equal(api.filter(flow,{quick:'oreb'}).length,1);
+assert.ok(api.filter(flow,{quick:'runs'}).length>=3);
+assert.ok(api.filter(flow,{quick:'clutch'}).length>=2);
+console.log('PBP Command Center v180: score flow, runs, lead changes, turnover bursts, player pulse, clutch windows, coach signals and evidence filters passed.');
