@@ -1,4 +1,4 @@
-/* CourtIQ v179 · keep game history inside Games, never in the main navigation. */
+/* CourtIQ v192 · canonical workspace navigation with persistent Live Bench entry. */
 (() => {
   'use strict';
 
@@ -12,6 +12,8 @@
     ${navItem('◫','Team Analytics','team-analytics')}
     ${navItem('♟','Players','players')}
     ${navItem('◈','Season Memory','season')}
+    <small class="cq-nav-label">LIVE</small>
+    ${navItem('●','Live Bench','live',true)}
     <small class="cq-nav-label">PREPARATION</small>
     ${navItem('◎','Opponent Scouting','scouting')}
     ${navItem('◇','Coach View','coach')}
@@ -45,14 +47,8 @@
   const observer = new MutationObserver(scheduleSync);
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scheduleSync, { once: true });
-  } else {
-    scheduleSync();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scheduleSync, { once: true });
+  else scheduleSync();
 
-  window.CourtIQNavigation = {
-    sync: syncNavigation,
-    historyLocation: 'games-only'
-  };
+  window.CourtIQNavigation = { sync: syncNavigation, historyLocation: 'games-only', version: '192' };
 })();
