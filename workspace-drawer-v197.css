@@ -1,0 +1,130 @@
+/* CourtIQ v197 · drawer navigation.
+   The workspace uses a full-width canvas; navigation opens only when requested. */
+body.cq-workspace-mode{overflow-x:hidden}
+
+/* Main workspace no longer reserves permanent sidebar width. */
+.cq-workspace-mode .app{
+  grid-template-columns:minmax(0,1fr)!important;
+}
+.cq-workspace-mode .main{
+  min-width:0!important;
+  width:100%!important;
+  grid-column:1!important;
+}
+
+/* Navigation becomes an off-canvas drawer on every screen size. */
+.cq-workspace-mode .side,
+.cq-workspace-mode .cq-side{
+  position:fixed!important;
+  top:0!important;
+  left:0!important;
+  bottom:0!important;
+  width:min(300px,88vw)!important;
+  height:100vh!important;
+  z-index:120!important;
+  transform:translateX(-104%)!important;
+  transition:transform .2s ease!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  padding:18px 14px 24px!important;
+  border-right:1px solid #2a3b53!important;
+  box-shadow:none!important;
+  pointer-events:auto!important;
+}
+.cq-workspace-mode .side.cq-side-open,
+.cq-workspace-mode .cq-side.cq-side-open{
+  transform:translateX(0)!important;
+  box-shadow:22px 0 70px #000b!important;
+}
+
+/* Always provide an obvious way to enter/leave navigation. */
+.cq-workspace-mode .cq-mobile-menu{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:42px!important;
+  height:42px!important;
+  flex:0 0 42px!important;
+  border:1px solid #2b405a!important;
+  background:#0c1726!important;
+  color:#fff!important;
+  border-radius:10px!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  font-size:19px!important;
+}
+.cq-side-close{
+  position:sticky;
+  top:0;
+  margin-left:auto;
+  margin-bottom:8px;
+  z-index:3;
+  display:grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  border:1px solid #30445e;
+  border-radius:10px;
+  background:#0d1929;
+  color:#f7f9fc;
+  font-size:23px;
+  line-height:1;
+  cursor:pointer;
+  pointer-events:auto;
+}
+.cq-side-close:hover{background:#142238}
+
+/* Drawer labels always remain readable. */
+.cq-workspace-mode .cq-nav-label,
+.cq-workspace-mode .cq-menu .cq-nav-item b,
+.cq-workspace-mode .cq-side .tagline{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+.cq-workspace-mode .cq-menu .cq-nav-item{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  width:100%!important;
+  min-height:44px!important;
+  gap:11px!important;
+  padding:10px 11px!important;
+  pointer-events:auto!important;
+}
+.cq-workspace-mode .cq-menu .cq-nav-item span{flex:0 0 20px!important;width:20px!important}
+.cq-workspace-mode .cq-menu .cq-nav-item b{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+
+/* One controlled backdrop, tap anywhere outside to exit the menu. */
+body.cq-nav-open .cq-side-backdrop{
+  display:block!important;
+  position:fixed!important;
+  inset:0!important;
+  z-index:110!important;
+  background:#02060da6!important;
+  backdrop-filter:blur(3px);
+  pointer-events:auto!important;
+}
+body:not(.cq-nav-open) .cq-side-backdrop{display:none!important;pointer-events:none!important}
+
+/* Remove the old bottom-floating card that crowded the navigation drawer. */
+.cq-workspace-mode .cq-side .quote{position:static!important;margin-top:14px!important;left:auto!important;right:auto!important;bottom:auto!important}
+
+/* Keep the top bar usable with the full-width workspace. */
+.cq-workspace-mode .cq-top{
+  display:flex!important;
+  position:sticky!important;
+  top:0!important;
+  z-index:20!important;
+}
+
+@media(max-width:720px){
+  .cq-workspace-mode .side,
+  .cq-workspace-mode .cq-side{width:min(286px,90vw)!important}
+  .cq-workspace-mode .cq-top{padding:0 10px!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .cq-workspace-mode .side,
+  .cq-workspace-mode .cq-side{transition:none!important}
+}
