@@ -1,0 +1,17 @@
+/* CourtIQ v189 · UI reliability styles for mobile navigation, click targets and error feedback. */
+.cq-site-menu{display:none}
+.cq-side-backdrop{display:none}
+.cq-ui-toast{position:fixed;left:50%;bottom:24px;z-index:5000;max-width:min(520px,calc(100vw - 32px));padding:11px 15px;border:1px solid #3a4d67;border-radius:10px;background:#0b1727;color:#edf5ff;box-shadow:0 16px 48px #0009;font:700 12px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,18px);transition:opacity .18s ease,transform .18s ease}.cq-ui-toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:720px){
+  .cq-site-nav{position:relative;gap:10px}
+  .cq-site-menu{display:inline-flex;margin-left:auto;width:42px;height:42px;flex:0 0 42px;align-items:center;justify-content:center;flex-direction:column;gap:4px;border:1px solid #2b405a;border-radius:10px;background:#0c1726;color:#fff;cursor:pointer}
+  .cq-site-menu span{display:block;width:17px;height:2px;border-radius:2px;background:currentColor}
+  .cq-site-nav .cq-site-actions{margin-left:0}
+  .cq-site-nav.cq-site-nav-open nav{display:grid;position:absolute;top:58px;left:12px;right:12px;z-index:110;gap:4px;padding:10px;border:1px solid #2b405a;border-radius:14px;background:#0b1727;box-shadow:0 22px 60px #000a}
+  .cq-site-nav.cq-site-nav-open nav a{display:block;padding:12px;border-radius:9px;color:#dce6f2}
+  .cq-site-nav.cq-site-nav-open nav a:active{background:#13253b}
+  body.cq-nav-open{overflow:hidden}
+  body.cq-nav-open .cq-side-backdrop{display:block;position:fixed;inset:0;z-index:79;background:#02060d99;backdrop-filter:blur(2px)}
+  .cq-mobile-menu,.cq-nav-item,.cq-account,.cq-home-link,.cq-top-import{min-height:42px}
+  .cq-menu .cq-nav-item{touch-action:manipulation}
+}
