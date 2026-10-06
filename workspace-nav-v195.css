@@ -1,5 +1,27 @@
-/* CourtIQ v195 · workspace navigation visibility fix.
-   Keep navigation labels visible on desktop/tablet; use drawer only on mobile. */
+/* CourtIQ v196 · workspace navigation visibility + clickability fix.
+   Keep navigation labels visible and guarantee the sidebar remains above workspace content. */
+
+.cq-workspace-mode .cq-side{
+  position:sticky!important;
+  top:0!important;
+  z-index:20!important;
+  pointer-events:auto!important;
+}
+.cq-workspace-mode .cq-menu{
+  position:relative!important;
+  z-index:21!important;
+  pointer-events:auto!important;
+}
+.cq-workspace-mode .cq-menu .cq-nav-item{
+  position:relative!important;
+  z-index:22!important;
+  pointer-events:auto!important;
+  touch-action:manipulation;
+  user-select:none;
+}
+.cq-workspace-mode .cq-menu .cq-nav-item>*{
+  pointer-events:none!important;
+}
 
 /* Stable readable sidebar on non-mobile screens. */
 @media (min-width:721px){
@@ -27,9 +49,10 @@
     align-items:center!important;
     gap:11px!important;
     width:100%!important;
-    min-height:38px;
+    min-height:42px;
     padding:9px 10px!important;
     text-align:left!important;
+    cursor:pointer!important;
   }
   .cq-workspace-mode .cq-menu .cq-nav-item span{
     display:inline-block!important;
@@ -73,10 +96,11 @@
   }
 }
 
-/* Mobile remains a full-width labelled drawer. */
+/* Mobile remains a full-width labelled drawer above its backdrop. */
 @media (max-width:720px){
   .cq-workspace-mode .side{
     width:270px!important;
+    z-index:80!important;
   }
   .cq-workspace-mode .cq-nav-label,
   .cq-workspace-mode .cq-menu .cq-nav-item b{
@@ -86,6 +110,7 @@
   }
   .cq-workspace-mode .cq-menu .cq-nav-item{
     justify-content:flex-start!important;
-    min-height:42px;
+    min-height:44px;
+    cursor:pointer!important;
   }
 }
