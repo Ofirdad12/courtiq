@@ -1,0 +1,47 @@
+/* CourtIQ Basketball Intelligence */
+.basketballIntelV1 {
+  margin: 24px 0 0;
+  border: 1px solid rgba(126,156,205,.22);
+  border-radius: 20px;
+  background: linear-gradient(180deg,rgba(15,28,49,.96),rgba(7,15,28,.98));
+  overflow: hidden;
+}
+.biHero { display:flex; justify-content:space-between; gap:24px; align-items:flex-end; padding:24px; border-bottom:1px solid rgba(126,156,205,.15); }
+.biHero h3,.biSection h3 { margin:4px 0 6px; }
+.biHero p { margin:0; color:#9fb0c9; }
+.biHero label { display:grid; gap:6px; font-size:11px; color:#8fa4c1; min-width:220px; }
+.biHero select,.biAskInput { background:#091525; color:#fff; border:1px solid #29405f; border-radius:10px; padding:11px 12px; }
+.biSection { padding:22px 24px; border-top:1px solid rgba(126,156,205,.12); }
+.biGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.biCard,.biDecision,.biLineup { border:1px solid rgba(113,148,201,.2); background:rgba(9,21,37,.72); border-radius:14px; padding:15px; }
+.biCardTop,.biDecision header,.biSeasonTitle { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.biCardTop span,.biRank { display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:#152b47; font-weight:800; }
+.biCard small,.biDecision small,.biLineup small { color:#8fa4c1; }
+.biCard h4,.biDecision h4 { margin:10px 0 8px; }
+.biCard p,.biDecision p { color:#b8c5d8; line-height:1.45; }
+.biCard em { font-style:normal; font-size:10px; color:#7ea4d2; }
+.biLineups { display:grid; gap:10px; }
+.biLineup { display:grid; grid-template-columns:auto minmax(220px,1.4fr) minmax(360px,2fr); gap:14px; align-items:center; }
+.biLineupMetrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.biLineupMetrics span { background:rgba(255,255,255,.035); padding:9px; border-radius:9px; }
+.biLineupMetrics small,.biLineupMetrics b { display:block; }
+.biEmpty { border:1px dashed #36506f; border-radius:14px; padding:18px; display:grid; gap:6px; color:#aab9cc; }
+.biAskBar { display:grid; grid-template-columns:1fr auto; gap:10px; }
+.biAskChips { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.biAskChips button { border:1px solid #29405f; background:#0a182a; color:#bcd0e8; border-radius:999px; padding:7px 10px; cursor:pointer; }
+.biAnswer { min-height:76px; border-left:3px solid #5d89bc; background:rgba(9,21,37,.62); padding:14px 16px; border-radius:8px; color:#d5e0ef; line-height:1.55; }
+.biSeasonIntel { margin-top:12px; }
+.biSeasonTitle { margin:10px 0; color:#bcd0e8; }
+.biSeasonTitle span { font-size:11px; color:#8fa4c1; }
+@media(max-width:900px){
+  .biGrid { grid-template-columns:1fr; }
+  .biLineup { grid-template-columns:auto 1fr; }
+  .biLineupMetrics { grid-column:1/-1; }
+  .biHero { align-items:stretch; flex-direction:column; }
+  .biHero label { min-width:0; }
+}
+@media(max-width:560px){
+  .biSection,.biHero { padding:16px; }
+  .biLineupMetrics { grid-template-columns:repeat(2,1fr); }
+  .biAskBar { grid-template-columns:1fr; }
+}
