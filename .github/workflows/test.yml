@@ -76,8 +76,8 @@ jobs:
           node --check club-os-league-extension.js
           node --check nav-cleanup.js
           node --check live-bench-entry-v198.js
-          node --check workspace-controller-v200.js
-          node tests/test_workspace_controller_v200.js
+          node --check workspace-controller-v201.js
+          node tests/test_workspace_controller_v201.js
           node tests/test_ui_router_contract.js
       - name: Check Supabase Edge Function contract
         run: |
