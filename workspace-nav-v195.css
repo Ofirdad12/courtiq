@@ -1,0 +1,91 @@
+/* CourtIQ v195 · workspace navigation visibility fix.
+   Keep navigation labels visible on desktop/tablet; use drawer only on mobile. */
+
+/* Stable readable sidebar on non-mobile screens. */
+@media (min-width:721px){
+  .cq-workspace-mode .app{
+    grid-template-columns:232px minmax(0,1fr)!important;
+  }
+  .cq-workspace-mode .cq-side{
+    width:auto!important;
+    min-width:0!important;
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+  .cq-workspace-mode .cq-menu{
+    display:grid!important;
+    gap:4px!important;
+  }
+  .cq-workspace-mode .cq-nav-label{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  .cq-workspace-mode .cq-menu .cq-nav-item{
+    display:flex!important;
+    justify-content:flex-start!important;
+    align-items:center!important;
+    gap:11px!important;
+    width:100%!important;
+    min-height:38px;
+    padding:9px 10px!important;
+    text-align:left!important;
+  }
+  .cq-workspace-mode .cq-menu .cq-nav-item span{
+    display:inline-block!important;
+    flex:0 0 19px;
+    width:19px!important;
+    font-size:11px!important;
+  }
+  .cq-workspace-mode .cq-menu .cq-nav-item b{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:11px;
+    line-height:1.25;
+  }
+  .cq-workspace-mode .cq-side .tagline{
+    display:block!important;
+  }
+}
+
+/* Slightly tighter but still fully labelled on tablets / small laptops. */
+@media (min-width:721px) and (max-width:1050px){
+  .cq-workspace-mode .app{
+    grid-template-columns:220px minmax(0,1fr)!important;
+  }
+  .cq-workspace-mode .cq-side{
+    padding:18px 11px!important;
+  }
+  .cq-workspace-mode .cq-side .logo{
+    font-size:19px!important;
+    margin:0 8px 18px!important;
+  }
+  .cq-workspace-mode .cq-side .quote{
+    display:none!important;
+  }
+  .cq-workspace-mode .cq-menu .cq-nav-item b{
+    font-size:10.5px!important;
+  }
+}
+
+/* Mobile remains a full-width labelled drawer. */
+@media (max-width:720px){
+  .cq-workspace-mode .side{
+    width:270px!important;
+  }
+  .cq-workspace-mode .cq-nav-label,
+  .cq-workspace-mode .cq-menu .cq-nav-item b{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  .cq-workspace-mode .cq-menu .cq-nav-item{
+    justify-content:flex-start!important;
+    min-height:42px;
+  }
+}
