@@ -58,6 +58,7 @@ jobs:
           node tests/test_live_coach_intelligence.js
           node --check live-bench.js
           node tests/test_live_bench.js
+          node --check live-source-support.js
           node --check nav-cleanup.js
       - name: Check Supabase Edge Function contract
         run: |
@@ -69,7 +70,11 @@ jobs:
           grep -q 'game-zone.asp' supabase/functions/import-ibba-game/index.ts
           grep -q 'LIVE PREVIEW' supabase/functions/live-game-preview/index.ts
           grep -q 'GENIUS_LIVESTATS' supabase/functions/live-game-preview/index.ts
-          grep -q 'verify' supabase/functions/live-game-preview/index.ts || true
+          grep -q 'provider==="PLK"' supabase/functions/live-game-preview/index.ts
+          grep -q 'provider==="EUROCUP"' supabase/functions/live-game-preview/index.ts
+          grep -q 'akcja-po-akcji' supabase/functions/live-game-preview/index.ts
+          grep -q 'api/PlayByPlay' supabase/functions/live-game-preview/index.ts
+          grep -q 'api-live.euroleague.net' supabase/functions/live-game-preview/index.ts
       - name: Check pilot activation contract
         run: |
           grep -q 'createUser' supabase/functions/create-pilot-account/index.ts
