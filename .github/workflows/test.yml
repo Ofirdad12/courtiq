@@ -2,6 +2,8 @@ name: CourtIQ tests
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
   test:
@@ -51,6 +53,9 @@ jobs:
           node tests/test_tactical_workspace.js
           node tests/test_coach_workflow.js
           node tests/test_euroleague_import.js
+          node --check basketball-intelligence.js
+          node --check live-bench.js
+          node tests/test_live_bench.js
       - name: Check Supabase Edge Function contract
         run: |
           grep -q 'validateTeam' supabase/functions/import-ibba-game/index.ts
@@ -59,7 +64,9 @@ jobs:
           grep -q 'basket.co.il' supabase/functions/import-ibba-game/index.ts
           grep -q 'WINNER_LEAGUE' supabase/functions/import-ibba-game/index.ts
           grep -q 'game-zone.asp' supabase/functions/import-ibba-game/index.ts
-
+          grep -q 'LIVE PREVIEW' supabase/functions/live-game-preview/index.ts
+          grep -q 'GENIUS_LIVESTATS' supabase/functions/live-game-preview/index.ts
+          grep -q 'verify' supabase/functions/live-game-preview/index.ts || true
       - name: Check pilot activation contract
         run: |
           grep -q 'createUser' supabase/functions/create-pilot-account/index.ts
