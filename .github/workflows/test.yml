@@ -61,6 +61,9 @@ jobs:
           node --check live-source-support.js
           node --check decision-intelligence.js
           node tests/test_decision_intelligence.js
+          node --check club-os-data.js
+          node --check club-os.js
+          node tests/test_club_os.js
           node --check nav-cleanup.js
       - name: Check Supabase Edge Function contract
         run: |
@@ -77,6 +80,14 @@ jobs:
           grep -q 'akcja-po-akcji' supabase/functions/live-game-preview/index.ts
           grep -q 'api/PlayByPlay' supabase/functions/live-game-preview/index.ts
           grep -q 'api-live.euroleague.net' supabase/functions/live-game-preview/index.ts
+      - name: Check Club OS contract
+        run: |
+          grep -q 'club_seasons' supabase/migrations/20261006_club_os_v186.sql
+          grep -q 'club_teams' supabase/migrations/20261006_club_os_v186.sql
+          grep -q 'club_member_scopes' supabase/migrations/20261006_club_os_v186.sql
+          grep -q 'my_club_os_context' supabase/migrations/20261006_club_os_v186.sql
+          grep -q "'gm'" supabase/migrations/20261006_club_os_v186.sql
+          grep -q "'scout'" supabase/migrations/20261006_club_os_v186.sql
       - name: Check pilot activation contract
         run: |
           grep -q 'createUser' supabase/functions/create-pilot-account/index.ts
