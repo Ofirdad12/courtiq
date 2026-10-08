@@ -43,7 +43,7 @@ function validateUrl(raw:string){
   const isGenius=/^(?:fiba)?livestats\.dcd\.shared\.geniussports\.com$/.test(u.hostname);
   if(isIbba && !/^\/match\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/i.test(u.pathname)) throw new Error("Unsupported IBBA URL. Use an official /match/... page.");
   if(isBasket && (!(u.pathname.toLowerCase().endsWith("/game-zone.asp") || u.pathname.toLowerCase()==="/game-zone.asp") || !u.searchParams.get("GameId"))) throw new Error("Unsupported Winner League URL. Use basket.co.il/game-zone.asp?GameId=...");
-  if(isFiba && !/^\/en\/events\/eurocup-women-\d{2}-\d{2}\/games\/\d+-[a-z0-9-]+\/?$/i.test(u.pathname)) throw new Error("Unsupported FIBA URL. Use an official EuroCup Women game page.");
+  if(isFiba && !/^\/en\/events\/[a-z0-9][a-z0-9-]*\/games\/\d+-[a-z0-9-]+\/?$/i.test(u.pathname)) throw new Error("Unsupported FIBA URL. Use an official FIBA event game page.");
   if(isEuroleague && !/^\/en\/(euroleague|eurocup)\/game-center\/\d{4}-\d{2}\/[a-z0-9-]+\/[EU]\d{4}\/\d+\/?$/i.test(u.pathname)) throw new Error("Unsupported EuroLeague Basketball URL. Use an official EuroLeague or EuroCup game-center page.");
   if(isEurobasket && !/\/Basketball-Box-Score\.aspx$/i.test(u.pathname)) throw new Error("For Eurobasket, paste a specific Basketball-Box-Score.aspx?Game=... game URL, not the Poland league home page.");
   if(isPlk && !/^\/mecz\/\d+(?:\/[^?#]*)?\/?$/i.test(u.pathname)) throw new Error("Unsupported PLK URL. Use an official plk.pl/mecz/... game page.");
@@ -636,7 +636,7 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
     "Review the possessions that produced the largest efficiency gap before assigning tactical causation."
   ];
   return {id:meta.id,comp:meta.competition,date:meta.date_display,home:meta.home,away:meta.away,hs:home.points,as:away.points,quarters,metrics,factors,stats,findings,videos,
-    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="GENIUS_LIVESTATS"?"FIBA LIVESTATS / GENIUS SPORTS OFFICIAL DATA":meta.provider==="PLK"?"PLK OFFICIAL BOX SCORE":meta.provider==="EUROBASKET_POLAND"?"EUROBASKET POLAND BOX SCORE":meta.provider==="EUROCUP"?"EUROCUP OFFICIAL BOX SCORE":meta.provider==="EUROLEAGUE"?"EUROLEAGUE OFFICIAL BOX SCORE":meta.provider==="FIBA"?"FIBA EUROCUP WOMEN OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
+    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="GENIUS_LIVESTATS"?"FIBA LIVESTATS / GENIUS SPORTS OFFICIAL DATA":meta.provider==="PLK"?"PLK OFFICIAL BOX SCORE":meta.provider==="EUROBASKET_POLAND"?"EUROBASKET POLAND BOX SCORE":meta.provider==="EUROCUP"?"EUROCUP OFFICIAL BOX SCORE":meta.provider==="EUROLEAGUE"?"EUROLEAGUE OFFICIAL BOX SCORE":meta.provider==="FIBA"?"FIBA OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
     ask:meta.home+" and "+meta.away+" are compared here using verified box-score totals. Tactical causation requires video verification.",
     raw:{home,away},calculated:{home:hm,away:am},formulaCatalog};
 }
@@ -827,7 +827,10 @@ Deno.serve(async(req:Request)=>{
     const eventSlug=u.pathname.match(/\/events\/([^/]+)/)?.[1]||"";
     const eventSeason=eventSlug.match(/-(\d{2})-(\d{2})$/);
     const geniusCompetition=provider==="GENIUS_LIVESTATS"?clean(String(geniusData?.competition?.name||geniusData?.competitionName||geniusData?.leagueName||"")):"";
-    const title=provider==="GENIUS_LIVESTATS"?(geniusCompetition||(geniusLeague==="IBBA"?"IBBA · FIBA LiveStats":"FIBA LiveStats · "+geniusLeague)):provider==="PLK"?"Polska Liga Koszykówki":provider==="EUROBASKET_POLAND"?"Poland · Eurobasket":provider==="EUROCUP"?`EuroCup ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="EUROLEAGUE"?`EuroLeague ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="FIBA"?"EuroCup Women "+(eventSeason?"20"+eventSeason[1]+"/"+eventSeason[2]:""):clean($("title").text())||"IBBA";
+    const fibaCompetitionBase=eventSlug.replace(/-\d{2}-\d{2}$/i,"");
+    const fibaCompetitionName=({"eurocup-women":"EuroCup Women","fiba-europe-cup":"FIBA Europe Cup"} as Record<string,string>)[fibaCompetitionBase]||fibaCompetitionBase.split("-").filter(Boolean).map((x:string)=>x.toLowerCase()==="fiba"?"FIBA":x.charAt(0).toUpperCase()+x.slice(1)).join(" ");
+    const fibaSeason=eventSeason?"20"+eventSeason[1]+"/"+eventSeason[2]:"";
+    const title=provider==="GENIUS_LIVESTATS"?(geniusCompetition||(geniusLeague==="IBBA"?"IBBA · FIBA LiveStats":"FIBA LiveStats · "+geniusLeague)):provider==="PLK"?"Polska Liga Koszykówki":provider==="EUROBASKET_POLAND"?"Poland · Eurobasket":provider==="EUROCUP"?`EuroCup ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="EUROLEAGUE"?`EuroLeague ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="FIBA"?clean([fibaCompetitionName,fibaSeason].filter(Boolean).join(" ")):clean($("title").text())||"IBBA";
 
     const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
@@ -928,7 +931,7 @@ Deno.serve(async(req:Request)=>{
           const rosterRow:any=rosterByName.get(playerNameKey(player.name));
           if(!rosterRow) continue;
           const rawStats={games:1,minutes:player.minutes,points:player.points,rebounds:player.rebounds,assists:player.ast,turnovers:player.tov,two_pm:player.two_pm,two_pa:player.two_pa,three_pm:player.three_pm,three_pa:player.three_pa,ftm:player.ftm,fta:player.fta,oreb:player.oreb,dreb:player.dreb,steals:player.steals,blocks:player.blocks,value:player.value,plus_minus:player.plus_minus,starter:player.starter};
-          const sample={player_id:rosterRow.player_id,season:club.season,competition:title,club_name:"Maccabi Bnot Ashdod",phase:fibaData?.game?.round?.roundName||"Game",games:1,minutes:player.minutes,raw_stats:rawStats,published_summary:{},source_label:"FIBA EuroCup Women official box score",source_url:u.toString(),source_note:"Single-game verified FIBA sample. Advanced metrics are calculated from official totals.",verified:true};
+          const sample={player_id:rosterRow.player_id,season:club.season,competition:title,club_name:"Maccabi Bnot Ashdod",phase:fibaData?.game?.round?.roundName||"Game",games:1,minutes:player.minutes,raw_stats:rawStats,published_summary:{},source_label:title+" official box score",source_url:u.toString(),source_note:"Single-game verified FIBA sample. Advanced metrics are calculated from official totals.",verified:true};
           const {data:existing,error:existingErr}=await admin.from("player_samples").select("id").eq("player_id",rosterRow.player_id).eq("source_url",u.toString()).limit(1);
           if(existingErr) throw existingErr;
           const save=existing?.length?await admin.from("player_samples").update(sample).eq("id",existing[0].id):await admin.from("player_samples").insert(sample);
