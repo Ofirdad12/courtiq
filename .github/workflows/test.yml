@@ -74,6 +74,8 @@ jobs:
           node --check league-intelligence.js
           node tests/test_league_intelligence.js
           node --check club-os-league-extension.js
+          node --check scouting-report-v203.js
+          node tests/test_scouting_report_v203.js
           node --check nav-cleanup.js
           node --check live-bench-entry-v198.js
           node --check workspace-controller-v201.js
