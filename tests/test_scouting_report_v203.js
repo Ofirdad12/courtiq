@@ -1,20 +1,18 @@
-const fs=require('fs');
-const assert=require('assert');
-
-const index=fs.readFileSync('index.html','utf8');
-const scout=fs.readFileSync('scouting-report-v203.js','utf8');
-
-assert(index.includes('scouting-report-v203.js?v=203'),'v203 scouting workflow must be loaded');
-assert(index.indexOf('report-exports.js?v=201') < index.indexOf('scouting-report-v203.js?v=203'),'scouting workflow must load after report exports');
-assert(scout.includes('BUILD SCOUTING REPORT'),'workspace must expose the scouting report action');
-assert(scout.includes('courtiq_pending_scout'),'successful imports must hand off to the scouting workflow');
-assert(scout.includes('contenteditable="true"'),'coach narrative must be editable before PDF export');
-assert(scout.includes('PRINT / SAVE PDF'),'report must expose PDF export through print');
-assert(scout.includes('Coach Summary'),'report must contain a coach-facing executive summary');
-assert(scout.includes('3 Coach Decisions'),'report must translate data into coach decisions');
-assert(scout.includes('Key Players'),'report must contain player scouting context');
-assert(scout.includes('Recent Form'),'report must contain recent-team context when stored games exist');
-assert(scout.includes('does not infer play types, coverages or causation'),'report must preserve the evidence boundary');
-assert(scout.includes('window.CourtIQScoutingReport'),'report workflow must expose a public integration surface');
-
-console.log('CourtIQ v203 scouting report workflow contract: OK');
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const sandbox={console,URL,setTimeout,clearTimeout,MutationObserver:class{observe(){}},document:{documentElement:{},readyState:'loading',addEventListener(){}},sessionStorage:{getItem(){return null}}};sandbox.window=sandbox;
+vm.createContext(sandbox);vm.runInContext(fs.readFileSync(__dirname+'/../season-workbench.js','utf8'),sandbox);vm.runInContext(fs.readFileSync(__dirname+'/../scouting-report-v203.js','utf8'),sandbox);
+const api=sandbox.CourtIQScoutingReport;
+const index=fs.readFileSync(require('path').join(__dirname,'../index.html'),'utf8');
+assert(/scouting-report-v203\.js\?v=\d+/.test(index));
+assert(index.indexOf('report-exports.js')<index.indexOf('scouting-report-v203.js'));
+const p=(points,made,attempts,minutes)=>({name:'Player',points,two_pm:made,two_pa:attempts,three_pm:0,three_pa:0,ftm:0,fta:0,minutes,ast:null,tov:null,oreb:1,dreb:2});
+const g=(id,home,away,player)=>({id,_dbId:id,date:'04-10-2026',home,away,hs:10,as:20,comp:'League',players:{home:[player],away:[]}});
+const games=[g(1,'Haifa','A',p(2,1,1,10)),g(2,'Haifa','B',p(2,1,9,20)),g(3,'Haifa','C',p(0,0,0,0)),g(4,'C','Haifa',p(50,25,25,30))];
+let r=api.aggregatePlayers(games,'Haifa')[0];assert.equal(r.g,2);assert.equal(r.ppg,2);assert.equal(r.ts,20);assert.equal(r.efg,20);assert.equal(r.apg,null);assert.equal(r.topg,null);assert.equal(r.rpg,3);
+assert.equal(api.uniqueGames([games[0],games[0]]).length,1);
+assert.equal(api.uniqueGames([{...games[0],sourceUrl:'https://example.com/match/1/?utm_source=x'},{...games[1],sourceUrl:'https://example.com/match/1/'}]).length,1);
+assert.equal(api.teamGames(games,'Other').length,0);
+const invalid=g(5,'Haifa','B',p(100,1,2,20));r=api.aggregatePlayers([invalid],'Haifa')[0];assert.equal(r.shooting,0);assert.equal(r.ts,null);assert.equal(r.notes.length,1);
+const str=g(6,'Haifa','B',{...p(4,2,10,20),two_pm:'2',two_pa:'10'});assert.equal(api.aggregatePlayers([str],'Haifa')[0].ts,20);
+const out=api.documentHtml(games[0],'<img src=x onerror=alert(1)>',[]);assert(!out.includes('<img src=x'));assert(out.includes('&lt;img'));
+console.log('PASS: pooled rates, DNP, missing fields, team isolation, deduplication, invalid rows, numeric strings and HTML escaping.');
