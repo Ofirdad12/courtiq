@@ -47,10 +47,14 @@ jobs:
           node tests/test_court_analytics.js
           node --check lineup-engine.js
           node tests/test_lineup_engine.js
+          node --check rapm-engine.js
+          node tests/test_rapm_engine.js
+          node --check rapm-ui.js
           node tests/test_official_demo.js
           node tests/test_season_source.js
           node --check season-workbench.js
           node tests/test_season_workbench.js
+          node --check season-data-science.js
           node --check tactical-workspace.js
           node tests/test_tactical_workspace.js
           node tests/test_coach_workflow.js
