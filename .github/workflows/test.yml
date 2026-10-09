@@ -89,6 +89,8 @@ jobs:
           node --check live-bench-entry-v198.js
           node --check workspace-controller-v201.js
           node tests/test_workspace_controller_v201.js
+          node --check commercial-integrity-v212.js
+          node tests/test_commercial_integrity_v212.js
           node tests/test_ui_router_contract.js
       - name: Check Supabase Edge Function contract
         run: |
@@ -105,6 +107,7 @@ jobs:
           grep -q 'akcja-po-akcji' supabase/functions/live-game-preview/index.ts
           grep -q 'api/PlayByPlay' supabase/functions/live-game-preview/index.ts
           grep -q 'api-live.euroleague.net' supabase/functions/live-game-preview/index.ts
+          grep -q 'courtiq_preserve_starter_truth' supabase/migrations/20261009_starter_truth_state.sql
       - name: Check Club OS contract
         run: |
           grep -q 'club_seasons' supabase/migrations/20261006_club_os_v186.sql
