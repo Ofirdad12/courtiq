@@ -88,6 +88,8 @@ jobs:
           node tests/test_scouting_report_v203.js
           node --check coach-brief-v214.js
           node tests/test_coach_brief_v214.js
+          node --check report-library-v219.js
+          node tests/test_report_library_v219.js
           node --check season-memory-v215.js
           node tests/test_season_memory_v215.js
           node --check plan-usage-v216.js
@@ -153,6 +155,13 @@ jobs:
           grep -q 'COACH BRIEF' launch-readiness-v218.js
           grep -q 'SEASON MEMORY' launch-readiness-v218.js
           grep -q 'launch-readiness-v218.js' index.html
+      - name: Check saved report contract
+        run: |
+          grep -q 'create table if not exists public.saved_reports' supabase/migrations/20261009_saved_reports_v219.sql
+          grep -q 'club members create saved reports' supabase/migrations/20261009_saved_reports_v219.sql
+          grep -q 'SAVE TO LIBRARY' report-library-v219.js
+          grep -q 'CourtIQReportLibrary' app-actions-v194.js
+          grep -q 'report-library-v219.js' index.html
       - name: Check Club OS contract
         run: |
           grep -q 'club_seasons' supabase/migrations/20261006_club_os_v186.sql
