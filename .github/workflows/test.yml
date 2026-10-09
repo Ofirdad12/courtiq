@@ -25,6 +25,7 @@ jobs:
       - name: Check browser JavaScript syntax
         run: |
           node --check data.js
+          node --check multi-club-v213.js
           node --check coach.js
           node --check app.js
           node --check app-actions-v194.js
@@ -108,6 +109,19 @@ jobs:
           grep -q 'api/PlayByPlay' supabase/functions/live-game-preview/index.ts
           grep -q 'api-live.euroleague.net' supabase/functions/live-game-preview/index.ts
           grep -q 'courtiq_preserve_starter_truth' supabase/migrations/20261009_starter_truth_state.sql
+          grep -q 'const requestedClubId=Number(body.club_id||0);' supabase/functions/import-ibba-game/index.ts
+          grep -q 'onConflict:"club_id,provider,external_id"' supabase/functions/import-ibba-game/index.ts
+          grep -q 'starter_verified=true' supabase/functions/import-ibba-game/index.ts
+          ! grep -q 'maccabi-bnot-ashdod' supabase/functions/import-ibba-game/index.ts
+          ! grep -q 'Ashdod pilot' supabase/functions/import-ibba-game/index.ts
+      - name: Check multi-club tenant contract
+        run: |
+          grep -q 'courtiq_active_club_id' multi-club-v213.js
+          grep -q 'club_id:chosen' multi-club-v213.js
+          grep -q 'games_club_provider_external_id_key' supabase/migrations/20261009_multi_club_game_scope.sql
+          grep -q 'club and competition access player stats' supabase/migrations/20261009_multi_club_game_scope.sql
+          grep -q 'club and competition access game reports' supabase/migrations/20261009_multi_club_game_scope.sql
+          grep -q 'club access import runs' supabase/migrations/20261009_multi_club_game_scope.sql
       - name: Check Club OS contract
         run: |
           grep -q 'club_seasons' supabase/migrations/20261006_club_os_v186.sql

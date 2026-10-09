@@ -656,13 +656,17 @@ Deno.serve(async(req:Request)=>{
     const anon=Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const userDb=createClient(supabaseUrl,anon,{global:{headers:{Authorization:auth}}});
-    const {data:clubs,error:clubErr}=await userDb.from("clubs").select("id,name,season").eq("slug","maccabi-bnot-ashdod").limit(1);
+    const body=await req.json();
+    const requestedClubId=Number(body.club_id||0);
+    let clubQuery=userDb.from("clubs").select("id,name,season").order("id",{ascending:true}).limit(requestedClubId?1:2);
+    if(requestedClubId) clubQuery=clubQuery.eq("id",requestedClubId);
+    const {data:clubs,error:clubErr}=await clubQuery;
     if(clubErr) throw clubErr;
-    if(!clubs?.length) return j({error:"This account does not have access to the Ashdod pilot."},403);
+    if(!clubs?.length) return j({error:"This account does not have access to the selected club."},403);
+    if(!requestedClubId&&clubs.length>1) return j({error:"Select a club before importing this game.",code:"CLUB_SELECTION_REQUIRED"},409);
 
     const club=clubs[0];
     auditClubId=club.id;
-    const body=await req.json();
     const parsed=validateUrl(String(body.url||""));
     const u=parsed.u, provider=parsed.provider;
     auditUrl=u.toString();
@@ -763,8 +767,11 @@ Deno.serve(async(req:Request)=>{
       // from the first five substitution-outs in official play-by-play.
       const starters=plkStarterNames($,parsedPlayers[0].players,parsedPlayers[1].players);
       if(starters.verified){
-        parsedPlayers[0].players.forEach((p:any)=>p.starter=starters.home.includes(p.name));
-        parsedPlayers[1].players.forEach((p:any)=>p.starter=starters.away.includes(p.name));
+        parsedPlayers[0].players.forEach((p:any)=>{p.starter=starters.home.includes(p.name);p.starter_verified=true;p.starter_source="official_play_by_play";});
+        parsedPlayers[1].players.forEach((p:any)=>{p.starter=starters.away.includes(p.name);p.starter_verified=true;p.starter_source="official_play_by_play";});
+      }else{
+        parsedPlayers[0].players.forEach((p:any)=>{p.starter=null;p.starter_verified=false;p.starter_source="unknown";});
+        parsedPlayers[1].players.forEach((p:any)=>{p.starter=null;p.starter_verified=false;p.starter_source="unknown";});
       }
       const text=clean($.root().text()), qm=[...text.matchAll(/(\d{1,3}):(\d{1,3})/g)].slice(0,4);
       quarters=qm.map((m:any)=>[Number(m[1]),Number(m[2])]);
@@ -870,7 +877,7 @@ Deno.serve(async(req:Request)=>{
     const {data:game,error:gameErr}=await admin.from("games").upsert({
       external_id:id,provider,source_url:u.toString(),competition:title,game_date:gameDate,
       home_team:homeName,away_team:awayName,payload,club_id:club.id
-    },{onConflict:"provider,external_id"}).select("id").single();
+    },{onConflict:"club_id,provider,external_id"}).select("id").single();
     if(gameErr) throw gameErr;
 
     // CourtIQ V2 Data Quality Gate.
@@ -914,24 +921,26 @@ Deno.serve(async(req:Request)=>{
         }
         const season=gameDate?(Number(gameDate.slice(5,7))>=7?gameDate.slice(0,4)+"-"+String(Number(gameDate.slice(0,4))+1).slice(-2):String(Number(gameDate.slice(0,4))-1)+"-"+gameDate.slice(2,4)):"2026-27";
         const calculated={efg:player.efg,ts:player.ts,pps:player.pps,points_per_40:player.points_per_40,rebounds_per_40:player.rebounds_per_40,assists_per_40:player.assists_per_40,play_end_share:player.play_end_share,box_impact_per_40:player.box_impact_per_40};
-        const {error:memoryErr}=await admin.from("game_player_stats").upsert({game_id:game.id,player_id:playerId,provider,external_game_id:id,season,competition:title,team_name:teamName,opponent_name:opponentName,side:sideName,player_external_id:stableExternal,player_name:player.name,jersey_number:player.number||null,starter:Boolean(player.starter),minutes:player.minutes||0,stats:player,calculated,source_url:u.toString(),verified:qualityPassed,updated_at:new Date().toISOString()},{onConflict:"game_id,player_id"});
+        const {error:memoryErr}=await admin.from("game_player_stats").upsert({game_id:game.id,player_id:playerId,provider,external_game_id:id,season,competition:title,team_name:teamName,opponent_name:opponentName,side:sideName,player_external_id:stableExternal,player_name:player.name,jersey_number:player.number||null,starter:typeof player.starter==="boolean"?player.starter:null,minutes:player.minutes||0,stats:player,calculated,source_url:u.toString(),verified:qualityPassed,updated_at:new Date().toISOString()},{onConflict:"game_id,player_id"});
         if(memoryErr) throw memoryErr;
       }
     }
 
     let linkedPlayerSamples=0;
     if(provider==="FIBA"){
-      const ashdodSide=/ashdod/i.test(homeName)?0:/ashdod/i.test(awayName)?1:-1;
-      if(ashdodSide>=0){
+      const key=(value:string)=>clean(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
+      const clubKey=key(String(club.name||""));
+      const clubSide=clubKey&&key(homeName).includes(clubKey)?0:clubKey&&key(awayName).includes(clubKey)?1:-1;
+      if(clubSide>=0){
         const {data:rosterRows,error:rosterErr}=await admin.from("club_players").select("player_id,players(id,name)").eq("club_id",club.id).eq("season",club.season).eq("roster_status","roster");
         if(rosterErr) throw rosterErr;
         const rosterByName=new Map((rosterRows||[]).map((row:any)=>[playerNameKey(String(row.players?.name||"")),row]));
-        const teamPlayers=parsedPlayers[ashdodSide].players.filter((p:any)=>p.has_played||p.minutes>0);
+        const teamPlayers=parsedPlayers[clubSide].players.filter((p:any)=>p.has_played||p.minutes>0);
         for(const player of teamPlayers){
           const rosterRow:any=rosterByName.get(playerNameKey(player.name));
           if(!rosterRow) continue;
           const rawStats={games:1,minutes:player.minutes,points:player.points,rebounds:player.rebounds,assists:player.ast,turnovers:player.tov,two_pm:player.two_pm,two_pa:player.two_pa,three_pm:player.three_pm,three_pa:player.three_pa,ftm:player.ftm,fta:player.fta,oreb:player.oreb,dreb:player.dreb,steals:player.steals,blocks:player.blocks,value:player.value,plus_minus:player.plus_minus,starter:player.starter};
-          const sample={player_id:rosterRow.player_id,season:club.season,competition:title,club_name:"Maccabi Bnot Ashdod",phase:fibaData?.game?.round?.roundName||"Game",games:1,minutes:player.minutes,raw_stats:rawStats,published_summary:{},source_label:title+" official box score",source_url:u.toString(),source_note:"Single-game verified FIBA sample. Advanced metrics are calculated from official totals.",verified:true};
+          const sample={player_id:rosterRow.player_id,season:club.season,competition:title,club_name:club.name,phase:fibaData?.game?.round?.roundName||"Game",games:1,minutes:player.minutes,raw_stats:rawStats,published_summary:{},source_label:title+" official box score",source_url:u.toString(),source_note:"Single-game verified FIBA sample. Advanced metrics are calculated from official totals.",verified:true};
           const {data:existing,error:existingErr}=await admin.from("player_samples").select("id").eq("player_id",rosterRow.player_id).eq("source_url",u.toString()).limit(1);
           if(existingErr) throw existingErr;
           const save=existing?.length?await admin.from("player_samples").update(sample).eq("id",existing[0].id):await admin.from("player_samples").insert(sample);
