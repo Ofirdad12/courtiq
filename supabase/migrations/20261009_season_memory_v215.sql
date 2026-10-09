@@ -2,7 +2,7 @@
 -- Live, tenant-safe memory surfaces. These views update automatically whenever
 -- an official game import updates games/game_player_stats.
 
-create or replace function private.courtiq_json_num(p_json jsonb, p_key text)
+create or replace function public.courtiq_json_num(p_json jsonb, p_key text)
 returns numeric
 language sql
 immutable
@@ -15,9 +15,9 @@ as $$
   end
 $$;
 
-revoke all on function private.courtiq_json_num(jsonb, text) from public;
-revoke all on function private.courtiq_json_num(jsonb, text) from anon;
-revoke all on function private.courtiq_json_num(jsonb, text) from authenticated;
+revoke all on function public.courtiq_json_num(jsonb, text) from public;
+revoke all on function public.courtiq_json_num(jsonb, text) from anon;
+grant execute on function public.courtiq_json_num(jsonb, text) to authenticated;
 
 create or replace view public.team_game_memory
 with (security_invoker = true)
@@ -47,23 +47,23 @@ with expanded as (
 ), n as (
   select
     e.*,
-    private.courtiq_json_num(team_raw,'points') as points_for,
-    private.courtiq_json_num(opp_raw,'points') as points_against,
-    private.courtiq_json_num(team_raw,'two_pm') as two_pm,
-    private.courtiq_json_num(team_raw,'two_pa') as two_pa,
-    private.courtiq_json_num(team_raw,'three_pm') as three_pm,
-    private.courtiq_json_num(team_raw,'three_pa') as three_pa,
-    private.courtiq_json_num(team_raw,'ftm') as ftm,
-    private.courtiq_json_num(team_raw,'fta') as fta,
-    private.courtiq_json_num(team_raw,'ast') as ast,
-    private.courtiq_json_num(team_raw,'tov') as tov,
-    private.courtiq_json_num(team_raw,'oreb') as oreb,
-    private.courtiq_json_num(team_raw,'dreb') as dreb,
-    private.courtiq_json_num(opp_raw,'two_pa') + private.courtiq_json_num(opp_raw,'three_pa') as opp_fga,
-    private.courtiq_json_num(opp_raw,'fta') as opp_fta,
-    private.courtiq_json_num(opp_raw,'oreb') as opp_oreb,
-    private.courtiq_json_num(opp_raw,'dreb') as opp_dreb,
-    private.courtiq_json_num(opp_raw,'tov') as opp_tov
+    public.courtiq_json_num(team_raw,'points') as points_for,
+    public.courtiq_json_num(opp_raw,'points') as points_against,
+    public.courtiq_json_num(team_raw,'two_pm') as two_pm,
+    public.courtiq_json_num(team_raw,'two_pa') as two_pa,
+    public.courtiq_json_num(team_raw,'three_pm') as three_pm,
+    public.courtiq_json_num(team_raw,'three_pa') as three_pa,
+    public.courtiq_json_num(team_raw,'ftm') as ftm,
+    public.courtiq_json_num(team_raw,'fta') as fta,
+    public.courtiq_json_num(team_raw,'ast') as ast,
+    public.courtiq_json_num(team_raw,'tov') as tov,
+    public.courtiq_json_num(team_raw,'oreb') as oreb,
+    public.courtiq_json_num(team_raw,'dreb') as dreb,
+    public.courtiq_json_num(opp_raw,'two_pa') + public.courtiq_json_num(opp_raw,'three_pa') as opp_fga,
+    public.courtiq_json_num(opp_raw,'fta') as opp_fta,
+    public.courtiq_json_num(opp_raw,'oreb') as opp_oreb,
+    public.courtiq_json_num(opp_raw,'dreb') as opp_dreb,
+    public.courtiq_json_num(opp_raw,'tov') as opp_tov
   from expanded e
 ), calc as (
   select
@@ -138,27 +138,27 @@ select
   gps.minutes,
   gps.verified,
   gps.source_url,
-  private.courtiq_json_num(gps.stats,'points') as points,
+  public.courtiq_json_num(gps.stats,'points') as points,
   coalesce(
-    private.courtiq_json_num(gps.stats,'rebounds'),
-    private.courtiq_json_num(gps.stats,'oreb') + private.courtiq_json_num(gps.stats,'dreb')
+    public.courtiq_json_num(gps.stats,'rebounds'),
+    public.courtiq_json_num(gps.stats,'oreb') + public.courtiq_json_num(gps.stats,'dreb')
   ) as rebounds,
-  private.courtiq_json_num(gps.stats,'oreb') as oreb,
-  private.courtiq_json_num(gps.stats,'dreb') as dreb,
-  private.courtiq_json_num(gps.stats,'ast') as ast,
-  private.courtiq_json_num(gps.stats,'tov') as tov,
-  private.courtiq_json_num(gps.stats,'steals') as steals,
-  private.courtiq_json_num(gps.stats,'blocks') as blocks,
-  private.courtiq_json_num(gps.stats,'two_pm') as two_pm,
-  private.courtiq_json_num(gps.stats,'two_pa') as two_pa,
-  private.courtiq_json_num(gps.stats,'three_pm') as three_pm,
-  private.courtiq_json_num(gps.stats,'three_pa') as three_pa,
-  private.courtiq_json_num(gps.stats,'ftm') as ftm,
-  private.courtiq_json_num(gps.stats,'fta') as fta,
-  private.courtiq_json_num(gps.calculated,'ts') as ts_pct,
-  private.courtiq_json_num(gps.calculated,'efg') as efg_pct,
-  private.courtiq_json_num(gps.calculated,'play_end_share') as play_end_share,
-  private.courtiq_json_num(gps.calculated,'three_pa_rate') as three_pa_rate,
+  public.courtiq_json_num(gps.stats,'oreb') as oreb,
+  public.courtiq_json_num(gps.stats,'dreb') as dreb,
+  public.courtiq_json_num(gps.stats,'ast') as ast,
+  public.courtiq_json_num(gps.stats,'tov') as tov,
+  public.courtiq_json_num(gps.stats,'steals') as steals,
+  public.courtiq_json_num(gps.stats,'blocks') as blocks,
+  public.courtiq_json_num(gps.stats,'two_pm') as two_pm,
+  public.courtiq_json_num(gps.stats,'two_pa') as two_pa,
+  public.courtiq_json_num(gps.stats,'three_pm') as three_pm,
+  public.courtiq_json_num(gps.stats,'three_pa') as three_pa,
+  public.courtiq_json_num(gps.stats,'ftm') as ftm,
+  public.courtiq_json_num(gps.stats,'fta') as fta,
+  public.courtiq_json_num(gps.calculated,'ts') as ts_pct,
+  public.courtiq_json_num(gps.calculated,'efg') as efg_pct,
+  public.courtiq_json_num(gps.calculated,'play_end_share') as play_end_share,
+  public.courtiq_json_num(gps.calculated,'three_pa_rate') as three_pa_rate,
   gps.stats,
   gps.calculated
 from public.game_player_stats gps
