@@ -88,6 +88,8 @@ jobs:
           node tests/test_scouting_report_v203.js
           node --check coach-brief-v214.js
           node tests/test_coach_brief_v214.js
+          node --check season-memory-v215.js
+          node tests/test_season_memory_v215.js
           node --check nav-cleanup.js
           node --check live-bench-entry-v198.js
           node --check workspace-controller-v201.js
@@ -124,6 +126,14 @@ jobs:
           grep -q 'club and competition access player stats' supabase/migrations/20261009_multi_club_game_scope.sql
           grep -q 'club and competition access game reports' supabase/migrations/20261009_multi_club_game_scope.sql
           grep -q 'club access import runs' supabase/migrations/20261009_multi_club_game_scope.sql
+      - name: Check live season memory contract
+        run: |
+          grep -q 'security_invoker = true' supabase/migrations/20261009_season_memory_v215.sql
+          grep -q 'team_game_memory' supabase/migrations/20261009_season_memory_v215.sql
+          grep -q 'player_game_memory' supabase/migrations/20261009_season_memory_v215.sql
+          grep -q 'grant select on public.team_game_memory to authenticated' supabase/migrations/20261009_season_memory_v215.sql
+          grep -q 'grant select on public.player_game_memory to authenticated' supabase/migrations/20261009_season_memory_v215.sql
+          grep -q 'SEASON MEMORY' season-memory-v215.js
       - name: Check Club OS contract
         run: |
           grep -q 'club_seasons' supabase/migrations/20261006_club_os_v186.sql
