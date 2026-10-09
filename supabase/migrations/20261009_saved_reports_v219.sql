@@ -8,14 +8,14 @@ create table if not exists public.saved_reports (
   title text not null,
   subject_name text not null,
   competition text,
-  sample_game_ids bigint[] not null default '{}'::bigint[],
-  sample_games integer not null default 0,
+  sample_game_ids bigint[] not null,
+  sample_games integer not null,
   confidence text,
   payload jsonb not null,
   created_by uuid not null default auth.uid(),
   created_at timestamptz not null default now(),
   constraint saved_reports_type_check check (report_type in ('coach_brief','opponent_scout','season_snapshot')),
-  constraint saved_reports_sample_check check (sample_games >= 0),
+  constraint saved_reports_sample_check check (sample_games > 0 and sample_games = cardinality(sample_game_ids)),
   constraint saved_reports_confidence_check check (confidence is null or confidence in ('LOW','MEDIUM','HIGH'))
 );
 
@@ -28,7 +28,10 @@ alter table public.saved_reports enable row level security;
 drop policy if exists "club members read saved reports" on public.saved_reports;
 create policy "club members read saved reports"
 on public.saved_reports for select to authenticated
-using (private.is_club_member(club_id));
+using (
+  private.is_club_member(club_id)
+  and can_access_competition(coalesce(competition,''))
+);
 
 drop policy if exists "club members create saved reports" on public.saved_reports;
 create policy "club members create saved reports"
@@ -36,11 +39,14 @@ on public.saved_reports for insert to authenticated
 with check (
   created_by=(select auth.uid())
   and private.is_club_member(club_id)
+  and can_access_competition(coalesce(competition,''))
   and not exists (
     select 1
     from unnest(sample_game_ids) gid
     left join public.games g on g.id=gid
-    where g.id is null or g.club_id<>saved_reports.club_id
+    where g.id is null
+       or g.club_id<>saved_reports.club_id
+       or not can_access_competition(coalesce(g.competition,''))
   )
 );
 
@@ -48,4 +54,4 @@ revoke update, delete on public.saved_reports from anon, authenticated;
 grant select, insert on public.saved_reports to authenticated;
 
 comment on table public.saved_reports is
-  'Immutable tenant-safe report snapshots. Stores the selected game sample and deterministic report payload used at save time.';
+  'Immutable tenant-safe report snapshots. Stores the exact selected game sample and deterministic report payload used at save time.';
