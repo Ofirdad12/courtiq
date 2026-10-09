@@ -21,7 +21,7 @@
       if(name==='games')return typeof openGameLibrary==='function'?(openGameLibrary(),true):false;
       if(name==='season')return typeof openSeasonMemory==='function'?(openSeasonMemory(),true):false;
       if(name==='scouting')return typeof openOpponentScout==='function'?(openOpponentScout(),true):(typeof openTacticalWorkspace==='function'?(openTacticalWorkspace(),true):false);
-      if(name==='reports')return typeof openFullReport==='function'?(openFullReport(),true):false;
+      if(name==='reports')return call(root.CourtIQReportLibrary?.open,root.CourtIQReportLibrary)||(typeof openFullReport==='function'?(openFullReport(),true):false);
       if(name==='connected')return typeof openConnectedIntelligence==='function'?(openConnectedIntelligence(),true):false;
       if(name==='player-memory')return typeof openPlayerMemory==='function'?(openPlayerMemory(),true):call(root.CourtIQPlayers?.openPlayers,root.CourtIQPlayers);
       if(name==='account'||name==='login')return typeof openAccount==='function'?(openAccount(),true):false;
