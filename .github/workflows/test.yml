@@ -92,6 +92,8 @@ jobs:
           node tests/test_season_memory_v215.js
           node --check plan-usage-v216.js
           node tests/test_plan_usage_v216.js
+          node --check launch-readiness-v218.js
+          node tests/test_launch_readiness_v218.js
           node --check nav-cleanup.js
           node --check live-bench-entry-v198.js
           node --check workspace-controller-v201.js
@@ -144,6 +146,13 @@ jobs:
           grep -q 'COURTIQ_SEAT_LIMIT_REACHED' supabase/migrations/20261009_saas_entitlements_v216.sql
           grep -q 'courtiq_enforce_game_entitlement' supabase/migrations/20261009_saas_entitlements_v216.sql
           grep -q 'PLAN · USAGE' plan-usage-v216.js
+      - name: Check launch readiness contract
+        run: |
+          grep -q 'LAUNCH READY · מוכנות' launch-readiness-v218.js
+          grep -q 'TEAM SCOUTING' launch-readiness-v218.js
+          grep -q 'COACH BRIEF' launch-readiness-v218.js
+          grep -q 'SEASON MEMORY' launch-readiness-v218.js
+          grep -q 'launch-readiness-v218.js' index.html
       - name: Check Club OS contract
         run: |
           grep -q 'club_seasons' supabase/migrations/20261006_club_os_v186.sql
