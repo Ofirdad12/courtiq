@@ -16,3 +16,18 @@ const invalid=g(5,'Haifa','B',p(100,1,2,20));r=api.aggregatePlayers([invalid],'H
 const str=g(6,'Haifa','B',{...p(4,2,10,20),two_pm:'2',two_pa:'10'});assert.equal(api.aggregatePlayers([str],'Haifa')[0].ts,20);
 const out=api.documentHtml(games[0],'<img src=x onerror=alert(1)>',[]);assert(!out.includes('<img src=x'));assert(out.includes('&lt;img'));
 console.log('PASS: pooled rates, DNP, missing fields, team isolation, deduplication, invalid rows, numeric strings and HTML escaping.');
+const withRaw=(game,made,attempts)=>({...game,hs:2*made,raw:{home:{points:2*made,two_pm:made,two_pa:attempts,three_pm:0,three_pa:0,ftm:0,fta:0,oreb:0,dreb:5,tov:2,ast:3},away:{points:20,two_pm:10,two_pa:20,three_pm:0,three_pa:0,ftm:0,fta:0,oreb:1,dreb:5,tov:2,ast:2}}});
+const sample=[withRaw(games[0],1,1),withRaw(games[1],1,9)];
+let rows=api.evidenceRows(sample,'Haifa'),e=api.teamEvidence(rows);
+assert.equal(e.m.efg.value,20);assert.equal(e.m.efg.n,2);assert.equal(e.m.three.value,null);assert.equal(e.m.astTo.value,1.5);assert.equal(e.m.drb.value,100*10/12);assert.equal(e.m.poss.n,2);
+assert.equal(api.detailedPlayers(rows)[0].ts,20);assert.equal(api.concentration(rows).value,100);
+const broken=JSON.parse(JSON.stringify(sample));broken[0].raw.home.points=999;broken[0].raw.home.tov=null;
+e=api.teamEvidence(api.evidenceRows(broken,'Haifa'));assert.equal(e.m.efg.n,1);assert.equal(e.m.tov.n,1);assert.equal(e.m.poss.n,1);
+assert.equal(api.trendEvidence(rows).ready,false);
+const six=Array.from({length:6},(_,i)=>({...sample[0],id:10+i,_dbId:10+i,date:`0${i+1}-10-2026`}));
+let trend=api.trendEvidence(api.evidenceRows(six,'Haifa'));assert.equal(trend.ready,true);assert.equal(trend.deltas.pf,0);
+six[0].comp='Cup';assert.equal(api.trendEvidence(api.evidenceRows(six,'Haifa')).ready,false);
+const foreign=withRaw(g(55,'Other','B',p(2,1,1,10)),1,1);assert.equal(api.evidenceRows([...sample,foreign],'Haifa').length,2);
+const html=api.documentHtml(sample[0],'Haifa',sample);for(const title of ['ממצאים מוכחים','כיסוי הנתונים','ריכוז הניקוד','פירוט משחקים','בית, חוץ ויריבות'])assert(html.includes(title));
+console.log('PASS: team evidence denominators, partial inputs, score reconciliation, estimated possessions, player evidence, concentration, dates and complete same-competition trend windows.');
+
