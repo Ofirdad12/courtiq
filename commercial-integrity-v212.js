@@ -6,7 +6,8 @@ const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const arr=v=>Array.isArray(v)?v:[];
 
 function providerOf(record){
-  return String(record?.provider||record?.payload?.provider||record?.source?.provider||record?.ui?.provider||record?.payload?.ui?.provider||record?.sourceLabel||record?.payload?.ui?.sourceLabel||'').toUpperCase().includes('PLK')?PROVIDER_PLK:String(record?.provider||record?.payload?.provider||record?.source?.provider||'').toUpperCase();
+  const raw=String(record?.provider||record?.payload?.provider||record?.source?.provider||record?.ui?.provider||record?.payload?.ui?.provider||record?.sourceLabel||record?.payload?.ui?.sourceLabel||'').toUpperCase();
+  return raw.includes('PLK')?PROVIDER_PLK:raw;
 }
 function uiOf(record){return record?.payload?.ui||record?.ui||record||null;}
 function playerSides(record){
@@ -46,7 +47,7 @@ function normalizeRecord(record){
   const ui=uiOf(record);
   if(ui){
     ui.starterEvidence={verified,status:verified?'VERIFIED':'UNKNOWN',home,away};
-    if(!verified&&ui.splits){ui.splits=null;}
+    if(!verified&&ui.splits)ui.splits=null;
   }
   if(record.payload){
     record.payload.starter_evidence={verified,status:verified?'VERIFIED':'UNKNOWN',home,away};
@@ -59,7 +60,8 @@ function qualityOf(record){
   const checks=arr(q?.checks);
   const pass=checks.filter(x=>String(x?.status||'').toUpperCase()==='PASS').length;
   const score=Number.isFinite(Number(q?.score))?Number(q.score):(checks.length?Math.round(pass/checks.length*100):null);
-  const status=String(q?.status||record?.payload?.verified===true?'VERIFIED':record?.payload?.verified===false?'REVIEW':'').toUpperCase();
+  const fallback=record?.payload?.verified===true?'VERIFIED':record?.payload?.verified===false?'REVIEW':'';
+  const status=String(q?.status||fallback).toUpperCase();
   const sides=playerSides(record);
   const starterVerified=providerOf(record)!==PROVIDER_PLK?null:(starterEvidence(sides?.home).verified&&starterEvidence(sides?.away).verified);
   return {status:status||'UNKNOWN',score,checks,pass,total:checks.length,starterVerified};
@@ -83,16 +85,18 @@ if(typeof document==='undefined'||typeof window==='undefined')return;
 
 function normalizeActive(){try{if(window.CourtIQActiveGame)normalizeRecord(window.CourtIQActiveGame);}catch(_){} }
 function wrapWorkspace(){
-  const d=window.CourtIQData;
-  if(!d||typeof d.workspace!=='function'||d.workspace.__cqIntegrityWrapped)return;
-  const original=d.workspace.bind(d);
-  const wrapped=async(...args)=>{
-    const value=await original(...args);
-    for(const g of arr(value?.games))normalizeRecord(g);
-    return value;
-  };
-  wrapped.__cqIntegrityWrapped=true;
-  d.workspace=wrapped;
+  try{
+    const d=window.CourtIQData;
+    if(!d||typeof d.workspace!=='function'||d.workspace.__cqIntegrityWrapped)return;
+    const original=d.workspace.bind(d);
+    const wrapped=async(...args)=>{
+      const value=await original(...args);
+      for(const g of arr(value?.games))normalizeRecord(g);
+      return value;
+    };
+    wrapped.__cqIntegrityWrapped=true;
+    d.workspace=wrapped;
+  }catch(_){}
 }
 function ensureStyle(){
   if(document.getElementById('cqCommercialIntegrityStyle'))return;
@@ -119,13 +123,16 @@ async function activeRecord(){
 async function renderHealth(){
   const token=++latestToken,host=document.querySelector('.gamehead,.cq-gamehead');
   if(!host)return;
-  const old=document.getElementById('cqImportHealth');if(old)old.remove();
   const record=await activeRecord();if(token!==latestToken||!record)return;
   normalizeRecord(record);normalizeActive();
   const q=qualityOf(record),provider=providerOf(record)||'OFFICIAL';
-  const row=document.createElement('div');row.id='cqImportHealth';row.className='cq-import-health';
   const score=q.score==null?'—':`${Math.round(q.score)}/100`;
   const starter=q.starterVerified===null?'':q.starterVerified?' · Starters verified':' · Starters unknown';
+  const sig=[recordKey(record),q.status,score,q.pass,q.total,starter].join('|');
+  const old=document.getElementById('cqImportHealth');
+  if(old?.dataset?.sig===sig)return;
+  if(old)old.remove();
+  const row=document.createElement('div');row.id='cqImportHealth';row.className='cq-import-health';row.dataset.sig=sig;
   row.innerHTML=`<span class="cq-health-pill" data-state="${E(q.status)}">IMPORT HEALTH · <b>${E(score)}</b> · ${E(q.status)}</span><span class="cq-health-detail"><strong>${E(provider)}</strong>${E(q.total?` · ${q.pass}/${q.total} checks passed`:'')}${E(starter)}</span>`;
   host.appendChild(row);
 }
@@ -136,9 +143,8 @@ function refresh(){
   setTimeout(()=>{scheduled=false;renderHealth();},30);
 }
 
-const observer=new MutationObserver(refresh);
-observer.observe(document.documentElement,{childList:true,subtree:true});
 window.addEventListener('hashchange',refresh);
 window.addEventListener('load',refresh);
 for(const ms of [0,250,800,1800,3500])setTimeout(refresh,ms);
+setInterval(refresh,2500);
 })();
