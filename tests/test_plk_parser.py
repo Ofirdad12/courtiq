@@ -2,10 +2,11 @@ from api.plk import parse_plk_html, validate_plk_url
 
 URL="https://plk.pl/mecz/225903/dziki-warszawa-vs-zastal-zielona-gora/statystyki"
 
+
 def test_plk_225903_fixture():
     html="""<html><head><title>Dziki Warszawa vs Zastal Zielona Góra | 26.09.2026 - Statystyki - Polska Liga Koszykówki</title></head><body>
     <table><tr><th>NR</th><th>Zawodnik</th></tr>
-    <tr><td>1</td><td>A. Luke</td><td>6</td><td>26:05</td><td>0/1</td><td>0</td><td>2/5</td><td>40</td><td>2/6</td><td>33.3</td><td>2/6</td><td>33.3</td><td>1</td><td>1</td><td>2</td><td>1</td><td>1</td><td>9</td><td>1</td><td>1</td><td>0</td><td>0</td><td>8</td><td>0</td></tr>
+    <tr><td>1</td><td>A. Luke</td><td>6</td><td>26:05</td><td>0/1</td><td>0</td><td>2/5</td><td>40</td><td>2/6</td><td>33.3</td><td>0/0</td><td>0</td><td>1</td><td>1</td><td>2</td><td>1</td><td>1</td><td>9</td><td>1</td><td>1</td><td>0</td><td>0</td><td>8</td><td>0</td></tr>
     <tr><td>Suma</td><td>77</td><td>200:00</td><td>17/32</td><td>53.1</td><td>9/30</td><td>30</td><td>26/62</td><td>41.9</td><td>16/25</td><td>64</td><td>11</td><td>26</td><td>37</td><td>24</td><td>22</td><td>24</td><td>15</td><td>8</td><td>4</td><td>3</td><td>83</td></tr></table>
     <table><tr><th>NR</th><th>Zawodnik</th></tr>
     <tr><td>0</td><td>C. Garrison</td><td>10</td><td>31:03</td><td>1/3</td><td>33.3</td><td>2/5</td><td>40</td><td>3/8</td><td>37.5</td><td>2/2</td><td>100</td><td>1</td><td>5</td><td>6</td><td>8</td><td>3</td><td>2</td><td>3</td><td>2</td><td>0</td><td>0</td><td>18</td><td>10</td></tr>
@@ -21,7 +22,19 @@ def test_plk_225903_fixture():
     assert game["away"]["raw"]["three_pa"]==27
     assert game["players"]["home"][0]["name"]=="A. Luke"
     assert game["players"]["away"][0]["name"]=="C. Garrison"
+    assert game["players"]["home"][0]["minutes_raw"]=="26:05"
+    assert game["players"]["home"][0]["two_pa"]==1
+    assert game["players"]["home"][0]["three_pm"]==2
+    assert game["players"]["home"][0]["fga"]==6
+    assert game["players"]["home"][0]["oreb"]==1
+    assert game["players"]["home"][0]["dreb"]==1
+    assert game["players"]["home"][0]["ast"]==1
+    assert game["players"]["home"][0]["tov"]==1
+    assert game["players"]["home"][0]["eval"]==8
+    assert game["players"]["home"][0]["starter"] is None
     assert game["validation"]["status"]=="verified"
+    assert game["evidence"]["player_boxscore"] is True
+
 
 def test_plk_rejects_non_official_host():
     try:
