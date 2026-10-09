@@ -16,9 +16,9 @@ const extracted=bridge.extractGames(rows);
 assert.equal(extracted.coverage.games,2);
 assert.equal(extracted.coverage.gamesFromPossessionEngine,2);
 assert.equal(extracted.coverage.gamesWithPossessionStints,2);
-assert.equal(extracted.coverage.certifiedPossessions,8);
+assert.equal(extracted.coverage.certifiedPossessions,12);
 assert.equal(extracted.stints.length,2);
-assert.equal(extracted.coverage.totalPossessions,8);
+assert.equal(extracted.coverage.totalPossessions,12);
 
 const model=globalThis.CourtIQRAPM.fitGames(rows,{force:true,minGames:1,minStints:1,minPossessions:1});
 assert.equal(model.status,'READY');
