@@ -47,8 +47,13 @@ jobs:
           node tests/test_court_analytics.js
           node --check lineup-engine.js
           node tests/test_lineup_engine.js
+          node --check possession-engine.js
+          node tests/test_possession_engine.js
           node --check rapm-engine.js
+          node --check rapm-possession-bridge.js
           node tests/test_rapm_engine.js
+          node tests/test_rapm_possession_bridge.js
+          node --check possession-ui.js
           node --check rapm-ui.js
           node tests/test_official_demo.js
           node tests/test_season_source.js
