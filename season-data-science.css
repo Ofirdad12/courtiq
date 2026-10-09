@@ -1,0 +1,24 @@
+.seasonDataScienceModal{z-index:10050}
+.sds-modal{width:min(1180px,96vw);max-height:92vh;overflow:auto;background:#08111f;border:1px solid rgba(123,163,255,.22);color:#edf4ff}
+.sds-toolbar{display:flex;gap:12px;align-items:end;justify-content:space-between;margin:0 36px 14px 0;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.sds-toolbar label{display:grid;gap:6px;font-size:11px;color:#8fa6c8;text-transform:uppercase;letter-spacing:.09em}
+.sds-toolbar select{min-width:240px;background:#0e1a2c;color:#fff;border:1px solid #263b5d;border-radius:9px;padding:10px}
+.sds-source{font-size:11px;color:#84a7d6;border:1px solid rgba(132,167,214,.28);border-radius:999px;padding:7px 10px}
+.sds-body{padding:0 2px 8px}
+.sds-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:8px 0 18px}
+.sds-head small,.sds-title small{display:block;color:#65d6ff;font-size:11px;letter-spacing:.11em;font-weight:800}
+.sds-head h2{font-size:28px;margin:5px 0 6px}.sds-head p{margin:0;color:#9fb2cf;max-width:760px;line-height:1.55}.sds-head>span{font-size:11px;border:1px solid #274263;border-radius:999px;padding:7px 10px;color:#89a4ca}
+.sds-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 12px}
+.sds-kpi,.sds-panel{background:linear-gradient(180deg,rgba(15,29,49,.96),rgba(9,19,34,.96));border:1px solid rgba(113,151,205,.18);border-radius:14px}
+.sds-kpi{padding:16px}.sds-kpi small{display:block;color:#8da8cb;font-size:10px;letter-spacing:.08em}.sds-kpi strong{display:block;font-size:30px;margin:7px 0 2px}.sds-kpi span{font-size:11px;color:#6fd5ff}.sds-kpi p{font-size:11px;color:#8097b8;margin:8px 0 0}
+.sds-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sds-panel{padding:16px;min-width:0}.sds-full{margin-top:12px}
+.sds-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}.sds-title h3{font-size:16px;margin:4px 0}.sds-title>b,.sds-title>span{font-size:11px;color:#8ca5c8;font-weight:600}
+.sds-spark{width:100%;height:180px;border-radius:10px;background:#07101c}.sds-spark polyline{fill:none;stroke:currentColor;stroke-width:3;color:#69d5ff}.sds-spark circle{fill:#d8f4ff}
+.sds-ready{display:grid;gap:8px}.sds-ready>div{padding:11px;border-radius:10px;background:#091523;border:1px solid rgba(255,255,255,.06)}.sds-ready b{margin-right:8px}.sds-ready span{float:right;font-size:10px;padding:3px 7px;border-radius:999px;background:#17253a;color:#b9c9df}.sds-ready span.ok{background:rgba(37,190,130,.14);color:#63e3ae}.sds-ready span.warn{background:rgba(245,167,66,.12);color:#ffc16e}.sds-ready p{clear:both;margin:7px 0 0;color:#8fa3c0;font-size:11px;line-height:1.45}
+.sds-list{display:grid;gap:8px}.sds-row{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;background:#091523}.sds-row>span{min-width:64px;font-size:11px;font-weight:800}.sds-row>span.up{color:#65e0ad}.sds-row>span.down{color:#ff9e9e}.sds-row b{display:block;font-size:12px}.sds-row small{color:#8299ba}
+.sds-scroll{overflow:auto}.sds-scroll table{width:100%;border-collapse:collapse;font-size:11px}.sds-scroll th,.sds-scroll td{padding:9px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap}.sds-scroll th{color:#819abc;font-weight:700}.sds-scroll td{color:#dce8f7}
+.sds-note{font-size:10px;color:#758bab;line-height:1.5;margin:10px 0 0}.sds-empty{padding:16px;border:1px dashed rgba(255,255,255,.13);border-radius:10px;color:#8499b7;font-size:12px}
+.sds-decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.sds-decisions>div{padding:13px;background:#091523;border-radius:10px}.sds-decisions b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#142b46;color:#71d9ff;margin-right:7px}.sds-decisions span{font-weight:700}.sds-decisions p{font-size:11px;line-height:1.5;color:#8fa3c0}
+.sds-loading{padding:50px;text-align:center;color:#9bb0cd}.sds-loading b{display:block;color:#fff;margin-bottom:8px}
+@media(max-width:850px){.sds-kpis{grid-template-columns:1fr 1fr}.sds-grid{grid-template-columns:1fr}.sds-decisions{grid-template-columns:1fr}.sds-head{display:block}.sds-head>span{display:inline-block;margin-top:10px}}
+@media(max-width:520px){.sds-kpis{grid-template-columns:1fr}.sds-toolbar{align-items:stretch;flex-direction:column}.sds-toolbar select{width:100%;min-width:0}.sds-head h2{font-size:22px}.sds-modal{width:98vw;padding:14px}}
