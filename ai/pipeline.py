@@ -12,6 +12,9 @@ from ai.tactical_engine import detect
 from ai.tactical_taxonomy import capabilities
 from ai.quality_gate import gate
 
+LEGACY_PIPELINE='tracking-to-tactics-v1'
+CURRENT_PIPELINE='tracking-to-tactics-v2'
+
 
 def run(payload):
     prepared=assign(payload) if payload.get('teams') else payload
@@ -26,7 +29,8 @@ def run(payload):
     )
     return {
         'schema':'courtiq-video-intelligence-v234',
-        'pipeline':'tracking-to-tactics-v2',
+        'pipeline':CURRENT_PIPELINE,
+        'compatible_with':[LEGACY_PIPELINE],
         'model':tactical['model'],
         'stats':{
             'frames':len(normalized['frames']),
