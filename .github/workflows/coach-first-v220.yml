@@ -73,3 +73,13 @@ jobs:
           grep -q 'INCOMPLETE games are automatically excluded' data-quality-center-v225.js
           grep -q 'CourtIQDataQuality' app-actions-v194.js
           grep -q 'data-quality-center-v225.js' index.html
+      - name: Check Player Intelligence
+        run: |
+          node --check player-intelligence-v226.js
+          node tests/test_player_intelligence_v226.js
+          grep -q 'COURTIQ PLAYER INTELLIGENCE' player-intelligence-v226.js
+          grep -q 'WHAT CHANGED?' player-intelligence-v226.js
+          grep -q 'PLAY-END SHARE' player-intelligence-v226.js
+          grep -q 'CourtIQPlayerIntelligence' app-actions-v194.js
+          grep -q 'Player Intelligence' nav-cleanup.js
+          grep -q 'player-intelligence-v226.js' index.html
