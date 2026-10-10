@@ -1,7 +1,7 @@
-/* CourtIQ v229 · coach-first workspace navigation. Routing is owned by ui-router-v194.js. */
+/* CourtIQ v230 · coach-first workspace navigation. Routing is owned by ui-router-v194.js. */
 (() => {
   'use strict';
-  const VERSION='229';
+  const VERSION='230';
   const ADVANCED_KEY='courtiq_nav_advanced_open';
   const navItem=(icon,label,action,primary=false,advanced=false)=>
     `<button type="button" class="cq-nav-item${primary?' cq-nav-primary':''}${advanced?' cq-nav-advanced':''}" data-cq-action="${action}"><span>${icon}</span><b>${label}</b></button>`;
@@ -27,6 +27,7 @@
       ${navItem('▶','Play-by-Play','play',false,true)}
       ${navItem('▦','Lineups','lineups',false,true)}
       ${navItem('◆','Connected Intelligence','connected',false,true)}
+      ${navItem('⚙','System Health','system-health',false,true)}
     </div>`;
 
   function applyAdvancedState(menu,open){
