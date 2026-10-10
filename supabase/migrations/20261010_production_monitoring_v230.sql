@@ -38,6 +38,6 @@ using (
 );
 
 revoke all on public.client_health_events from anon;
-grant insert on public.client_health_events to authenticated;
-grant select on public.client_health_events to authenticated;
+revoke all on public.client_health_events from authenticated;
+grant select, insert on public.client_health_events to authenticated;
 grant usage, select on sequence public.client_health_events_id_seq to authenticated;
