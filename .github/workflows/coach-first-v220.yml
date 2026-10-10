@@ -83,3 +83,12 @@ jobs:
           grep -q 'CourtIQPlayerIntelligence' app-actions-v194.js
           grep -q 'Player Intelligence' nav-cleanup.js
           grep -q 'player-intelligence-v226.js' index.html
+      - name: Check scouting splits and stability
+        run: |
+          node --check scouting-stability-v227.js
+          node tests/test_scouting_stability_v227.js
+          grep -q 'SPLITS & STABILITY' scouting-stability-v227.js
+          grep -q 'OUTLIER SIGNALS' scouting-stability-v227.js
+          grep -q 'HOME vs AWAY' scouting-stability-v227.js
+          grep -q 'CourtIQScoutingStability' scouting-stability-v227.js
+          grep -q 'scouting-stability-v227.js' index.html
