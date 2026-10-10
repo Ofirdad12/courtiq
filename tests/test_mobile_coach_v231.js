@@ -1,0 +1,15 @@
+const assert=require('assert');
+const fs=require('fs');
+const css=fs.readFileSync('mobile-coach-v231.css','utf8');
+assert(css.includes('@media (max-width:760px)'));
+assert(css.includes('min-height:100dvh'));
+assert(css.includes('env(safe-area-inset-top)'));
+assert(css.includes('env(safe-area-inset-bottom)'));
+assert(css.includes('--cq-touch:44px'));
+assert(css.includes('.owControls'));
+assert(css.includes('.piControls'));
+assert(css.includes('.htActions'));
+assert(css.includes('.pgActions'));
+assert(css.includes('overflow-x:auto'));
+assert(css.includes('@media (orientation:landscape)'));
+console.log('mobile-coach-v231 tests passed');
