@@ -49,3 +49,9 @@ jobs:
           grep -q 'CourtIQOpponentWorkspace' app-actions-v194.js
           grep -q 'Opponent Workspace' nav-cleanup.js
           grep -q 'opponent-workspace-v222.js' index.html
+      - name: Check opponent default selection
+        run: |
+          node --check opponent-default-v223.js
+          node tests/test_opponent_default_v223.js
+          grep -q 'courtiq_last_opponent' opponent-default-v223.js
+          grep -q 'opponent-default-v223.js' index.html
