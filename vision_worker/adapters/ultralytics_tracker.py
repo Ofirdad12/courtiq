@@ -1,8 +1,11 @@
-"""Ultralytics-based raw MP4 detector/tracker adapter for CourtIQ v235.
+"""Ultralytics-based raw MP4 detector/tracker adapter for CourtIQ v236.
 
-This optional runtime adapter keeps heavy CV imports lazy and emits CourtIQ's
-validated detector contract: stable player IDs, ball observations, image-space
-ball-handler evidence, appearance samples, team labels, and a court homography.
+The adapter emits CourtIQ's validated detector contract: persistent player
+IDs, ball observations, image-space ball-handler evidence, appearance samples,
+team labels, a court homography and calibration-quality metadata.
+
+A dedicated basketball-ball checkpoint can be supplied independently from the
+player model. Generic COCO ``sports ball`` remains a baseline fallback only.
 """
 from __future__ import annotations
 
@@ -10,7 +13,12 @@ import math
 from collections import defaultdict
 
 from ai.video_detector import VideoDetector, validate_detection
-from vision_worker.court_calibration import compute_homography, load_calibration, point_in_polygon
+from vision_worker.court_calibration import (
+    calibration_quality,
+    compute_homography,
+    load_calibration,
+    point_in_polygon,
+)
 
 
 def _center(box):
@@ -32,6 +40,7 @@ def _distance_point_to_box(point, box):
 
 
 def _choose_ball(candidates, previous, frame_shape):
+    """Choose a plausible ball candidate using confidence + temporal motion."""
     if not candidates:
         return None
     if previous is None:
@@ -107,6 +116,9 @@ def _assign_team_clusters(frames, cv2, np, min_track_observations=4):
         tid: np.median(np.asarray(samples[tid], dtype=np.float32), axis=0)
         for tid in eligible
     }
+    # A third cluster helps absorb officials/ambiguous shirts when enough
+    # persistent tracks exist; only the two dominant basketball-team clusters
+    # are retained downstream.
     k = 3 if len(eligible) >= 8 else 2
     rows = []
     for tid in eligible:
@@ -157,18 +169,42 @@ def _assign_team_clusters(frames, cv2, np, min_track_observations=4):
     }
 
 
-class UltralyticsTrackingDetector(VideoDetector):
-    """Detect people + sports ball and maintain persistent track IDs.
+def _ball_candidates_from_result(result, ball_class_id, ball_confidence, polygon):
+    balls = []
+    if result is None or result.boxes is None:
+        return balls
+    boxes = result.boxes
+    xyxy = boxes.xyxy.cpu().tolist()
+    confs = boxes.conf.cpu().tolist()
+    classes = boxes.cls.cpu().tolist()
+    for i, box in enumerate(xyxy):
+        cls = int(classes[i])
+        conf = float(confs[i])
+        if cls != int(ball_class_id) or conf < float(ball_confidence):
+            continue
+        if point_in_polygon(_center(box), polygon):
+            balls.append({
+                "bbox": [round(float(v), 2) for v in box],
+                "confidence": round(conf, 4),
+                "source": "detected",
+            })
+    return balls
 
-    Default class IDs match COCO (`person=0`, `sports ball=32`). A custom
-    basketball model can override them without changing CourtIQ downstream.
+
+class UltralyticsTrackingDetector(VideoDetector):
+    """Detect players + basketball and maintain persistent player track IDs.
+
+    ``model`` handles player tracking. When ``ball_model`` is omitted, the same
+    model's ``sports ball`` class is used as a generic fallback. A dedicated
+    basketball-ball checkpoint may use its own class ID via ``ball_class_id``.
     """
 
     def __init__(
         self,
         court_calibration,
         model="yolo26n.pt",
-        tracker="bytetrack.yaml",
+        ball_model=None,
+        tracker="tracktrack.yaml",
         device=None,
         imgsz=1280,
         player_confidence=0.28,
@@ -180,6 +216,7 @@ class UltralyticsTrackingDetector(VideoDetector):
     ):
         self.calibration = load_calibration(court_calibration)
         self.model_name = model
+        self.ball_model_name = ball_model
         self.tracker = tracker
         self.device = device
         self.imgsz = int(imgsz)
@@ -208,8 +245,10 @@ class UltralyticsTrackingDetector(VideoDetector):
             cap.release()
             raise ValueError("video reports invalid FPS")
 
-        model = YOLO(self.model_name)
+        player_model = YOLO(self.model_name)
+        ball_model = YOLO(self.ball_model_name) if self.ball_model_name else None
         homography = compute_homography(self.calibration)
+        calibration_meta = calibration_quality(self.calibration, homography)
         polygon = self.calibration.get("play_area_polygon")
         frames = []
         frame_index = 0
@@ -221,19 +260,25 @@ class UltralyticsTrackingDetector(VideoDetector):
             ok, frame = cap.read()
             if not ok:
                 break
-            kwargs = {
+
+            player_classes = [self.player_class_id]
+            if ball_model is None and self.ball_class_id != self.player_class_id:
+                player_classes.append(self.ball_class_id)
+            track_kwargs = {
                 "persist": True,
                 "tracker": self.tracker,
-                "classes": [self.player_class_id, self.ball_class_id],
-                "conf": min(self.player_confidence, self.ball_confidence),
+                "classes": player_classes,
+                "conf": min(self.player_confidence, self.ball_confidence if ball_model is None else self.player_confidence),
                 "imgsz": self.imgsz,
                 "verbose": False,
             }
             if self.device is not None:
-                kwargs["device"] = self.device
-            results = model.track(frame, **kwargs)
+                track_kwargs["device"] = self.device
+            results = player_model.track(frame, **track_kwargs)
             result = results[0] if results else None
-            players, balls = [], []
+            players = []
+            balls = []
+
             if result is not None and result.boxes is not None:
                 boxes = result.boxes
                 xyxy = boxes.xyxy.cpu().tolist()
@@ -256,12 +301,31 @@ class UltralyticsTrackingDetector(VideoDetector):
                             "confidence": round(conf, 4),
                             "appearance": app,
                         })
-                    elif cls == self.ball_class_id and conf >= self.ball_confidence:
-                        if point_in_polygon(_center(box), polygon):
-                            balls.append({
-                                "bbox": [round(float(v), 2) for v in box],
-                                "confidence": round(conf, 4),
-                            })
+                if ball_model is None:
+                    balls = _ball_candidates_from_result(
+                        result,
+                        self.ball_class_id,
+                        self.ball_confidence,
+                        polygon,
+                    )
+
+            if ball_model is not None:
+                ball_kwargs = {
+                    "classes": [self.ball_class_id],
+                    "conf": self.ball_confidence,
+                    "imgsz": self.imgsz,
+                    "verbose": False,
+                }
+                if self.device is not None:
+                    ball_kwargs["device"] = self.device
+                ball_results = ball_model.predict(frame, **ball_kwargs)
+                ball_result = ball_results[0] if ball_results else None
+                balls = _ball_candidates_from_result(
+                    ball_result,
+                    self.ball_class_id,
+                    self.ball_confidence,
+                    polygon,
+                )
 
             chosen_ball = _choose_ball(balls, previous_ball, frame.shape)
             if chosen_ball is not None:
@@ -288,8 +352,10 @@ class UltralyticsTrackingDetector(VideoDetector):
             "frames": frames,
             "homography": homography,
             "detector": {
-                "adapter": "ultralytics-track-v235",
+                "adapter": "ultralytics-track-v236",
                 "model": self.model_name,
+                "ball_model": self.ball_model_name or self.model_name,
+                "ball_model_mode": "dedicated" if self.ball_model_name else "generic_shared_model",
                 "tracker": self.tracker,
                 "imgsz": self.imgsz,
                 "sample_every": self.sample_every,
@@ -303,6 +369,7 @@ class UltralyticsTrackingDetector(VideoDetector):
                 "coordinate_system": "courtiq-94x50-feet",
                 "points": len(self.calibration["image_points"]),
                 "play_area_filter": bool(polygon),
+                "quality": calibration_meta,
             },
         }
         return validate_detection(payload)
