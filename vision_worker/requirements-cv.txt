@@ -1,0 +1,7 @@
+# Optional raw-video CV runtime for CourtIQ Vision Engine v235.
+# ffmpeg/ffprobe remain system dependencies.
+#
+# Ultralytics is intentionally isolated behind an adapter because its licensing
+# must be reviewed before commercial deployment. The CourtIQ detector contract
+# can be backed by another model stack without changing downstream analytics.
+ultralytics==8.4.175
