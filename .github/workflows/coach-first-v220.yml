@@ -104,3 +104,14 @@ jobs:
           grep -q 'Postgame Review' nav-cleanup.js
           grep -q 'postgame-learning-v228.js' index.html
           grep -q 'postgame_reviews' supabase/migrations/20261010_postgame_learning_v228.sql
+      - name: Check Halftime Adjustment
+        run: |
+          node --check halftime-adjustment-v229.js
+          node tests/test_halftime_adjustment_v229.js
+          grep -q 'COURTIQ HALFTIME ADJUSTMENT' halftime-adjustment-v229.js
+          grep -q 'PLAN vs FIRST HALF' halftime-adjustment-v229.js
+          grep -q 'SECOND-HALF CHECKS' halftime-adjustment-v229.js
+          grep -q 'HALFTIME CERTIFIED' halftime-adjustment-v229.js
+          grep -q "name==='halftime'" app-actions-v194.js
+          grep -q 'Halftime Adjustment' nav-cleanup.js
+          grep -q 'halftime-adjustment-v229.js' index.html
