@@ -30,3 +30,10 @@ jobs:
           grep -q "name==='coach-brief'" app-actions-v194.js
           grep -q "clickId('coachBriefFlow')" app-actions-v194.js
           grep -q 'prep-hub-v220.js' index.html
+      - name: Check consolidated coach action surface
+        run: |
+          node --check coach-surface-v221.js
+          node tests/test_coach_surface_v221.js
+          grep -q 'GAME PREP' coach-surface-v221.js
+          grep -q 'cqCoachToolsMenu' coach-surface-v221.js
+          grep -q 'coach-surface-v221.js' index.html
