@@ -1,0 +1,64 @@
+/* CourtIQ v231 · mobile/tablet coach UX. Desktop remains unchanged. */
+:root{--cq-touch:44px}
+html{-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit}
+button,[role="button"],select{touch-action:manipulation}
+
+@media (max-width:1024px){
+  .modal{padding:12px!important;align-items:flex-start!important;overflow:auto!important}
+  .modalCard{width:min(100%,960px)!important;max-height:calc(100dvh - 24px)!important;overflow:auto!important;-webkit-overflow-scrolling:touch}
+  .modalX{position:sticky!important;top:0!important;z-index:30!important;float:right!important;min-width:var(--cq-touch)!important;min-height:var(--cq-touch)!important}
+  .cq-nav-item,.cq-nav-advanced-toggle{min-height:var(--cq-touch)!important}
+  .cqCoachTools button,.pills button,.owActions button,.pgActions button,.htActions button,.dqRetry{min-height:var(--cq-touch)!important}
+  .owControls select,.piControls select,.pgGame select,.htStart input,.piControls select,.dqCard select{min-height:var(--cq-touch)!important}
+  .owScroll,.piTable,.tableWrap,[class*="Table"],[class*="Scroll"]{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  .owScroll table,.piTable table{min-width:680px}
+  .owTop,.piHero,.pgHero,.htHero,.dqHero,.phHero{gap:10px!important}
+}
+
+@media (max-width:760px){
+  body{overscroll-behavior-y:none}
+  .modal{padding:0!important;background:#07101d!important}
+  .modalCard{width:100%!important;max-width:none!important;min-height:100dvh!important;max-height:100dvh!important;border-radius:0!important;border-left:0!important;border-right:0!important;padding:14px!important;padding-top:max(12px,env(safe-area-inset-top))!important;padding-bottom:max(16px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important}
+  .modalX{top:max(4px,env(safe-area-inset-top))!important;border-radius:12px!important}
+  .owTop,.piHero,.pgHero,.htHero,.dqHero,.phHero{flex-direction:column!important}
+  .owTop h2,.piHero h2{font-size:24px!important}
+  .owControls,.piControls{grid-template-columns:1fr!important;position:sticky;top:0;z-index:15;background:#07101d;padding:7px 0;margin:8px 0!important}
+  .owControls label,.piControls label{font-size:9px!important}
+  .owControls select,.piControls select,.pgGame select{width:100%!important;font-size:16px!important}
+  .owSample,.dqSummary,.pgSample,.phCards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .owSample article,.dqSummary article,.pgSample article,.phCards article{min-width:0}
+  .owActions,.pgActions,.htActions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+  .owActions button,.pgActions button,.htActions button{width:100%!important;white-space:normal!important}
+  .owCards,.owTrend,.owDecisionGrid,.piGrid,.htFactors,.pgKpis,.ssGrid{grid-template-columns:1fr!important}
+  .piMetrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .piProfile{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .ssCards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .owCards article,.owDecisionGrid section,.piGrid section,.htFactor,.pgKpi{min-width:0!important}
+  .owTitle,.piTitle,.pgTitle,.htTitle{align-items:flex-start!important}
+  .owSources li{align-items:flex-start!important;gap:8px!important}
+  .owSources li span{overflow-wrap:anywhere}
+  .dqMain,.dqFailed>article,.piRole,.htStart>div{flex-direction:column!important}
+  .dqRight{align-items:flex-start!important;width:100%!important}
+  .dqRetry{width:100%!important}
+  .pgNote{font-size:16px!important;min-height:110px!important}
+  .htStart input{font-size:16px!important;width:100%!important;box-sizing:border-box!important}
+  .htScore{justify-content:space-between!important;gap:8px!important}
+  .htScore em{width:100%;order:3;text-align:center}
+  .pgPast article{grid-template-columns:1fr!important}
+  .phEvents article{align-items:flex-start!important}
+  .cqCoachToolsMenu{position:fixed!important;left:12px!important;right:12px!important;bottom:max(12px,env(safe-area-inset-bottom))!important;top:auto!important;max-height:60dvh!important;overflow:auto!important}
+}
+
+@media (max-width:420px){
+  .owActions,.pgActions,.htActions{grid-template-columns:1fr!important}
+  .piProfile,.ssCards{grid-template-columns:1fr!important}
+  .owSample,.dqSummary,.pgSample,.phCards,.piMetrics{grid-template-columns:1fr 1fr!important}
+  .htScore span{font-size:10px!important}.htScore b{font-size:22px!important}
+}
+
+@media (orientation:landscape) and (max-height:600px) and (min-width:700px){
+  .modalCard{max-height:100dvh!important;border-radius:0!important}
+  .owControls,.piControls{position:static!important}
+  .owDecisionGrid,.piGrid,.ssGrid{grid-template-columns:1fr 1fr!important}
+}
