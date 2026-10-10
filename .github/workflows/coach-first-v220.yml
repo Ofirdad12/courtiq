@@ -131,3 +131,11 @@ jobs:
           grep -q 'mobile-coach-v231.css' index.html
           grep -q 'safe-area-inset-top' mobile-coach-v231.css
           grep -q 'min-height:100dvh' mobile-coach-v231.css
+      - name: Check Video Evidence Bridge
+        run: |
+          node --check video-evidence-v232.js
+          node tests/test_video_evidence_v232.js
+          grep -q 'VIDEO EVIDENCE BRIDGE' video-evidence-v232.js
+          grep -q 'COUNTEREXAMPLE' video-evidence-v232.js
+          grep -q 'OPEN CLIP' video-evidence-v232.js
+          grep -q 'video-evidence-v232.js' index.html
