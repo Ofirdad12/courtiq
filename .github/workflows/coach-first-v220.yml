@@ -55,3 +55,13 @@ jobs:
           node tests/test_opponent_default_v223.js
           grep -q 'courtiq_last_opponent' opponent-default-v223.js
           grep -q 'opponent-default-v223.js' index.html
+      - name: Check Pregame Package
+        run: |
+          node --check pregame-package-v224.js
+          node tests/test_pregame_package_v224.js
+          grep -q 'PREGAME PACKAGE · LOCKER ROOM VIEW' pregame-package-v224.js
+          grep -q '3 TO STOP' pregame-package-v224.js
+          grep -q '3 TO ATTACK / TEST' pregame-package-v224.js
+          grep -q '3 FIRST-QUARTER KPIs' pregame-package-v224.js
+          grep -q 'PRINT PREGAME' pregame-package-v224.js
+          grep -q 'pregame-package-v224.js' index.html
