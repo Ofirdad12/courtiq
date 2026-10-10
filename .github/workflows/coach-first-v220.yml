@@ -65,3 +65,11 @@ jobs:
           grep -q '3 FIRST-QUARTER KPIs' pregame-package-v224.js
           grep -q 'PRINT PREGAME' pregame-package-v224.js
           grep -q 'pregame-package-v224.js' index.html
+      - name: Check Data Quality Center
+        run: |
+          node --check data-quality-center-v225.js
+          node tests/test_data_quality_v225.js
+          grep -q 'COURTIQ DATA QUALITY CENTER' data-quality-center-v225.js
+          grep -q 'INCOMPLETE games are automatically excluded' data-quality-center-v225.js
+          grep -q 'CourtIQDataQuality' app-actions-v194.js
+          grep -q 'data-quality-center-v225.js' index.html
