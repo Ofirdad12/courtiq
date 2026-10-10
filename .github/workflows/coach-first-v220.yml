@@ -139,3 +139,15 @@ jobs:
           grep -q 'COUNTEREXAMPLE' video-evidence-v232.js
           grep -q 'OPEN CLIP' video-evidence-v232.js
           grep -q 'video-evidence-v232.js' index.html
+      - name: Check Video Intelligence
+        run: |
+          node --check video-intelligence-v233.js
+          node tests/test_video_intelligence_v233.js
+          grep -q 'TACTICAL VIDEO ANALYSIS' video-intelligence-v233.js
+          grep -q 'UPLOAD + QUEUE ANALYSIS' video-intelligence-v233.js
+          grep -q 'Evidence guardrail' video-intelligence-v233.js
+          grep -q "name==='video-intelligence'" app-actions-v194.js
+          grep -q 'Video Intelligence' nav-cleanup.js
+          grep -q 'video-intelligence-v233.js' index.html
+          grep -q 'courtiq-game-video' supabase/migrations/20261010_video_intelligence_v233.sql
+          grep -q 'tracking-to-tactics-v1' ai/pipeline.py

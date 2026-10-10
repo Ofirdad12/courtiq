@@ -1,7 +1,7 @@
-/* CourtIQ v230 · coach-first workspace navigation. Routing is owned by ui-router-v194.js. */
+/* CourtIQ v233 · coach-first workspace navigation. Routing is owned by ui-router-v194.js. */
 (() => {
   'use strict';
-  const VERSION='230';
+  const VERSION='233';
   const ADVANCED_KEY='courtiq_nav_advanced_open';
   const navItem=(icon,label,action,primary=false,advanced=false)=>
     `<button type="button" class="cq-nav-item${primary?' cq-nav-primary':''}${advanced?' cq-nav-advanced':''}" data-cq-action="${action}"><span>${icon}</span><b>${label}</b></button>`;
@@ -12,6 +12,7 @@
     ${navItem('▣','Games & Quality','games')}
     ${navItem('◎','Opponent Workspace','scouting',true)}
     ${navItem('◇','Coach Brief','coach-brief',true)}
+    ${navItem('▶','Video Intelligence','video-intelligence',true)}
     ${navItem('▤','Reports','reports')}
     ${navItem('◈','Season Memory','season')}
     ${navItem('+','Import Game','import')}

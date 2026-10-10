@@ -1,4 +1,4 @@
-/* CourtIQ v230 · explicit action bridge from the legacy app to the coach-first workspace. */
+/* CourtIQ v233 · explicit action bridge from the legacy app to the coach-first workspace. */
 (function(root){
   'use strict';
 
@@ -11,13 +11,13 @@
   function clickId(id){
     const el=document.getElementById(id);
     if(!el)return false;
-    try{el.click();return true}catch(err){console.error('[CourtIQ v230] click failed',id,err);report(id,err);return false}
+    try{el.click();return true}catch(err){console.error('[CourtIQ v233] click failed',id,err);report(id,err);return false}
   }
   function tab(view){
     const button=document.querySelector(`[data-game-tab="${view}"]`);
     if(!button)return false;
-    try{root.CourtIQUIRecovery?.activateGameTab?.(button);}catch(err){console.error('[CourtIQ v230] tab recovery failed',err);report('tab:'+view,err);}
-    try{button.click();return true;}catch(err){console.error('[CourtIQ v230] tab click failed',err);report('tab:'+view,err);return false;}
+    try{root.CourtIQUIRecovery?.activateGameTab?.(button);}catch(err){console.error('[CourtIQ v233] tab recovery failed',err);report('tab:'+view,err);}
+    try{button.click();return true;}catch(err){console.error('[CourtIQ v233] tab click failed',err);report('tab:'+view,err);return false;}
   }
 
   function run(name){
@@ -27,6 +27,7 @@
       if(name==='season')return clickId('seasonMemoryFlow')||(typeof openSeasonMemory==='function'?(openSeasonMemory(),true):false);
       if(name==='scouting')return call(root.CourtIQOpponentWorkspace?.open,root.CourtIQOpponentWorkspace)||clickId('scoutingReportFlow')||(typeof openOpponentScout==='function'?(openOpponentScout(),true):(typeof openTacticalWorkspace==='function'?(openTacticalWorkspace(),true):false));
       if(name==='coach-brief')return clickId('coachBriefFlow')||run('coach');
+      if(name==='video-intelligence')return call(root.CourtIQVideoIntelligence?.open,root.CourtIQVideoIntelligence)||(typeof openVideoRoom==='function'?(openVideoRoom(),true):false);
       if(name==='halftime')return call(root.CourtIQHalftimeAdjustment?.open,root.CourtIQHalftimeAdjustment);
       if(name==='postgame')return call(root.CourtIQPostgameLearning?.open,root.CourtIQPostgameLearning);
       if(name==='reports')return call(root.CourtIQReportLibrary?.open,root.CourtIQReportLibrary)||(typeof openFullReport==='function'?(openFullReport(),true):false);
@@ -41,9 +42,9 @@
       if(name==='team-analytics')return tab('team');
       if(name==='play')return tab('play');
       if(name==='lineups')return tab('lineups');
-    }catch(err){console.error('[CourtIQ v230] bridge error:',name,err);report(name,err);}
+    }catch(err){console.error('[CourtIQ v233] bridge error:',name,err);report(name,err);}
     return false;
   }
 
-  root.CourtIQAppActions={version:'230',run,tab};
+  root.CourtIQAppActions={version:'233',run,tab};
 })(typeof window!=='undefined'?window:globalThis);
