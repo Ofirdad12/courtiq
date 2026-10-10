@@ -1,0 +1,21 @@
+const fs=require('fs');
+const vm=require('vm');
+const src=fs.readFileSync('prep-hub-v220.js','utf8');
+const sandbox={console,window:{},document:undefined};
+vm.createContext(sandbox);vm.runInContext(src,sandbox);
+const {prepState,nextCoachAction,coachSteps,confidenceLabel}=sandbox.window.CourtIQPrepHub.Core;
+function ok(v,m){if(!v)throw new Error(m)}
+let s=prepState({checks:{},counts:{games:0,roster:0}},0);
+ok(nextCoachAction(s).key==='import','empty workspace should start with import');
+ok(confidenceLabel(s)==='BUILDING SAMPLE','empty workspace confidence label incorrect');
+s=prepState({checks:{importValidated:true},counts:{games:3,roster:10}},0);
+ok(s.sampleReady&&s.validated&&!s.strongSample,'3-game sample state incorrect');
+ok(nextCoachAction(s).key==='scouting','validated sample should route to scouting');
+ok(coachSteps(s).length===4,'coach workflow must remain four steps');
+s=prepState({checks:{importValidated:true},counts:{games:5,roster:10}},2);
+ok(s.strongSample&&s.reportReady,'strong saved-report state incorrect');
+ok(confidenceLabel(s)==='STRONG SAMPLE','strong sample label incorrect');
+ok(nextCoachAction(s).key==='reports','saved output should route to report review');
+s=prepState({checks:{importValidated:false},counts:{games:4}},0);
+ok(nextCoachAction(s).key==='games','failed validation must route to data quality before scouting');
+console.log('prep-hub-v220 tests passed');
