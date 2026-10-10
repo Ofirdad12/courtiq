@@ -1,8 +1,8 @@
 """Ultralytics-based raw MP4 detector/tracker adapter for CourtIQ v235.
 
-This is an optional runtime adapter. It keeps heavy CV imports lazy and emits
-CourtIQ's detector contract: stable player track IDs, a ball observation,
-appearance samples, team labels, and an image->court homography.
+This optional runtime adapter keeps heavy CV imports lazy and emits CourtIQ's
+validated detector contract: stable player IDs, ball observations, image-space
+ball-handler evidence, appearance samples, team labels, and a court homography.
 """
 from __future__ import annotations
 
@@ -23,6 +23,14 @@ def _foot(box):
     return ((x1 + x2) / 2.0, y2)
 
 
+def _distance_point_to_box(point, box):
+    x, y = point
+    x1, y1, x2, y2 = map(float, box)
+    dx = max(x1 - x, 0.0, x - x2)
+    dy = max(y1 - y, 0.0, y - y2)
+    return math.hypot(dx, dy)
+
+
 def _choose_ball(candidates, previous, frame_shape):
     if not candidates:
         return None
@@ -31,11 +39,38 @@ def _choose_ball(candidates, previous, frame_shape):
     h, w = frame_shape[:2]
     diag = max(1.0, math.hypot(w, h))
     px, py = _center(previous["bbox"])
+
     def score(row):
         x, y = _center(row["bbox"])
         motion_penalty = math.hypot(x - px, y - py) / diag
         return float(row.get("confidence", 0)) - 0.35 * motion_penalty
+
     return max(candidates, key=score)
+
+
+def _infer_handler(players, ball, previous_handler=None):
+    """Infer control in image space, where airborne-ball perspective is valid.
+
+    Homography is a floor-plane transform, so it should not be the primary
+    source of ball-handler ownership for an airborne ball. Distances are
+    normalized by player-box height to remain useful across camera zooms.
+    """
+    if not ball or not players:
+        return None
+    point = _center(ball["bbox"])
+    ranked = []
+    for player in players:
+        box = player["bbox"]
+        height = max(12.0, float(box[3]) - float(box[1]))
+        normalized = _distance_point_to_box(point, box) / height
+        ranked.append((normalized, str(player["track_id"])))
+    ranked.sort()
+    best_distance, best_id = ranked[0]
+    if previous_handler is not None:
+        previous = next((d for d, tid in ranked if tid == str(previous_handler)), None)
+        if previous is not None and previous <= 0.70 and previous <= best_distance + 0.16:
+            return str(previous_handler)
+    return best_id if best_distance <= 0.55 else None
 
 
 def _jersey_appearance(frame, box, cv2, np):
@@ -68,14 +103,16 @@ def _assign_team_clusters(frames, cv2, np, min_track_observations=4):
     if len(eligible) < 4:
         return {"status": "insufficient_tracks", "eligible_tracks": len(eligible)}
 
-    track_vectors = {tid: np.median(np.asarray(samples[tid], dtype=np.float32), axis=0) for tid in eligible}
+    track_vectors = {
+        tid: np.median(np.asarray(samples[tid], dtype=np.float32), axis=0)
+        for tid in eligible
+    }
     k = 3 if len(eligible) >= 8 else 2
-    rows, owners = [], []
+    rows = []
     for tid in eligible:
         repeats = min(20, counts[tid])
         for _ in range(repeats):
             rows.append(track_vectors[tid])
-            owners.append(tid)
     data = np.asarray(rows, dtype=np.float32)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 60, 0.2)
     _, labels, centers = cv2.kmeans(data, k, None, criteria, 8, cv2.KMEANS_PP_CENTERS)
@@ -84,7 +121,10 @@ def _assign_team_clusters(frames, cv2, np, min_track_observations=4):
     cluster_weight = defaultdict(int)
     for label in labels:
         cluster_weight[int(label)] += 1
-    selected = [idx for idx, _ in sorted(cluster_weight.items(), key=lambda kv: kv[1], reverse=True)[:2]]
+    selected = [
+        idx
+        for idx, _ in sorted(cluster_weight.items(), key=lambda kv: kv[1], reverse=True)[:2]
+    ]
     selected = sorted(selected, key=lambda idx: tuple(float(x) for x in centers[idx]))
     names = {selected[0]: "team_a", selected[1]: "team_b"}
 
@@ -95,9 +135,12 @@ def _assign_team_clusters(frames, cv2, np, min_track_observations=4):
         d1, c1 = distances[0]
         d2, _ = distances[1]
         margin = (d2 - d1) / max(d1 + d2, 1e-6)
-        nearest_all = int(np.argmin([float(np.linalg.norm(vec - c)) for c in centers]))
+        nearest_all = int(np.argmin([float(np.linalg.norm(vec - center)) for center in centers]))
         if nearest_all in names and margin >= 0.08:
-            track_team[tid] = {"team": names[c1], "confidence": round(min(1.0, 0.5 + margin), 3)}
+            track_team[tid] = {
+                "team": names[c1],
+                "confidence": round(min(1.0, 0.5 + margin), 3),
+            }
 
     for frame in frames:
         for player in frame.get("players", []):
@@ -171,6 +214,7 @@ class UltralyticsTrackingDetector(VideoDetector):
         frames = []
         frame_index = 0
         previous_ball = None
+        previous_handler = None
         dropped_untracked_players = 0
 
         while True:
@@ -222,11 +266,15 @@ class UltralyticsTrackingDetector(VideoDetector):
             chosen_ball = _choose_ball(balls, previous_ball, frame.shape)
             if chosen_ball is not None:
                 previous_ball = chosen_ball
+            handler_track_id = _infer_handler(players, chosen_ball, previous_handler)
+            if handler_track_id is not None:
+                previous_handler = handler_track_id
             if frame_index % self.sample_every == 0:
                 frames.append({
                     "frame": frame_index,
                     "players": players,
                     "ball": chosen_ball,
+                    "handler_track_id": handler_track_id,
                 })
             frame_index += 1
 
@@ -248,6 +296,7 @@ class UltralyticsTrackingDetector(VideoDetector):
                 "processed_frames": frame_index,
                 "emitted_frames": len(frames),
                 "dropped_untracked_players": dropped_untracked_players,
+                "handler_inference": "image-space-player-box-proximity",
             },
             "team_inference": team_meta,
             "calibration": {
