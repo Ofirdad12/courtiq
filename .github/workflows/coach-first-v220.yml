@@ -125,3 +125,9 @@ jobs:
           grep -q 'System Health' nav-cleanup.js
           grep -q 'production-monitoring-v230.js' index.html
           grep -q 'client_health_events' supabase/migrations/20261010_production_monitoring_v230.sql
+      - name: Check Mobile Coach UX
+        run: |
+          node tests/test_mobile_coach_v231.js
+          grep -q 'mobile-coach-v231.css' index.html
+          grep -q 'safe-area-inset-top' mobile-coach-v231.css
+          grep -q 'min-height:100dvh' mobile-coach-v231.css
