@@ -1,0 +1,32 @@
+name: CourtIQ coach-first contract
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  coach-first:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check Game Prep Hub
+        run: |
+          node --check prep-hub-v220.js
+          node tests/test_prep_hub_v220.js
+      - name: Check coach-first navigation contract
+        run: |
+          grep -q 'GAME PREP' nav-cleanup.js
+          grep -q 'Prep Hub' nav-cleanup.js
+          grep -q 'Coach Brief' nav-cleanup.js
+          grep -q 'Advanced Analytics' nav-cleanup.js
+          grep -q 'cq-nav-advanced-group' nav-cleanup.js
+      - name: Check action routing contract
+        run: |
+          grep -q 'CourtIQPrepHub' app-actions-v194.js
+          grep -q "name==='coach-brief'" app-actions-v194.js
+          grep -q "clickId('coachBriefFlow')" app-actions-v194.js
+          grep -q 'prep-hub-v220.js' index.html
