@@ -1,7 +1,7 @@
-/* CourtIQ v226 · coach-first workspace navigation. Routing is owned by ui-router-v194.js. */
+/* CourtIQ v228 · coach-first workspace navigation. Routing is owned by ui-router-v194.js. */
 (() => {
   'use strict';
-  const VERSION='226';
+  const VERSION='228';
   const ADVANCED_KEY='courtiq_nav_advanced_open';
   const navItem=(icon,label,action,primary=false,advanced=false)=>
     `<button type="button" class="cq-nav-item${primary?' cq-nav-primary':''}${advanced?' cq-nav-advanced':''}" data-cq-action="${action}"><span>${icon}</span><b>${label}</b></button>`;
@@ -17,6 +17,7 @@
     ${navItem('+','Import Game','import')}
     <small class="cq-nav-label">GAME DAY</small>
     ${navItem('●','Live Bench','live')}
+    ${navItem('↺','Postgame Review','postgame')}
     <button type="button" class="cq-nav-advanced-toggle" data-cq-advanced-toggle aria-expanded="false"><span>•••</span><b>Advanced Analytics</b><i>⌄</i></button>
     <div class="cq-nav-advanced-group" hidden>
       ${navItem('◫','Team Analytics','team-analytics',false,true)}

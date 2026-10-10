@@ -92,3 +92,15 @@ jobs:
           grep -q 'HOME vs AWAY' scouting-stability-v227.js
           grep -q 'CourtIQScoutingStability' scouting-stability-v227.js
           grep -q 'scouting-stability-v227.js' index.html
+      - name: Check Postgame Learning Loop
+        run: |
+          node --check postgame-learning-v228.js
+          node tests/test_postgame_learning_v228.js
+          grep -q 'COURTIQ POSTGAME LEARNING' postgame-learning-v228.js
+          grep -q 'EXPECTATION → ACTUAL' postgame-learning-v228.js
+          grep -q 'MEMORY QUEUE' postgame-learning-v228.js
+          grep -q 'PAST GAME LEARNING' postgame-learning-v228.js
+          grep -q "name==='postgame'" app-actions-v194.js
+          grep -q 'Postgame Review' nav-cleanup.js
+          grep -q 'postgame-learning-v228.js' index.html
+          grep -q 'postgame_reviews' supabase/migrations/20261010_postgame_learning_v228.sql
