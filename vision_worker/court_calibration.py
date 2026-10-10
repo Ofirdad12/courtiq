@@ -1,13 +1,14 @@
 """Court calibration helpers for the CourtIQ vision worker.
 
-v235 deliberately uses explicit image-to-court correspondences instead of
-pretending that a broadcast image can always be auto-calibrated.  The output
-homography maps image pixels to the canonical 94x50 foot basketball court used
-by the downstream tactical engine.
+v236 keeps explicit image-to-court correspondences and adds reprojection
+quality evidence. The homography maps image pixels to CourtIQ's canonical
+94x50-foot basketball court; calibration quality is reported rather than
+silently assuming every four-point fit generalizes to the full playing area.
 """
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -58,11 +59,7 @@ def load_calibration(source: str | Path | dict) -> dict:
 
 
 def compute_homography(calibration: dict) -> list[list[float]]:
-    """Compute image-pixel -> 94x50 court homography using RANSAC.
-
-    OpenCV is intentionally imported lazily so repository tests and non-CV
-    deployments do not require the heavy vision dependency set.
-    """
+    """Compute image-pixel -> 94x50 court homography using RANSAC."""
     calibration = validate_calibration(calibration)
     try:
         import cv2  # type: ignore
@@ -80,6 +77,60 @@ def compute_homography(calibration: dict) -> list[list[float]]:
     if mask is not None and int(mask.sum()) < 4:
         raise ValueError("court calibration has fewer than four RANSAC inliers")
     return [[float(v) for v in row] for row in matrix.tolist()]
+
+
+def project_point(homography: list[list[float]], point: list[float] | tuple[float, float]) -> list[float]:
+    """Project one image-space point through a 3x3 homography, dependency-free."""
+    if len(homography) != 3 or any(len(row) != 3 for row in homography):
+        raise ValueError("homography must be a 3x3 matrix")
+    x, y = float(point[0]), float(point[1])
+    denominator = homography[2][0] * x + homography[2][1] * y + homography[2][2]
+    if abs(denominator) < 1e-12:
+        raise ValueError("homography projects point to infinity")
+    px = (homography[0][0] * x + homography[0][1] * y + homography[0][2]) / denominator
+    py = (homography[1][0] * x + homography[1][1] * y + homography[1][2]) / denominator
+    return [float(px), float(py)]
+
+
+def calibration_quality(calibration: dict, homography: list[list[float]]) -> dict:
+    """Measure calibration-point reprojection error in court feet.
+
+    Four-point homographies can fit their four correspondences exactly, so a
+    four/five-point calibration is never labelled ``good`` solely because its
+    training-point error is tiny. Six or more landmarks provide redundancy for
+    a stronger quality signal.
+    """
+    calibration = validate_calibration(calibration)
+    errors = []
+    for image_point, expected in zip(calibration["image_points"], calibration["court_points"]):
+        projected = project_point(homography, image_point)
+        errors.append(math.hypot(projected[0] - expected[0], projected[1] - expected[1]))
+
+    rms = math.sqrt(sum(error * error for error in errors) / max(1, len(errors)))
+    maximum = max(errors) if errors else float("inf")
+    warnings = []
+    if len(errors) < 6:
+        warnings.append("limited_landmark_redundancy")
+    if rms > 1.5:
+        warnings.append("court_reprojection_error_above_1_5ft")
+    if maximum > 3.0:
+        warnings.append("court_reprojection_outlier_above_3ft")
+
+    if rms > 3.0 or maximum > 6.0:
+        tier = "poor"
+    elif rms > 1.5 or len(errors) < 6:
+        tier = "review"
+    else:
+        tier = "good"
+
+    return {
+        "tier": tier,
+        "rms_error_ft": round(rms, 3),
+        "max_error_ft": round(maximum, 3),
+        "landmarks": len(errors),
+        "redundant_landmarks": max(0, len(errors) - 4),
+        "warnings": warnings,
+    }
 
 
 def point_in_polygon(point: tuple[float, float], polygon: list[list[float]] | None) -> bool:

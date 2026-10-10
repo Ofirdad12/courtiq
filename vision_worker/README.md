@@ -1,31 +1,51 @@
-# CourtIQ Vision Engine v235
+# CourtIQ Vision Engine v236
 
-CourtIQ now has a real raw-MP4 computer-vision path in front of the v234 tactical engine.
+CourtIQ's raw-MP4 vision path now has a reliability layer in front of the v234 tactical engine.
 
 ## Pipeline
 
-`authorized MP4 -> player/ball detection -> persistent tracking -> court calibration -> team inference -> 94x50 normalization -> possessions -> tactical engine -> confidence/review`
+`authorized MP4 -> player detection/tracking -> ball detection -> short-gap recovery -> court calibration -> team inference -> vision quality gate -> 94x50 normalization -> possessions -> tactical engine -> confidence/review`
 
-The worker still supports deterministic replay JSON for QA, but it no longer stops at the adapter boundary when the optional raw-video adapter is selected.
+The principle in v236 is simple: **tracking output is not automatically basketball truth**. CourtIQ measures whether the video has enough player, ball, handler, team and court evidence before tactical conclusions are treated as production-ready.
 
-## What v235 does from raw MP4
+## What v236 adds
 
-The optional Ultralytics adapter:
-- detects `person` and `sports ball` classes (or equivalent classes from a custom basketball checkpoint);
-- runs persistent multi-object tracking so player boxes carry stable `track_id` values;
-- filters bench/crowd detections with an optional `play_area_polygon`;
-- keeps a temporally stable ball candidate instead of selecting each frame independently;
-- samples jersey torso appearance in LAB color space;
-- infers two player-team clusters while leaving likely officials/unreliable tracks unassigned;
-- computes an image-pixel -> canonical 94x50-foot homography from explicit court landmarks;
-- writes `tracking.json` as evidence/debug output;
-- passes the tracking payload directly into CourtIQ's possession and tactical pipeline.
+On top of v235 raw MP4 tracking:
+
+- **TrackTrack is the default tracker** for the pinned Ultralytics runtime, while `--tracker` remains configurable.
+- **Dedicated ball model support** via `--ball-model`, so a basketball-specific small-object checkpoint can replace the generic COCO `sports ball` baseline without changing the downstream contract.
+- **Short-gap ball recovery**. Missing ball boxes may be linearly interpolated only when they are bounded by real observations and the gap is short. Every recovered observation is marked `source: "interpolated"` and carries reduced confidence.
+- **Vision Quality Gate** with explainable metrics for player coverage, visible-player count, real and usable ball coverage, handler coverage, team-assignment coverage and a track-fragmentation proxy.
+- **Court calibration QA** using reprojection error in feet. Four/five-point fits are flagged for review because they do not provide enough redundant landmarks to validate generalization.
+- **Review-first status routing**. Weak tracking produces `vision_quality_review` or `vision_quality_insufficient` instead of a misleading `completed` result.
+
+## Quality output
+
+`result.json` and `tracking.json` now include `vision_quality`. Example shape:
+
+```json
+{
+  "tier": "review",
+  "score": 0.71,
+  "review_required": true,
+  "auto_publish": false,
+  "warnings": ["low_real_ball_detection_coverage"],
+  "metrics": {
+    "player_detection_coverage": 0.98,
+    "median_visible_players": 10,
+    "ball_detection_coverage": 0.48,
+    "ball_usable_coverage": 0.72,
+    "handler_coverage": 0.66,
+    "team_assignment_coverage": 0.91
+  }
+}
+```
+
+`score` is a completeness/reliability gate, **not** a claim that tactical labels are X% accurate.
 
 ## Court calibration
 
-v235 intentionally starts with explicit calibration rather than pretending broadcast court mapping is solved for every camera angle. Provide at least four matched points. `court_points` use CourtIQ's canonical 94x50-foot coordinates.
-
-Example `calibration.json` for a fixed full-court camera:
+Provide at least four matched points. `court_points` use CourtIQ's canonical 94x50-foot coordinates.
 
 ```json
 {
@@ -35,7 +55,7 @@ Example `calibration.json` for a fixed full-court camera:
 }
 ```
 
-The matched image points do not have to be the four court corners; any four or more reliable landmarks with known 94x50 coordinates can be used. RANSAC is used when more correspondences are supplied.
+The matched image points do not have to be the four court corners. Six or more well-distributed landmarks are preferred because v236 can then use redundant correspondences to make the reprojection quality signal more meaningful. RANSAC is used when solving the homography.
 
 ## Install the optional CV runtime
 
@@ -45,7 +65,9 @@ pip install -r vision_worker/requirements-cv.txt
 
 `ffmpeg` and `ffprobe` are system dependencies.
 
-## Run real MP4 analysis
+## Run raw MP4 analysis
+
+Generic baseline:
 
 ```bash
 python vision_worker/worker.py game.mp4 \
@@ -53,15 +75,31 @@ python vision_worker/worker.py game.mp4 \
   --adapter ultralytics \
   --court-calibration calibration.json \
   --model yolo26n.pt \
-  --tracker bytetrack.yaml \
+  --tracker tracktrack.yaml \
   --imgsz 1280
 ```
 
-For a trained CourtIQ basketball checkpoint, replace `--model yolo26n.pt` with the model path. The adapter contract stays the same.
+Production-oriented player + dedicated basketball-ball models:
+
+```bash
+python vision_worker/worker.py game.mp4 \
+  --out output \
+  --adapter ultralytics \
+  --court-calibration calibration.json \
+  --model models/courtiq-players.pt \
+  --ball-model models/courtiq-ball.pt \
+  --player-class-id 0 \
+  --ball-class-id 0 \
+  --tracker tracktrack.yaml \
+  --max-ball-gap 4
+```
+
+A dedicated ball model is especially valuable because a basketball is small, fast, frequently occluded and visually very different from the generic sports-ball training distribution.
 
 The worker writes:
-- `output/tracking.json` — detector/tracker + homography evidence;
-- `output/result.json` — possessions, accepted/review tactical events and capabilities.
+
+- `output/tracking.json` — detector/tracker, recovered-ball provenance, homography, team and vision-quality evidence;
+- `output/result.json` — vision quality, possessions, accepted/review tactical events and capabilities.
 
 ## Deterministic QA mode
 
@@ -79,7 +117,9 @@ Without a detector, the result remains `awaiting_detector`; CourtIQ does not fab
 
 ## Current truth boundary
 
-v235 is a real first CV layer, not the final vision model. Generic COCO person/sports-ball weights are a baseline and should be replaced/evaluated against basketball-specific data before commercial accuracy claims. Fixed-camera or long stable-camera possessions are the current calibration sweet spot. Multi-camera broadcast cuts still need shot-boundary detection and per-shot/recovered homography. Jersey-number OCR and scoreboard/game-clock OCR are not enabled yet.
+v236 materially improves reliability, but it is still not a claim that CourtIQ can identify every concept perfectly from every raw broadcast. Generic person/sports-ball weights remain a baseline. Production accuracy still depends on basketball-specific validation data, camera quality and calibration.
+
+Current unsolved/next layers include automatic recovery across broadcast camera cuts, jersey-number OCR, scoreboard/game-clock OCR, roster identity matching and benchmarked concept-level precision/recall on a labelled basketball validation set.
 
 YouTube URLs can remain a playback/evidence source in the product, but pixel analysis requires an authorized media asset/byte stream available to the worker; an embedded YouTube player is not treated as a CV input.
 
