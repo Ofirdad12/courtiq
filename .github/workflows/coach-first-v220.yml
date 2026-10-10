@@ -37,3 +37,15 @@ jobs:
           grep -q 'GAME PREP' coach-surface-v221.js
           grep -q 'cqCoachToolsMenu' coach-surface-v221.js
           grep -q 'coach-surface-v221.js' index.html
+      - name: Check unified opponent workspace
+        run: |
+          node --check opponent-workspace-v222.js
+          node tests/test_opponent_workspace_v222.js
+          grep -q 'COURTIQ OPPONENT WORKSPACE' opponent-workspace-v222.js
+          grep -q '3 VERIFIED TENDENCIES' opponent-workspace-v222.js
+          grep -q 'HOW TO DEFEND' opponent-workspace-v222.js
+          grep -q 'HOW TO ATTACK' opponent-workspace-v222.js
+          grep -q 'CourtIQ guardrail' opponent-workspace-v222.js
+          grep -q 'CourtIQOpponentWorkspace' app-actions-v194.js
+          grep -q 'Opponent Workspace' nav-cleanup.js
+          grep -q 'opponent-workspace-v222.js' index.html
