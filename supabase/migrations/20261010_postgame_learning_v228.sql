@@ -70,5 +70,8 @@ with check (
 );
 
 revoke all on public.postgame_reviews from anon;
-grant select, insert, update on public.postgame_reviews to authenticated;
+grant select, insert on public.postgame_reviews to authenticated;
+revoke update on public.postgame_reviews from authenticated;
+grant update (pregame_report_id, opponent_name, competition, payload, review_version, reviewed_by, reviewed_at, updated_at)
+  on public.postgame_reviews to authenticated;
 grant usage, select on sequence public.postgame_reviews_id_seq to authenticated;
