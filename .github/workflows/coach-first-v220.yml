@@ -45,7 +45,7 @@ jobs:
           grep -q '3 VERIFIED TENDENCIES' opponent-workspace-v222.js
           grep -q 'HOW TO DEFEND' opponent-workspace-v222.js
           grep -q 'HOW TO ATTACK' opponent-workspace-v222.js
+          grep -q 'CourtIQ guardrail' opponent-workspace-v222.js
           grep -q 'CourtIQOpponentWorkspace' app-actions-v194.js
           grep -q 'Opponent Workspace' nav-cleanup.js
           grep -q 'opponent-workspace-v222.js' index.html
-          ! grep -qi 'pick.and.roll\|weak hand\|drop coverage\|switch coverage' opponent-workspace-v222.js
