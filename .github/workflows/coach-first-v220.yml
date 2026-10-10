@@ -115,3 +115,13 @@ jobs:
           grep -q "name==='halftime'" app-actions-v194.js
           grep -q 'Halftime Adjustment' nav-cleanup.js
           grep -q 'halftime-adjustment-v229.js' index.html
+      - name: Check Production Monitoring
+        run: |
+          node --check production-monitoring-v230.js
+          node tests/test_production_monitoring_v230.js
+          grep -q 'COURTIQ PRODUCTION HEALTH' production-monitoring-v230.js
+          grep -q 'Privacy guardrail' production-monitoring-v230.js
+          grep -q "name==='system-health'" app-actions-v194.js
+          grep -q 'System Health' nav-cleanup.js
+          grep -q 'production-monitoring-v230.js' index.html
+          grep -q 'client_health_events' supabase/migrations/20261010_production_monitoring_v230.sql

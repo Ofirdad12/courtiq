@@ -1,7 +1,8 @@
-/* CourtIQ v229 · explicit action bridge from the legacy app to the coach-first workspace. */
+/* CourtIQ v230 · explicit action bridge from the legacy app to the coach-first workspace. */
 (function(root){
   'use strict';
 
+  function report(name,err){try{root.CourtIQObservability?.capture?.('action_failure',err?.message||String(err||'Action failed'),{action:String(name||'unknown')},'error','app-actions')}catch(_){}}
   function call(fn,ctx=root){
     if(typeof fn!=='function')return false;
     fn.call(ctx);
@@ -10,13 +11,13 @@
   function clickId(id){
     const el=document.getElementById(id);
     if(!el)return false;
-    try{el.click();return true}catch(err){console.error('[CourtIQ v229] click failed',id,err);return false}
+    try{el.click();return true}catch(err){console.error('[CourtIQ v230] click failed',id,err);report(id,err);return false}
   }
   function tab(view){
     const button=document.querySelector(`[data-game-tab="${view}"]`);
     if(!button)return false;
-    try{root.CourtIQUIRecovery?.activateGameTab?.(button);}catch(err){console.error('[CourtIQ v229] tab recovery failed',err);}
-    try{button.click();return true;}catch(err){console.error('[CourtIQ v229] tab click failed',err);return false;}
+    try{root.CourtIQUIRecovery?.activateGameTab?.(button);}catch(err){console.error('[CourtIQ v230] tab recovery failed',err);report('tab:'+view,err);}
+    try{button.click();return true;}catch(err){console.error('[CourtIQ v230] tab click failed',err);report('tab:'+view,err);return false;}
   }
 
   function run(name){
@@ -29,6 +30,7 @@
       if(name==='halftime')return call(root.CourtIQHalftimeAdjustment?.open,root.CourtIQHalftimeAdjustment);
       if(name==='postgame')return call(root.CourtIQPostgameLearning?.open,root.CourtIQPostgameLearning);
       if(name==='reports')return call(root.CourtIQReportLibrary?.open,root.CourtIQReportLibrary)||(typeof openFullReport==='function'?(openFullReport(),true):false);
+      if(name==='system-health')return call(root.CourtIQObservability?.open,root.CourtIQObservability);
       if(name==='connected')return typeof openConnectedIntelligence==='function'?(openConnectedIntelligence(),true):false;
       if(name==='player-memory')return call(root.CourtIQPlayerIntelligence?.open,root.CourtIQPlayerIntelligence)||(typeof openPlayerMemory==='function'?(openPlayerMemory(),true):call(root.CourtIQPlayers?.openPlayers,root.CourtIQPlayers));
       if(name==='account'||name==='login')return typeof openAccount==='function'?(openAccount(),true):false;
@@ -39,9 +41,9 @@
       if(name==='team-analytics')return tab('team');
       if(name==='play')return tab('play');
       if(name==='lineups')return tab('lineups');
-    }catch(err){console.error('[CourtIQ v229] bridge error:',name,err);}
+    }catch(err){console.error('[CourtIQ v230] bridge error:',name,err);report(name,err);}
     return false;
   }
 
-  root.CourtIQAppActions={version:'229',run,tab};
+  root.CourtIQAppActions={version:'230',run,tab};
 })(typeof window!=='undefined'?window:globalThis);
