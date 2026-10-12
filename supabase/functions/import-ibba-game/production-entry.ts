@@ -1,9 +1,9 @@
 // Production bootstrap for the CourtIQ official-game importer.
 //
-// IBBA intermittently rejects serverless requests with HTTP 403. Before giving
-// up, retry only equivalent official IBBA URL variants (www/non-www and slash
-// normalization). If those official routes also fail, try the existing rendered
-// reader fallback. The deterministic parser and validation engine stay unchanged.
+// IBBA blocks many datacenter IPs with HTTP 403. Keep the official IBBA URL as
+// the source of truth, but retry through a small set of public read-through
+// routes when the direct request is blocked. Every successful response is still
+// parsed and validated by the existing deterministic CourtIQ engine.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -16,7 +16,7 @@ function requestUrl(input: RequestInfo | URL): string {
 function isIbbaPublicPage(raw: string): boolean {
   try {
     const u = new URL(raw);
-    return /^(?:www\.)?ibasketball\.co\.il$/i.test(u.hostname) && /^\/match\//i.test(u.pathname);
+    return /^(?:www\.)?ibasketball\.co\.il$/i.test(u.hostname) && /^\/match\/[a-z0-9-]+\/?$/i.test(u.pathname);
   } catch (_) {
     return false;
   }
@@ -37,24 +37,51 @@ function browserHeaders(referer: string): HeadersInit {
 function officialVariants(raw: string): string[] {
   const u = new URL(raw);
   const path = u.pathname.endsWith("/") ? u.pathname : u.pathname + "/";
-  const bare = path.endsWith("/") ? path.slice(0, -1) : path;
-  const variants = [
+  const bare = path.slice(0, -1);
+  return [...new Set([
     `https://www.ibasketball.co.il${path}`,
     `https://ibasketball.co.il${path}`,
     `https://www.ibasketball.co.il${bare}`,
     `https://ibasketball.co.il${bare}`
-  ];
-  return [...new Set(variants.filter(v => v !== raw))];
+  ].filter(v => v !== raw))];
 }
 
-async function usableHtml(res: Response): Promise<Response | null> {
+function looksLikeIbbaHtml(html: string): boolean {
+  if (!html || html.length < 1000) return false;
+  const hasDoc = /<(?:html|body|table|tbody|tr)\b/i.test(html);
+  const hasBasketballShape = /data-key=["'](?:fgs|threeps|fts|pts|ast|to)["']/i.test(html)
+    || /data-player-id=/i.test(html)
+    || /(?:2\s*נק|3\s*נק|סך\s*הכל|נק['׳])/i.test(html);
+  return hasDoc && hasBasketballShape;
+}
+
+async function htmlResponse(res: Response, route: string): Promise<Response | null> {
   if (!res.ok) return null;
   const html = await res.text();
-  if (!html || !/<(?:html|body|table|tbody|tr)\b/i.test(html)) return null;
+  if (!looksLikeIbbaHtml(html)) return null;
   return new Response(html, {
     status: 200,
-    headers: {"Content-Type": "text/html; charset=utf-8"}
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "X-CourtIQ-Fetch-Route": route
+    }
   });
+}
+
+async function tryFetch(url: string, route: string, statuses: string[], init?: RequestInit): Promise<Response | null> {
+  try {
+    const res = await nativeFetch(url, init);
+    statuses.push(`${route}=${res.status}`);
+    const parsed = await htmlResponse(res, route);
+    if (parsed) {
+      console.log(`[CourtIQ] IBBA fetch succeeded via ${route} after ${statuses.join(", ")}`);
+      return parsed;
+    }
+  } catch (error) {
+    statuses.push(`${route}=exception`);
+    console.warn(`[CourtIQ] IBBA ${route} exception`, error);
+  }
+  return null;
 }
 
 async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -69,51 +96,48 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
   const statuses: string[] = [`direct=${direct.status}`];
 
   for (const variant of officialVariants(url)) {
-    try {
-      const res = await nativeFetch(variant, {
-        method: "GET",
-        redirect: "follow",
-        headers: browserHeaders("https://www.ibasketball.co.il/")
-      });
-      statuses.push(`${new URL(variant).hostname}${new URL(variant).pathname.endsWith("/") ? "/" : ""}=${res.status}`);
-      const htmlRes = await usableHtml(res);
-      if (htmlRes) {
-        htmlRes.headers.set("X-CourtIQ-Fetch-Route", "ibba-official-alias");
-        console.log(`[CourtIQ] IBBA fallback activated via official alias after ${statuses.join(", ")}`);
-        return htmlRes;
-      }
-    } catch (error) {
-      statuses.push(`official-alias=exception`);
-      console.warn("[CourtIQ] IBBA official alias exception", error);
-    }
+    const hit = await tryFetch(
+      variant,
+      "official-alias",
+      statuses,
+      {method: "GET", redirect: "follow", headers: browserHeaders("https://www.ibasketball.co.il/")}
+    );
+    if (hit) return hit;
   }
 
-  try {
-    const readerTargets = [
-      `https://r.jina.ai/${url}`,
-      `https://r.jina.ai/http://www.ibasketball.co.il${new URL(url).pathname}`
-    ];
-    for (const readerUrl of readerTargets) {
-      const fallback = await nativeFetch(readerUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "text/plain",
-          "X-Respond-With": "html",
-          "X-Timeout": "20",
-          "X-Locale": "he-IL"
-        }
-      });
-      statuses.push(`reader=${fallback.status}`);
-      const htmlRes = await usableHtml(fallback);
-      if (htmlRes) {
-        htmlRes.headers.set("X-CourtIQ-Fetch-Route", "ibba-rendered-fallback");
-        console.log(`[CourtIQ] IBBA rendered fallback activated after ${statuses.join(", ")}`);
-        return htmlRes;
-      }
+  const encoded = encodeURIComponent(url);
+  const u = new URL(url);
+  const routes = [
+    {
+      route: "allorigins",
+      url: `https://api.allorigins.win/raw?url=${encoded}`,
+      init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
+    },
+    {
+      route: "codetabs",
+      url: `https://api.codetabs.com/v1/proxy?quest=${encoded}`,
+      init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
+    },
+    {
+      route: "corsproxy",
+      url: `https://corsproxy.io/?url=${encoded}`,
+      init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
+    },
+    {
+      route: "jina-https",
+      url: `https://r.jina.ai/${url}`,
+      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "20", "X-Locale": "he-IL"}}
+    },
+    {
+      route: "jina-http",
+      url: `https://r.jina.ai/http://www.ibasketball.co.il${u.pathname}`,
+      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "20", "X-Locale": "he-IL"}}
     }
-  } catch (error) {
-    statuses.push("reader=exception");
-    console.warn("[CourtIQ] IBBA rendered fallback exception", error);
+  ];
+
+  for (const candidate of routes) {
+    const hit = await tryFetch(candidate.url, candidate.route, statuses, candidate.init);
+    if (hit) return hit;
   }
 
   console.warn(`[CourtIQ] IBBA all fetch routes failed: ${statuses.join(", ")}`);
