@@ -63,7 +63,7 @@ function injectStyles(doc){
   main.cq-five-page{max-width:1180px;margin:auto;padding:18px}
   .cq-print-bar{position:sticky;top:0;z-index:10;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 14px;margin-bottom:14px;background:#123e2e;color:#fff;border-radius:10px}
   .cq-print-bar button{padding:9px 15px;border:0;border-radius:8px;font-weight:700;cursor:pointer}
-  .report-page{position:relative;background:#fff;border:1px solid #d5e1d9;border-radius:12px;min-height:190mm;margin:0 0 18px;padding:14mm 12mm 12mm;overflow:hidden}
+  .report-page{position:relative;background:#fff;border:1px solid #d5e1d9;border-radius:12px;min-height:190mm;margin:0 0 18px;padding:14mm 12mm 12mm;overflow:visible}
   .cq-page-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:3px solid #123e2e;padding-bottom:8px;margin-bottom:10px}
   .cq-page-head h1{margin:2px 0 0;font-size:24px}.cq-page-head p{margin:3px 0 0;color:#52675c}.cq-page-head>b{font-size:22px;color:#165d40}
   .cq-page-body{display:grid;gap:8px}.cq-page-body>section{margin:0;padding:10px 12px;border:1px solid #d8e4dc;border-radius:9px;background:#fff}
@@ -74,9 +74,9 @@ function injectStyles(doc){
   .cq-page-foot{position:absolute;bottom:6mm;left:12mm;right:12mm;border-top:1px solid #d5e1d9;padding-top:5px;font-size:9px;color:#61756a}
   .cq-check-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.cq-check-grid article{margin:0}.cq-check-grid ol{margin:4px 0;padding-right:20px}.cq-check-grid li{margin:4px 0}
   [contenteditable]{outline:none;border-bottom:1px dashed #8aa095}
-  .cq-compact-context table{font-size:10px}.cq-trim-note{margin-top:5px}
+  .cq-compact-context table{font-size:10px}.cq-trim-note{margin-top:5px}.cq-player-focus{display:grid;grid-template-columns:1fr 1fr;gap:7px}.cq-player-focus article{margin:0}
   @media(max-width:800px){main.cq-five-page{padding:8px}.report-page{min-height:0;padding:16px}.kpis,.cq-check-grid{grid-template-columns:1fr 1fr}.cq-page-foot{position:static;margin-top:12px}.cq-print-bar{position:static}}
-  @media print{body{background:#fff}main.cq-five-page{padding:0;max-width:none}.cq-print-bar{display:none}.report-page{height:190mm;min-height:190mm;margin:0;border:0;border-radius:0;page-break-after:always;break-after:page}.report-page:last-child{page-break-after:auto;break-after:auto}.cq-page-foot{bottom:3mm}a{color:#172d24;text-decoration:none}}
+  @media print{body{background:#fff}main.cq-five-page{padding:0;max-width:none}.cq-print-bar{display:none}.report-page{height:190mm;min-height:190mm;margin:0;border:0;border-radius:0;overflow:hidden;page-break-after:always;break-after:page}.report-page:last-child{page-break-after:auto;break-after:auto}.cq-page-foot{bottom:3mm}a{color:#172d24;text-decoration:none}}
   `;
   doc.head.appendChild(style);
 }
@@ -96,7 +96,7 @@ function condenseReport(win){
 
     const p1=page(doc,1,PAGE_TITLES[0],teamTitle+' · '+meta);
     append(p1,trimArticles(removeButtons(cloneSection(by('תמונת הקבוצה'))),1));
-    append(p1,trimArticles(removeButtons(cloneSection(by('ממצאים מוכחים'))),5));
+    append(p1,trimArticles(removeButtons(cloneSection(by('ממצאים מוכחים'))),4));
 
     const p2=page(doc,2,PAGE_TITLES[1],'המדדים שמגדירים את פרופיל הקבוצה במדגם שנבחר');
     append(p2,trimTable(removeButtons(cloneSection(by('כל המדדים הקבוצתיים'))),18));
@@ -111,7 +111,7 @@ function condenseReport(win){
     append(p4,trimTable(removeButtons(cloneSection(by('סגל וחלוקת תפוקה'))),10));
     const focus=doc.createElement('section');focus.innerHTML='<h2>פוקוס שחקניות</h2><div class="cq-player-focus"></div>';
     const holder=focus.querySelector('.cq-player-focus');
-    playerProfiles.slice(0,4).forEach(profile=>{const c=removeButtons(cloneSection(profile));compactText(c,3);c.querySelectorAll('h3').forEach(h=>{if(h.textContent.includes('פירוט משחקים')){let n=h.nextElementSibling;while(n){const next=n.nextElementSibling;n.remove();n=next;}h.remove();}});c.querySelectorAll('table').forEach((t,i)=>{if(i>0)t.closest('.scroll')?.remove();});holder.appendChild(c);});
+    playerProfiles.slice(0,4).forEach(profile=>{const card=doc.createElement('article'),title=sectionTitle(profile),paragraphs=[...profile.querySelectorAll('p')].slice(0,2);card.innerHTML=`<h3>${esc(title)}</h3>${paragraphs.map(p=>p.outerHTML).join('')||'<p>אין מספיק נתונים מסכמים לשחקנית זו.</p>'}`;holder.appendChild(card);});
     if(!holder.children.length)holder.innerHTML='<p>אין מספיק נתוני שחקניות תקינים במדגם.</p>';
     append(p4,focus);
 
@@ -127,7 +127,9 @@ function condenseReport(win){
 }
 function patchModal(modal){
   const btn=modal?.querySelector('.scoutBuild');
-  if(!btn||btn.dataset.cqFivePagePatched==='1'||typeof btn.onclick!=='function')return;
+  if(!btn)return;
+  if(btn.dataset.cqFivePagePatched==='1'){if(!btn.textContent.includes('5 עמודים'))btn.textContent=btn.textContent.replace('הפקת דוח סקאוט','הפקת דוח סקאוט · 5 עמודים');return;}
+  if(typeof btn.onclick!=='function')return;
   const originalHandler=btn.onclick;
   btn.dataset.cqFivePagePatched='1';
   btn.textContent=btn.textContent.replace('הפקת דוח סקאוט','הפקת דוח סקאוט · 5 עמודים');
