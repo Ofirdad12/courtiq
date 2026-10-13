@@ -1,16 +1,22 @@
 // Production bootstrap for the CourtIQ official-game importer.
 //
-// IBBA blocks many datacenter IPs with HTTP 403. Keep the official IBBA URL as
-// the source of truth, but retry through a small set of public read-through
-// routes when the direct request is blocked. Every successful response is still
-// parsed and validated by the existing deterministic CourtIQ engine.
+// IBBA can block datacenter IPs with HTTP 403. Keep the official IBBA URL as
+// the source of truth, but use tightly bounded fallback fetches so an import
+// never sits on slow proxy routes for tens of seconds.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
+const DIRECT_TIMEOUT_MS = 4500;
+const ALIAS_TIMEOUT_MS = 2500;
+const PROXY_TIMEOUT_MS = 4500;
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();
   return input.url;
+}
+
+function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+  return String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
 }
 
 function isIbbaPublicPage(raw: string): boolean {
@@ -55,6 +61,25 @@ function looksLikeIbbaHtml(html: string): boolean {
   return hasDoc && hasBasketballShape;
 }
 
+function abortControllerFor(timeoutMs: number, upstream?: AbortSignal | null) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("CourtIQ fetch timeout", "TimeoutError")), timeoutMs);
+  if (upstream) {
+    if (upstream.aborted) controller.abort(upstream.reason);
+    else upstream.addEventListener("abort", () => controller.abort(upstream.reason), {once: true});
+  }
+  return {controller, timer};
+}
+
+async function timedFetch(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number): Promise<Response> {
+  const {controller, timer} = abortControllerFor(timeoutMs, init?.signal);
+  try {
+    return await nativeFetch(input, {...init, signal: controller.signal});
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function htmlResponse(res: Response, route: string): Promise<Response | null> {
   if (!res.ok) return null;
   const html = await res.text();
@@ -68,80 +93,83 @@ async function htmlResponse(res: Response, route: string): Promise<Response | nu
   });
 }
 
-async function tryFetch(url: string, route: string, statuses: string[], init?: RequestInit): Promise<Response | null> {
+async function tryFetch(url: string, route: string, statuses: string[], timeoutMs: number, init?: RequestInit): Promise<Response | null> {
+  const {controller, timer} = abortControllerFor(timeoutMs, init?.signal);
   try {
-    const res = await nativeFetch(url, init);
+    const res = await nativeFetch(url, {...init, signal: controller.signal});
     statuses.push(`${route}=${res.status}`);
     const parsed = await htmlResponse(res, route);
     if (parsed) {
-      console.log(`[CourtIQ] IBBA fetch succeeded via ${route} after ${statuses.join(", ")}`);
+      console.log(`[CourtIQ] IBBA fetch succeeded via ${route}; ${statuses.join(", ")}`);
       return parsed;
     }
   } catch (error) {
-    statuses.push(`${route}=exception`);
-    console.warn(`[CourtIQ] IBBA ${route} exception`, error);
+    const kind = error instanceof DOMException && error.name === "TimeoutError" ? "timeout" : "exception";
+    statuses.push(`${route}=${kind}`);
+  } finally {
+    clearTimeout(timer);
   }
   return null;
 }
 
+async function firstValid(candidates: Array<{route: string; url: string; timeoutMs: number; init?: RequestInit}>, statuses: string[]): Promise<Response | null> {
+  const results = await Promise.all(candidates.map(c => tryFetch(c.url, c.route, statuses, c.timeoutMs, c.init)));
+  return results.find(Boolean) || null;
+}
+
 async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = requestUrl(input);
-  const direct = await nativeFetch(input, init);
-  const method = String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+  const method = requestMethod(input, init);
 
-  if (method !== "GET" || !isIbbaPublicPage(url) || ![403, 429, 503].includes(direct.status)) {
-    return direct;
+  if (method !== "GET" || !isIbbaPublicPage(url)) return nativeFetch(input, init);
+
+  let direct: Response | null = null;
+  try {
+    direct = await timedFetch(input, init, DIRECT_TIMEOUT_MS);
+    if (direct.ok || ![403, 429, 503].includes(direct.status)) return direct;
+  } catch (_) {
+    direct = null;
   }
 
-  const statuses: string[] = [`direct=${direct.status}`];
-
-  for (const variant of officialVariants(url)) {
-    const hit = await tryFetch(
-      variant,
-      "official-alias",
-      statuses,
-      {method: "GET", redirect: "follow", headers: browserHeaders("https://www.ibasketball.co.il/")}
-    );
-    if (hit) return hit;
-  }
+  const statuses: string[] = [`direct=${direct?.status ?? "timeout"}`];
+  const aliases = officialVariants(url).map(variant => ({
+    route: "official-alias",
+    url: variant,
+    timeoutMs: ALIAS_TIMEOUT_MS,
+    init: {method: "GET", redirect: "follow" as RequestRedirect, headers: browserHeaders("https://www.ibasketball.co.il/")}
+  }));
+  const aliasHit = await firstValid(aliases, statuses);
+  if (aliasHit) return aliasHit;
 
   const encoded = encodeURIComponent(url);
-  const u = new URL(url);
-  const routes = [
+  const proxies = [
     {
       route: "allorigins",
       url: `https://api.allorigins.win/raw?url=${encoded}`,
+      timeoutMs: PROXY_TIMEOUT_MS,
       init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
     },
     {
       route: "codetabs",
       url: `https://api.codetabs.com/v1/proxy?quest=${encoded}`,
+      timeoutMs: PROXY_TIMEOUT_MS,
       init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
     },
     {
-      route: "corsproxy",
-      url: `https://corsproxy.io/?url=${encoded}`,
-      init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
-    },
-    {
-      route: "jina-https",
+      route: "jina",
       url: `https://r.jina.ai/${url}`,
-      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "20", "X-Locale": "he-IL"}}
-    },
-    {
-      route: "jina-http",
-      url: `https://r.jina.ai/http://www.ibasketball.co.il${u.pathname}`,
-      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "20", "X-Locale": "he-IL"}}
+      timeoutMs: PROXY_TIMEOUT_MS,
+      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "4", "X-Locale": "he-IL"}}
     }
   ];
+  const proxyHit = await firstValid(proxies, statuses);
+  if (proxyHit) return proxyHit;
 
-  for (const candidate of routes) {
-    const hit = await tryFetch(candidate.url, candidate.route, statuses, candidate.init);
-    if (hit) return hit;
-  }
-
-  console.warn(`[CourtIQ] IBBA all fetch routes failed: ${statuses.join(", ")}`);
-  return direct;
+  console.warn(`[CourtIQ] IBBA bounded fetch failed: ${statuses.join(", ")}`);
+  return direct || new Response("Official source did not respond within CourtIQ's import budget.", {
+    status: 504,
+    headers: {"Content-Type": "text/plain; charset=utf-8", "X-CourtIQ-Fetch-Route": "timeout"}
+  });
 }
 
 Object.defineProperty(globalThis, "fetch", {
