@@ -7,7 +7,7 @@
 const nativeFetch = globalThis.fetch.bind(globalThis);
 const DIRECT_TIMEOUT_MS = 4500;
 const ALIAS_TIMEOUT_MS = 2500;
-const PROXY_TIMEOUT_MS = 4500;
+const PROXY_TIMEOUT_MS = 5500;
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -144,14 +144,20 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
   const encoded = encodeURIComponent(url);
   const proxies = [
     {
-      route: "allorigins",
-      url: `https://api.allorigins.win/raw?url=${encoded}`,
+      route: "corsdev-path",
+      url: `https://proxy.cors.dev/${url}`,
       timeoutMs: PROXY_TIMEOUT_MS,
-      init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
+      init: {method: "GET", headers: {"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}}
     },
     {
-      route: "codetabs",
-      url: `https://api.codetabs.com/v1/proxy?quest=${encoded}`,
+      route: "corsdev-query",
+      url: `https://proxy.cors.dev/?url=${encoded}`,
+      timeoutMs: PROXY_TIMEOUT_MS,
+      init: {method: "GET", headers: {"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}}
+    },
+    {
+      route: "allorigins",
+      url: `https://api.allorigins.win/raw?url=${encoded}`,
       timeoutMs: PROXY_TIMEOUT_MS,
       init: {method: "GET", headers: {"Accept": "text/html,*/*"}}
     },
@@ -159,16 +165,20 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
       route: "jina",
       url: `https://r.jina.ai/${url}`,
       timeoutMs: PROXY_TIMEOUT_MS,
-      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "4", "X-Locale": "he-IL"}}
+      init: {method: "GET", headers: {"Accept": "text/plain", "X-Respond-With": "html", "X-Timeout": "5", "X-Locale": "he-IL"}}
     }
   ];
   const proxyHit = await firstValid(proxies, statuses);
   if (proxyHit) return proxyHit;
 
   console.warn(`[CourtIQ] IBBA bounded fetch failed: ${statuses.join(", ")}`);
-  return direct || new Response("Official source did not respond within CourtIQ's import budget.", {
+  return new Response("The official IBBA source is blocking CourtIQ's server fetch and no verified relay returned the official game HTML.", {
     status: 504,
-    headers: {"Content-Type": "text/plain; charset=utf-8", "X-CourtIQ-Fetch-Route": "timeout"}
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-CourtIQ-Fetch-Route": "blocked",
+      "X-CourtIQ-Fetch-Diagnostics": statuses.join(";").slice(0, 900)
+    }
   });
 }
 
