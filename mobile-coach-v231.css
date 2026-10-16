@@ -24,7 +24,7 @@ button,[role="button"],select{touch-action:manipulation}
   .owTop,.piHero,.pgHero,.htHero,.dqHero,.phHero{flex-direction:column!important}
   .owTop h2,.piHero h2{font-size:24px!important}
   .owControls,.piControls{grid-template-columns:1fr!important;position:sticky;top:0;z-index:15;background:#07101d;padding:7px 0;margin:8px 0!important}
-  .owControls label,.piControls label{font-size:9px!important}
+  .owControls label,.piControls label{font-size:12px!important}
   .owControls select,.piControls select,.pgGame select{width:100%!important;font-size:16px!important}
   .owSample,.dqSummary,.pgSample,.phCards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   .owSample article,.dqSummary article,.pgSample article,.phCards article{min-width:0}
@@ -54,11 +54,29 @@ button,[role="button"],select{touch-action:manipulation}
   .owActions,.pgActions,.htActions{grid-template-columns:1fr!important}
   .piProfile,.ssCards{grid-template-columns:1fr!important}
   .owSample,.dqSummary,.pgSample,.phCards,.piMetrics{grid-template-columns:1fr 1fr!important}
-  .htScore span{font-size:10px!important}.htScore b{font-size:22px!important}
+  .htScore span{font-size:12px!important}.htScore b{font-size:22px!important}
 }
 
 @media (orientation:landscape) and (max-height:600px) and (min-width:700px){
   .modalCard{max-height:100dvh!important;border-radius:0!important}
   .owControls,.piControls{position:static!important}
   .owDecisionGrid,.piGrid,.ssGrid{grid-template-columns:1fr 1fr!important}
+}
+
+/* CourtIQ v246 · readability upgrade */
+html{font-size:16px;text-size-adjust:100%}
+body{font-size:14px;line-height:1.5}
+.tagline{font-size:10px}.menu div{font-size:14px}.search,.user{font-size:13px}.crumb{font-size:12px}.tabs span{font-size:14px}
+.clubbar small{font-size:10px}.clubbar b{font-size:14px}.clubbar span{font-size:11px}
+.team h2{font-size:21px}.score small{font-size:12px}.kpi label{font-size:13px}.kpi b{font-size:27px}.kpi small,.sectionhead small,.cov small{font-size:12px}
+.sectionhead h3{font-size:17px}.box h3,.ask h3{font-size:15px}
+.finding b{font-size:14px}.finding p{font-size:13px;line-height:1.6}.finding em{font-size:11px}.insight{font-size:13px;line-height:1.6}.v2bar span{font-size:13px}.pill{font-size:11px}
+.stats,.compareTable,.audit table,.matrix{font-size:12px}.stats th,.stats td{padding:7px 6px}.factor label{font-size:12px}.bar i,.qname{font-size:11px}.videoItem{font-size:12px}.compareHead span{font-size:11px}.schema{font-size:12px}
+button,input,select,textarea{font-size:13px}.importBtn{font-size:11px}.ask p,.answer,.impStatus{font-size:13px}.modalCard p{font-size:13px}.footer{font-size:12px}
+small{line-height:1.45}table{line-height:1.45}
+
+@media(max-width:680px){
+  body{font-size:15px}.crumb{font-size:11px}.team h2{font-size:15px}.score{font-size:36px}.tabs span{font-size:13px;padding:13px 0}
+  .kpi label{font-size:13px}.kpi b{font-size:26px}.finding b{font-size:14px}.finding p{font-size:13px}
+  .stats,.compareTable,.audit table,.matrix{font-size:12px}button,input,select,textarea{font-size:14px}
 }
