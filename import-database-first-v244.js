@@ -48,6 +48,15 @@ function identityFromUrl(raw){
   return null;
 }
 
+function importerFunctionForUrl(raw){
+  try{
+    const host=new URL(String(raw||'').trim()).hostname.replace(/^www\./i,'').toLowerCase();
+    return host==='ibasketball.co.il'?'import-ibba-game-v2':'import-ibba-game';
+  }catch(_){
+    return 'import-ibba-game';
+  }
+}
+
 async function savedGame(url){
   const identity=identityFromUrl(url);
   const d=window.CourtIQData;
@@ -92,11 +101,12 @@ async function invokeImport(url,clubId=null,retry=true){
   const chosen=await resolveClubId(clubId);
   if(!chosen)throw new Error('Select a club before importing a game.');
 
+  const importer=importerFunctionForUrl(url);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),CLIENT_TIMEOUT_MS);
   let res;
   try{
-    res=await fetch(SUPABASE_URL+'/functions/v1/import-ibba-game',{
+    res=await fetch(SUPABASE_URL+'/functions/v1/'+importer,{
       method:'POST',
       headers:{
         apikey:PUBLISHABLE_KEY,
@@ -159,9 +169,11 @@ function install(){
   };
   wrapper.__courtiqDatabaseFirstV244=true;
   wrapper.__courtiqHttpResilience=true;
+  wrapper.__courtiqIbbaV2=true;
   d.importOfficialGame=wrapper;
   d.__importDatabaseFirstV244=true;
   d.__importHttpResilience=true;
+  d.__importIbbaV2=true;
   return true;
 }
 
@@ -170,5 +182,5 @@ setTimeout(install,0);
 setTimeout(install,250);
 setTimeout(install,1000);
 window.addEventListener('load',install,{once:true});
-window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,invokeImport,resolveClubId};
+window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,invokeImport,resolveClubId,importerFunctionForUrl};
 })();
