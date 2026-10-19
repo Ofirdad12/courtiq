@@ -120,6 +120,10 @@ function applyKnownGames(){
   }catch(_){}
 }
 
+function refreshCurrentView(){
+  try{if(typeof render==='function')render();}catch(_){}
+}
+
 function wrapHydrator(){
   try{
     if(typeof hydrateOfficialDemoGame!=='function'||hydrateOfficialDemoGame.__teamPossessionsV248)return;
@@ -152,7 +156,9 @@ window.CourtIQTeamPossessions={METHOD,VERSION,estimateSide,calculate,applyToGame
 wrapHydrator();
 applyKnownGames();
 wrapImporter();
+refreshCurrentView();
 setTimeout(()=>{applyKnownGames();wrapImporter();},0);
 setTimeout(()=>{applyKnownGames();wrapImporter();},500);
+setTimeout(()=>{applyKnownGames();wrapImporter();},1500);
 window.addEventListener('load',()=>{applyKnownGames();wrapImporter();},{once:true});
 })();
