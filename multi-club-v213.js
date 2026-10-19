@@ -49,6 +49,13 @@ async function workspace(){
     request('/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at,club_id&club_id=eq.'+Number(club.id)+'&order=game_date.desc.nullslast'),
     request('/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url,analysis)&club_id=eq.'+Number(club.id)+'&season=eq.'+encodeURIComponent(club.season))
   ]);
+  for(const row of games||[]){
+    const ui=row.payload?.ui;
+    if(ui){
+      ui.raw=ui.raw||row.payload.raw;
+      window.CourtIQTeamPossessions?.applyToGame?.(ui);
+    }
+  }
   return {club,clubs:available,games:games||[],clubPlayers:clubPlayers||[]};
 }
 async function importOfficialGame(url,clubId=null){
