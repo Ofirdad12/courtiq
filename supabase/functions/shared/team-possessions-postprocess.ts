@@ -1,12 +1,15 @@
 // CourtIQ shared box-score possession correction for Supabase Edge Functions.
 // Installs before the legacy importer registers Deno.serve, then patches the
-// successful response and persisted game/report payloads to formula v3.
+// successful response and persisted game/report payloads to formula v4.
+// Also resolves Czech Basketball Federation (CBF) game pages to their linked
+// official FIBA LiveStats / Genius Sports feed before the legacy importer runs.
 
 const nativeServe = Deno.serve.bind(Deno);
 const nativeHttpFetch = globalThis.fetch.bind(globalThis);
 const METHOD = "TEAM_FULL_BOX_SCORE";
-const VERSION = "courtiq-formulas-v3";
-const POSSESSION_FORMULA = "0.5 × [TeamEst + OppEst], where TeamEst = FGA + 0.4 × FTA - 1.07 × (ORB / (ORB + Opp DRB)) × (FGA - FGM) + TOV";
+const VERSION = "courtiq-formulas-v4";
+const POSSESSION_FORMULA = "TeamEst = FGA + 0.4 × FTA - 1.07 × (ORB / (ORB + Opp DRB)) × (FGA - FGM) + TOV; keep TeamEst separate for each team";
+const CBF_HOST = "cbf.cz.basketball";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const pct = (a: number, b: number) => b > 0 ? Math.round(a / b * 1000) / 10 : 0;
@@ -45,9 +48,9 @@ function patchFormulaCatalog(catalog: any) {
   catalog.version = VERSION;
   catalog.box_score = {...(catalog.box_score || {}),
     possessions: POSSESSION_FORMULA,
-    ortg: "PTS / Shared Possessions × 100",
-    drtg: "Opponent PTS / Shared Possessions × 100",
-    pace: "Shared Possessions / Game Minutes × 40"
+    ortg: "Team PTS / Team Possessions × 100",
+    drtg: "Opponent PTS / Opponent Possessions × 100",
+    pace: "Team Possessions / Game Minutes × 40"
   };
   return catalog;
 }
@@ -71,19 +74,20 @@ export function patchUi(ui: any) {
   const homeEst = sideEstimate(homeRaw, awayRaw), awayEst = sideEstimate(awayRaw, homeRaw);
   if (!h || !a || homeEst == null || awayEst == null) return null;
 
-  const shared = (homeEst + awayEst) / 2;
   const periods = Array.isArray(ui.quarters) && ui.quarters.length ? Math.max(4, ui.quarters.length) : 4;
   const gameMinutes = 40 + Math.max(0, periods - 4) * 5;
-  const pace = shared * 40 / gameMinutes;
-  const homeOrtg = 100 * h.points / shared, awayOrtg = 100 * a.points / shared;
-  const poss1 = r1(shared), pace1 = r1(pace), hOrtg1 = r1(homeOrtg), aOrtg1 = r1(awayOrtg);
+  const homePace = homeEst * 40 / gameMinutes, awayPace = awayEst * 40 / gameMinutes;
+  const homeOrtg = 100 * h.points / homeEst, awayOrtg = 100 * a.points / awayEst;
+  const homePoss1 = r1(homeEst), awayPoss1 = r1(awayEst);
+  const homePace1 = r1(homePace), awayPace1 = r1(awayPace);
+  const hOrtg1 = r1(homeOrtg), aOrtg1 = r1(awayOrtg);
   const hNet = r1(hOrtg1 - aOrtg1), aNet = r1(aOrtg1 - hOrtg1);
 
   ui.calculated = ui.calculated || {};
-  ui.calculated.home = {...(ui.calculated.home || {}), possessions:poss1, pace:pace1, ortg:hOrtg1, drtg:aOrtg1, net_rating:hNet,
-    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:r1(homeEst), opponent_possession_estimate:r1(awayEst)};
-  ui.calculated.away = {...(ui.calculated.away || {}), possessions:poss1, pace:pace1, ortg:aOrtg1, drtg:hOrtg1, net_rating:aNet,
-    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:r1(awayEst), opponent_possession_estimate:r1(homeEst)};
+  ui.calculated.home = {...(ui.calculated.home || {}), possessions:homePoss1, pace:homePace1, ortg:hOrtg1, drtg:aOrtg1, net_rating:hNet,
+    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:homePoss1, opponent_possession_estimate:awayPoss1};
+  ui.calculated.away = {...(ui.calculated.away || {}), possessions:awayPoss1, pace:awayPace1, ortg:aOrtg1, drtg:hOrtg1, net_rating:aNet,
+    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:awayPoss1, opponent_possession_estimate:homePoss1};
   ui.possessionMethod = METHOD;
   ui.possessionFormulaVersion = VERSION;
   ui.formulaCatalog = patchFormulaCatalog(ui.formulaCatalog);
@@ -91,15 +95,17 @@ export function patchUi(ui: any) {
   patchRow(ui.metrics,"Offensive Rating",hOrtg1,aOrtg1,v=>Number(v).toFixed(1));
   patchRow(ui.metrics,"Defensive Rating",aOrtg1,hOrtg1,v=>Number(v).toFixed(1));
   patchRow(ui.metrics,"Net Rating",hNet,aNet,v=>Number(v).toFixed(1));
-  patchRow(ui.metrics,"Pace",pace1,pace1,v=>Number(v).toFixed(1));
-  patchRow(ui.stats,"Possessions",poss1,poss1);
-  patchRow(ui.stats,"Pace",pace1,pace1);
+  patchRow(ui.metrics,"Pace",homePace1,awayPace1,v=>Number(v).toFixed(1));
+  patchRow(ui.metrics,"Estimated Possessions",homePoss1,awayPoss1,v=>Number(v).toFixed(1));
+  patchRow(ui.metrics,"Possessions",homePoss1,awayPoss1,v=>Number(v).toFixed(1));
+  patchRow(ui.stats,"Possessions",homePoss1,awayPoss1);
+  patchRow(ui.stats,"Pace",homePace1,awayPace1);
   patchRow(ui.stats,"ORtg",hOrtg1,aOrtg1);
   patchRow(ui.stats,"DRtg",aOrtg1,hOrtg1);
   patchRow(ui.stats,"Net Rating",hNet,aNet);
-  patchPlayerShares(ui,"home",shared);
-  patchPlayerShares(ui,"away",shared);
-  return {shared:r1(shared), pace:pace1, homeEstimate:r1(homeEst), awayEstimate:r1(awayEst)};
+  patchPlayerShares(ui,"home",homeEst);
+  patchPlayerShares(ui,"away",awayEst);
+  return {homePossessions:homePoss1, awayPossessions:awayPoss1, homePace:homePace1, awayPace:awayPace1};
 }
 
 function patchReport(report: any, ui: any) {
@@ -148,19 +154,88 @@ async function persistCorrection(body: any) {
   }
 }
 
-async function patchResponse(response: Response) {
+function cbfGameUrl(raw: string) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && u.hostname.toLowerCase() === CBF_HOST && /^\/zapas\/\d+\/?$/i.test(u.pathname);
+  } catch (_) {
+    return false;
+  }
+}
+
+function liveStatsTarget(html: string) {
+  const source = String(html || "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("\\/", "/")
+    .replaceAll("\\u002F", "/");
+  const genius = source.match(/https?:\/\/(?:fibalivestats|livestats)\.dcd\.shared\.geniussports\.com\/u\/([a-z0-9_-]+)\/(\d+)(?:\/[^\"'<>\s]*)?/i);
+  if (genius) return `https://fibalivestats.dcd.shared.geniussports.com/u/${genius[1]}/${genius[2]}/bs.html`;
+  const legacy = source.match(/https?:\/\/(?:www\.)?fibalivestats\.com\/(?:u|webcast)\/([a-z0-9_-]+)\/(\d+)/i);
+  if (legacy) return `https://fibalivestats.dcd.shared.geniussports.com/u/${legacy[1]}/${legacy[2]}/bs.html`;
+  return null;
+}
+
+async function resolveCbfSource(raw: string) {
+  const source = new URL(raw);
+  source.hash = "";
+  const res = await nativeHttpFetch(source.toString(), {
+    method:"GET",
+    redirect:"follow",
+    headers:{
+      "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+      "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language":"cs-CZ,cs;q=0.9,en;q=0.8"
+    }
+  });
+  if (!res.ok) throw new Error(`CBF game page returned HTTP ${res.status}.`);
+  const target = liveStatsTarget(await res.text());
+  if (!target) throw new Error("CBF game page does not expose an official FIBA LiveStats link yet.");
+  return target;
+}
+
+async function normalizeIncomingRequest(req: Request) {
+  if (req.method !== "POST" || !(req.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
+    return {request:req, cbfSource:null as string|null, liveStatsSource:null as string|null};
+  }
+  let body: any;
+  try { body = await req.clone().json(); } catch (_) { return {request:req, cbfSource:null, liveStatsSource:null}; }
+  const raw = String(body?.url || "").trim();
+  if (!cbfGameUrl(raw)) return {request:req, cbfSource:null, liveStatsSource:null};
+
+  const liveStatsSource = await resolveCbfSource(raw);
+  const headers = new Headers(req.headers);
+  headers.delete("content-length");
+  headers.set("Content-Type", "application/json");
+  headers.set("X-CourtIQ-CBF-Source", raw);
+  const request = new Request(req.url, {
+    method:req.method,
+    headers,
+    body:JSON.stringify({...body, url:liveStatsSource}),
+    signal:req.signal
+  });
+  return {request, cbfSource:raw, liveStatsSource};
+}
+
+async function patchResponse(response: Response, source?: {cbfSource:string|null;liveStatsSource:string|null}) {
   if (!(response instanceof Response) || !response.ok) return response;
   const type = response.headers.get("content-type") || "";
   if (!type.toLowerCase().includes("json")) return response;
   try {
     const text = await response.text();
     const body = text ? JSON.parse(text) : null;
-    if (!body?.ui || !patchUi(body.ui)) return new Response(text, {status:response.status,statusText:response.statusText,headers:response.headers});
+    if (source?.cbfSource && body?.ui) {
+      body.ui.sourceLiveStatsUrl = source.liveStatsSource;
+      body.ui.sourceUrl = source.cbfSource;
+      body.ui.sourceLabel = "CBF · FIBA LIVESTATS / GENIUS SPORTS OFFICIAL DATA · DATA CONFIRMED";
+      body.source_url = source.cbfSource;
+    }
+    if (!body?.ui || !patchUi(body.ui)) return new Response(JSON.stringify(body ?? {}), {status:response.status,statusText:response.statusText,headers:response.headers});
     if (body.report) body.report = patchReport(body.report, body.ui);
     await persistCorrection(body);
     const headers = new Headers(response.headers);
     headers.set("Content-Type","application/json");
     headers.set("X-CourtIQ-Possessions","TEAM_FULL_BOX_SCORE");
+    if (source?.cbfSource) headers.set("X-CourtIQ-Source-Bridge","CBF_TO_GENIUS");
     return new Response(JSON.stringify(body), {status:response.status,statusText:response.statusText,headers});
   } catch (error) {
     console.warn("[CourtIQ] Team possessions response correction skipped:", error);
@@ -168,8 +243,29 @@ async function patchResponse(response: Response) {
   }
 }
 
+function bridgeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return new Response(JSON.stringify({error:message}), {
+    status:422,
+    headers:{
+      "Access-Control-Allow-Origin":"https://ofirdad12.github.io",
+      "Access-Control-Allow-Headers":"authorization, apikey, content-type",
+      "Access-Control-Allow-Methods":"POST, OPTIONS",
+      "Content-Type":"application/json"
+    }
+  });
+}
+
 const wrappedServe = (optionsOrHandler: any, maybeHandler?: any) => {
-  const wrap = (handler: any) => async (req: Request, info: any) => patchResponse(await handler(req, info));
+  const wrap = (handler: any) => async (req: Request, info: any) => {
+    try {
+      const normalized = await normalizeIncomingRequest(req);
+      return patchResponse(await handler(normalized.request, info), normalized);
+    } catch (error) {
+      console.warn("[CourtIQ] CBF source bridge failed:", error);
+      return bridgeError(error);
+    }
+  };
   return typeof optionsOrHandler === "function"
     ? nativeServe(wrap(optionsOrHandler))
     : nativeServe(optionsOrHandler, wrap(maybeHandler));
