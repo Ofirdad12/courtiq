@@ -62,7 +62,15 @@ async function savedGame(url){
   const d=window.CourtIQData;
   if(!identity||!d?.workspace)return null;
   const w=await d.workspace();
-  const row=(w?.games||[]).find(g=>String(g?.provider||'').toUpperCase()===identity.provider&&String(g?.external_id||'')===String(identity.externalId));
+  // Match only explicit source identities; never infer a match from team names.
+  const matches=id=>id&&id.provider===identity.provider&&String(id.externalId)===String(identity.externalId);
+  const row=(w?.games||[]).find(g=>{
+    const p=g?.payload;
+    if(!p?.ui||!(p.verified===true||p.quality?.status==='VERIFIED'))return false;
+    if(matches({provider:String(g.provider||'').toUpperCase(),externalId:g.external_id}))return true;
+    const aliases=Array.isArray(p.source_aliases)?p.source_aliases:[];
+    return aliases.some(alias=>typeof alias==='string'&&matches(identityFromUrl(alias)));
+  });
   if(!row?.payload?.ui)return null;
   const verified=row.payload.verified===true||row.payload.quality?.status==='VERIFIED';
   if(!verified)return null;
@@ -164,7 +172,10 @@ function install(){
   wrapper=async function(url,clubId=null){
     let cached=null;
     try{cached=await savedGame(url);}catch(_){}
-    if(cached)return cached;
+    if(cached){
+      window.CourtIQTeamPossessions?.applyToGame?.(cached.ui);
+      return cached;
+    }
     return invokeImport(url,clubId,true);
   };
   wrapper.__courtiqDatabaseFirstV244=true;
