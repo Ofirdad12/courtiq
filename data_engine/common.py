@@ -14,12 +14,12 @@ def build_game(home: dict, away: dict, metadata: dict, source: dict) -> dict:
         "source": source,
         "home": {
             "raw": home,
-            "possessions_est": estimate_possessions(home),
+            "possessions_est": estimate_possessions(home, away),
             "four_factors": compute_four_factors(home, away),
         },
         "away": {
             "raw": away,
-            "possessions_est": estimate_possessions(away),
+            "possessions_est": estimate_possessions(away, home),
             "four_factors": compute_four_factors(away, home),
         },
         "validation": validation,
