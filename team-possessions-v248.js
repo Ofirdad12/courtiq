@@ -1,13 +1,14 @@
-/* CourtIQ Team Possessions v252
- * Separate full box-score estimates, pace and ratings per team.
- * No averaging between the teams for Possessions, Pace, ORtg or DRtg.
+/* CourtIQ Team Possessions v253
+ * Separate full box-score possession estimates and ratings per team.
+ * Pace is a shared game metric: average both teams' possession estimates,
+ * then normalize to a 40-minute FIBA game (including overtime adjustment).
  * Exact play-by-play possessions remain owned by possession-engine.js.
  */
 (()=>{
 'use strict';
 
 const METHOD='TEAM_FULL_BOX_SCORE';
-const VERSION='252';
+const VERSION='253';
 const round1=value=>Math.round(value*10)/10;
 const pct=(a,b)=>b>0?Math.round((a/b*100)*10)/10:null;
 const number=value=>{
@@ -42,7 +43,8 @@ function calculate(team,opponent,periodCount=4){
   const possessions=teamEstimate;
   const periods=Math.max(4,Number.isFinite(Number(periodCount))?Number(periodCount):4);
   const gameMinutes=40+Math.max(0,periods-4)*5;
-  const pace=possessions*(40/gameMinutes);
+  const gamePossessions=(teamEstimate+opponentEstimate)/2;
+  const pace=gamePossessions*(40/gameMinutes);
   const ortg=100*t.points/possessions;
   const drtg=100*o.points/opponentEstimate;
   return {
@@ -55,6 +57,7 @@ function calculate(team,opponent,periodCount=4){
     netRating:ortg-drtg,
     teamEstimate,
     opponentEstimate,
+    gamePossessions,
     gameMinutes
   };
 }
@@ -88,32 +91,33 @@ function applyToGame(game){
   if(!home||!away)return null;
 
   const homePossessions=round1(home.possessions),awayPossessions=round1(away.possessions);
-  const homePace=round1(home.pace),awayPace=round1(away.pace);
+  const gamePace=round1(home.pace);
+  const homePace=gamePace,awayPace=gamePace;
   const homeOrtg=round1(home.ortg),awayOrtg=round1(away.ortg);
   const homeNet=round1(home.netRating),awayNet=round1(away.netRating);
 
   game.calculated=game.calculated||{};
-  game.calculated.home={...(game.calculated.home||{}),possessions:homePossessions,pace:homePace,ortg:homeOrtg,drtg:awayOrtg,net_rating:homeNet,possession_method:METHOD,possession_formula_version:VERSION,team_possession_estimate:round1(home.teamEstimate),opponent_possession_estimate:round1(home.opponentEstimate)};
-  game.calculated.away={...(game.calculated.away||{}),possessions:awayPossessions,pace:awayPace,ortg:awayOrtg,drtg:homeOrtg,net_rating:awayNet,possession_method:METHOD,possession_formula_version:VERSION,team_possession_estimate:round1(away.teamEstimate),opponent_possession_estimate:round1(away.opponentEstimate)};
+  game.calculated.home={...(game.calculated.home||{}),possessions:homePossessions,pace:homePace,ortg:homeOrtg,drtg:awayOrtg,net_rating:homeNet,possession_method:METHOD,possession_formula_version:VERSION,team_possession_estimate:round1(home.teamEstimate),opponent_possession_estimate:round1(home.opponentEstimate),game_possessions:round1(home.gamePossessions)};
+  game.calculated.away={...(game.calculated.away||{}),possessions:awayPossessions,pace:awayPace,ortg:awayOrtg,drtg:homeOrtg,net_rating:awayNet,possession_method:METHOD,possession_formula_version:VERSION,team_possession_estimate:round1(away.teamEstimate),opponent_possession_estimate:round1(away.opponentEstimate),game_possessions:round1(away.gamePossessions)};
   game.possessionMethod=METHOD;
   game.possessionFormulaVersion=VERSION;
 
   patchRow(game.metrics,'Offensive Rating',homeOrtg,awayOrtg,v=>v.toFixed(1));
   patchRow(game.metrics,'Defensive Rating',awayOrtg,homeOrtg,v=>v.toFixed(1));
   patchRow(game.metrics,'Net Rating',homeNet,awayNet,v=>v.toFixed(1));
-  patchRow(game.metrics,'Pace',homePace,awayPace,v=>v.toFixed(1));
+  patchRow(game.metrics,'Pace',gamePace,gamePace,v=>v.toFixed(1));
 
   patchRow(game.stats,'Possessions',homePossessions,awayPossessions);
   patchRow(game.metrics,'Estimated Possessions',homePossessions,awayPossessions);
   patchRow(game.metrics,'Possessions',homePossessions,awayPossessions);
-  patchRow(game.stats,'Pace',homePace,awayPace);
+  patchRow(game.stats,'Pace',gamePace,gamePace);
   patchRow(game.stats,'ORtg',homeOrtg,awayOrtg);
   patchRow(game.stats,'DRtg',awayOrtg,homeOrtg);
   patchRow(game.stats,'Net Rating',homeNet,awayNet);
 
   patchPlayerShares(game,'home',home.possessions);
   patchPlayerShares(game,'away',away.possessions);
-  return {home,away,possessions:homePossessions,opponentPossessions:awayPossessions,homePace,awayPace};
+  return {home,away,possessions:homePossessions,opponentPossessions:awayPossessions,gamePace,homePace,awayPace};
 }
 
 function applyKnownGames(){
