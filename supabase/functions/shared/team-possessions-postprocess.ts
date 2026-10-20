@@ -1,14 +1,14 @@
 // CourtIQ shared box-score possession correction for Supabase Edge Functions.
 // Installs before the legacy importer registers Deno.serve, then patches the
-// successful response and persisted game/report payloads to formula v4.
+// successful response and persisted game/report payloads to formula v5.
 // Also resolves Czech Basketball Federation (CBF) game pages to their linked
 // official FIBA LiveStats / Genius Sports feed before the legacy importer runs.
 
 const nativeServe = Deno.serve.bind(Deno);
 const nativeHttpFetch = globalThis.fetch.bind(globalThis);
 const METHOD = "TEAM_FULL_BOX_SCORE";
-const VERSION = "courtiq-formulas-v4";
-const POSSESSION_FORMULA = "TeamEst = FGA + 0.4 × FTA - 1.07 × (ORB / (ORB + Opp DRB)) × (FGA - FGM) + TOV; keep TeamEst separate for each team";
+const VERSION = "courtiq-formulas-v5";
+const POSSESSION_FORMULA = "TeamEst = FGA + 0.4 × FTA - 1.07 × (ORB / (ORB + Opp DRB)) × (FGA - FGM) + TOV; keep TeamEst separate for each team; Game Pace = average(Home TeamEst, Away TeamEst) × 40 / Game Minutes";
 const CBF_HOST = "cbf.cz.basketball";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -50,7 +50,7 @@ function patchFormulaCatalog(catalog: any) {
     possessions: POSSESSION_FORMULA,
     ortg: "Team PTS / Team Possessions × 100",
     drtg: "Opponent PTS / Opponent Possessions × 100",
-    pace: "Team Possessions / Game Minutes × 40"
+    pace: "[(Home TeamEst + Away TeamEst) / 2] × 40 / Game Minutes"
   };
   return catalog;
 }
@@ -76,18 +76,21 @@ export function patchUi(ui: any) {
 
   const periods = Array.isArray(ui.quarters) && ui.quarters.length ? Math.max(4, ui.quarters.length) : 4;
   const gameMinutes = 40 + Math.max(0, periods - 4) * 5;
-  const homePace = homeEst * 40 / gameMinutes, awayPace = awayEst * 40 / gameMinutes;
+  const gamePossessions = (homeEst + awayEst) / 2;
+  const gamePace = gamePossessions * 40 / gameMinutes;
   const homeOrtg = 100 * h.points / homeEst, awayOrtg = 100 * a.points / awayEst;
   const homePoss1 = r1(homeEst), awayPoss1 = r1(awayEst);
-  const homePace1 = r1(homePace), awayPace1 = r1(awayPace);
+  const gamePoss1 = r1(gamePossessions), gamePace1 = r1(gamePace);
+  const homePace1 = gamePace1, awayPace1 = gamePace1;
   const hOrtg1 = r1(homeOrtg), aOrtg1 = r1(awayOrtg);
   const hNet = r1(hOrtg1 - aOrtg1), aNet = r1(aOrtg1 - hOrtg1);
 
   ui.calculated = ui.calculated || {};
   ui.calculated.home = {...(ui.calculated.home || {}), possessions:homePoss1, pace:homePace1, ortg:hOrtg1, drtg:aOrtg1, net_rating:hNet,
-    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:homePoss1, opponent_possession_estimate:awayPoss1};
+    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:homePoss1, opponent_possession_estimate:awayPoss1, game_possessions:gamePoss1};
   ui.calculated.away = {...(ui.calculated.away || {}), possessions:awayPoss1, pace:awayPace1, ortg:aOrtg1, drtg:hOrtg1, net_rating:aNet,
-    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:awayPoss1, opponent_possession_estimate:homePoss1};
+    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:awayPoss1, opponent_possession_estimate:homePoss1, game_possessions:gamePoss1};
+  ui.gamePace = gamePace1;
   ui.possessionMethod = METHOD;
   ui.possessionFormulaVersion = VERSION;
   ui.formulaCatalog = patchFormulaCatalog(ui.formulaCatalog);
@@ -95,17 +98,17 @@ export function patchUi(ui: any) {
   patchRow(ui.metrics,"Offensive Rating",hOrtg1,aOrtg1,v=>Number(v).toFixed(1));
   patchRow(ui.metrics,"Defensive Rating",aOrtg1,hOrtg1,v=>Number(v).toFixed(1));
   patchRow(ui.metrics,"Net Rating",hNet,aNet,v=>Number(v).toFixed(1));
-  patchRow(ui.metrics,"Pace",homePace1,awayPace1,v=>Number(v).toFixed(1));
+  patchRow(ui.metrics,"Pace",gamePace1,gamePace1,v=>Number(v).toFixed(1));
   patchRow(ui.metrics,"Estimated Possessions",homePoss1,awayPoss1,v=>Number(v).toFixed(1));
   patchRow(ui.metrics,"Possessions",homePoss1,awayPoss1,v=>Number(v).toFixed(1));
   patchRow(ui.stats,"Possessions",homePoss1,awayPoss1);
-  patchRow(ui.stats,"Pace",homePace1,awayPace1);
+  patchRow(ui.stats,"Pace",gamePace1,gamePace1);
   patchRow(ui.stats,"ORtg",hOrtg1,aOrtg1);
   patchRow(ui.stats,"DRtg",aOrtg1,hOrtg1);
   patchRow(ui.stats,"Net Rating",hNet,aNet);
   patchPlayerShares(ui,"home",homeEst);
   patchPlayerShares(ui,"away",awayEst);
-  return {homePossessions:homePoss1, awayPossessions:awayPoss1, homePace:homePace1, awayPace:awayPace1};
+  return {homePossessions:homePoss1, awayPossessions:awayPoss1, gamePossessions:gamePoss1, gamePace:gamePace1, homePace:homePace1, awayPace:awayPace1};
 }
 
 function patchReport(report: any, ui: any) {
