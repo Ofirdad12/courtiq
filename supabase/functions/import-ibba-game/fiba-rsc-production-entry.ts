@@ -3,12 +3,14 @@
 // Next.js React Server Components (RSC / Flight) response. This adapter
 // requests that official payload, understands both direct and JSON-string
 // encoded Flight chunks, and presents the resolved objects to the existing
-// verified CourtIQ parser. Other providers pass through unchanged.
+// verified CourtIQ parser. It also preserves official play-by-play so the
+// browser possession engine can reconstruct actual possessions.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 const nativeServe = Deno.serve.bind(Deno);
 const FIBA_ATTEMPTS = 3;
 const FIBA_RETRY_MS = 1200;
+const fibaPbpByGame = new Map<number, any[]>();
 
 function sleep(ms:number){ return new Promise(resolve=>setTimeout(resolve,ms)); }
 function requestUrl(input: RequestInfo | URL): string {
@@ -24,6 +26,17 @@ function isFibaGamePage(raw: string): boolean {
     const u = new URL(raw);
     return /^(?:www\.)?fiba\.basketball$/i.test(u.hostname) && /\/games\/\d+-[^/]+-[^/?#]+\/?$/i.test(u.pathname);
   } catch (_) { return false; }
+}
+function fibaGameId(raw:string): number {
+  try{return Number(new URL(raw).pathname.match(/\/games\/(\d+)-/i)?.[1]||0);}catch(_){return 0;}
+}
+function pbpArray(value:any): any[] {
+  if(Array.isArray(value)) return value;
+  if(!value || typeof value!=="object") return [];
+  for(const key of ["actions","events","items","plays","playByPlay","c"]){
+    if(Array.isArray(value[key])) return value[key];
+  }
+  return [];
 }
 
 function jsonEnd(text: string, start: number): number {
@@ -74,8 +87,6 @@ function extractRoot(text: string, key: string, wantedGameId?: number): any {
 
 function decodedFlightSources(text:string): string[] {
   const sources=[text];
-  // Some Next.js builds embed useful Flight chunks as JSON string literals.
-  // Decode those strings exactly once, preserving the raw response as source 0.
   const tokens=text.match(/"(?:\\.|[^"\\])*"/g)||[];
   for(const token of tokens){
     try{
@@ -150,7 +161,7 @@ function rscHeaders(init?: RequestInit): Headers {
 async function fibaAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = requestUrl(input);
   if (requestMethod(input, init) !== "GET" || !isFibaGamePage(url)) return nativeFetch(input, init);
-  const gameId = Number(new URL(url).pathname.match(/\/games\/(\d+)-/i)?.[1] || 0);
+  const gameId = fibaGameId(url);
   if (!gameId) return nativeFetch(input, init);
 
   let lastError="";
@@ -161,6 +172,13 @@ async function fibaAwareFetch(input: RequestInfo | URL, init?: RequestInit): Pro
       if (rsc.ok && type.includes("x-component")) {
         const text = await rsc.text();
         const data = extractFibaRsc(text, gameId);
+        const pbp=pbpArray(data?.playByPlay);
+        if(pbp.length){
+          fibaPbpByGame.set(gameId,pbp);
+          console.log(`[CourtIQ] FIBA game ${gameId} preserved ${pbp.length} official play-by-play events.`);
+        }else{
+          console.warn(`[CourtIQ] FIBA game ${gameId} RSC contains no usable play-by-play array.`);
+        }
         const html = `<!doctype html><html><body><script>self.__next_f=${JSON.stringify(data)}</script></body></html>`;
         console.log(`[CourtIQ] FIBA game ${gameId} loaded from official RSC payload on attempt ${attempt}.`);
         return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","X-CourtIQ-FIBA-Route":"official-rsc","X-CourtIQ-FIBA-Game":String(gameId)}});
@@ -174,28 +192,53 @@ async function fibaAwareFetch(input: RequestInfo | URL, init?: RequestInit): Pro
     if(attempt<FIBA_ATTEMPTS) await sleep(FIBA_RETRY_MS);
   }
   console.warn(`[CourtIQ] FIBA RSC route not ready for game ${gameId}: ${lastError}`);
-  // Preserve legacy HTML as a final compatibility path. The response wrapper
-  // below turns the legacy parser's generic error into a precise pending state.
   return nativeFetch(input, init);
 }
 
 Object.defineProperty(globalThis,"fetch",{value:fibaAwareFetch,configurable:true,writable:true});
 
-// Wrap CourtIQ's normal request handler only to improve the user-facing FIBA
-// error state. We never fabricate partial stats: if the official box score is
-// not complete, the import remains blocked until verified team/player data exist.
 Object.defineProperty(Deno,"serve",{
   configurable:true,
   writable:true,
   value:(handler:any)=>nativeServe(async(req:Request)=>{
-    let isFiba=false;
+    let isFiba=false,gameId=0;
     try{
       if(req.method==="POST"){
         const body=await req.clone().json();
-        isFiba=isFibaGamePage(String(body?.url||""));
+        const source=String(body?.url||"");
+        isFiba=isFibaGamePage(source);
+        gameId=isFiba?fibaGameId(source):0;
       }
     }catch(_){}
+
     const response=await handler(req);
+
+    if(isFiba && response.ok && gameId){
+      const pbp=fibaPbpByGame.get(gameId)||[];
+      try{
+        if(pbp.length && (response.headers.get("content-type")||"").toLowerCase().includes("json")){
+          const payload=await response.clone().json();
+          if(payload && typeof payload==="object"){
+            payload.play_by_play=pbp;
+            if(payload.ui && typeof payload.ui==="object"){
+              payload.ui.play_by_play=pbp;
+              payload.ui.playByPlay=pbp;
+            }
+            if(payload.report && typeof payload.report==="object")payload.report.play_by_play=pbp;
+            const headers=new Headers(response.headers);
+            headers.set("Content-Type","application/json");
+            headers.set("X-CourtIQ-FIBA-PBP",String(pbp.length));
+            fibaPbpByGame.delete(gameId);
+            return new Response(JSON.stringify(payload),{status:response.status,statusText:response.statusText,headers});
+          }
+        }
+      }catch(error){
+        console.warn(`[CourtIQ] FIBA game ${gameId} PBP response attachment skipped:`,error);
+      }
+      fibaPbpByGame.delete(gameId);
+      return response;
+    }
+
     if(!isFiba || response.status<400) return response;
     try{
       const payload=await response.clone().json();
