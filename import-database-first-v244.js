@@ -62,12 +62,16 @@ function importerFunctionForUrl(raw){
   }
 }
 
+function uiHasPbp(ui){
+  const candidates=[ui?.play_by_play,ui?.playByPlay,ui?.pbp];
+  return candidates.some(v=>Array.isArray(v)&&v.length>0);
+}
+
 async function savedGame(url){
   const identity=identityFromUrl(url);
   const d=window.CourtIQData;
   if(!identity||!d?.workspace)return null;
   const w=await d.workspace();
-  // Match only explicit source identities; never infer a match from team names.
   const matches=id=>id&&id.provider===identity.provider&&String(id.externalId)===String(identity.externalId);
   const row=(w?.games||[]).find(g=>{
     const p=g?.payload;
@@ -79,6 +83,12 @@ async function savedGame(url){
   if(!row?.payload?.ui)return null;
   const verified=row.payload.verified===true||row.payload.quality?.status==='VERIFIED';
   if(!verified)return null;
+
+  // A verified FIBA box score without official play-by-play is not considered
+  // complete for possession analysis. Force a fresh import so the RSC adapter
+  // can attach the official event stream instead of reusing the stale cache.
+  if(identity.provider==='FIBA'&&!uiHasPbp(row.payload.ui))return null;
+
   return {
     game_id:row.id,
     ui:row.payload.ui,
