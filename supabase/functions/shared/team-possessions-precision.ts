@@ -1,11 +1,11 @@
-// CourtIQ precision layer for team possessions.
-// Imported before team-possessions-postprocess so it runs after the existing
-// response correction and preserves distinct team possession estimates.
+// CourtIQ unified team-possession layer.
+// One formula everywhere: Team Possessions = FGA - ORB + TOV + 0.44 * FTA.
+// Each team remains separate; pace is the shared average normalized to 40 minutes.
 
 const nativeServePrecision = Deno.serve.bind(Deno);
 const nativeFetchPrecision = globalThis.fetch.bind(globalThis);
-const METHOD = "TEAM_FULL_BOX_SCORE";
-const VERSION = "courtiq-formulas-v6";
+const METHOD = "TEAM_BOX_SCORE_ESTIMATE";
+const VERSION = "courtiq-formulas-v7";
 const r1 = (n:number) => Math.round(n * 10) / 10;
 const r2 = (n:number) => Math.round(n * 100) / 100;
 const finite = (v:unknown) => {
@@ -23,12 +23,11 @@ function teamBox(team:any){
   return {fgm,fga,fta:Number(fta),oreb:Number(oreb),dreb:Number(dreb),tov:Number(tov),points:Number(points)};
 }
 
-function sideEstimate(team:any, opponent:any){
-  const t=teamBox(team), o=teamBox(opponent);
-  if(!t || !o) return null;
-  const reboundWindow=t.oreb+o.dreb;
-  if(reboundWindow<=0) return null;
-  return t.fga + 0.4*t.fta - 1.07*(t.oreb/reboundWindow)*(t.fga-t.fgm) + t.tov;
+function sideEstimate(team:any){
+  const t=teamBox(team);
+  if(!t) return null;
+  const estimate=t.fga-t.oreb+t.tov+(0.44*t.fta);
+  return Number.isFinite(estimate) && estimate>0 ? estimate : null;
 }
 
 function patchRow(rows:any,label:string,home:any,away:any,formatter:(v:any)=>any=v=>v){
@@ -41,7 +40,7 @@ function patchRow(rows:any,label:string,home:any,away:any,formatter:(v:any)=>any
 function patchUiPrecision(ui:any){
   const homeRaw=ui?.raw?.home, awayRaw=ui?.raw?.away;
   const h=teamBox(homeRaw), a=teamBox(awayRaw);
-  const homeEst=sideEstimate(homeRaw,awayRaw), awayEst=sideEstimate(awayRaw,homeRaw);
+  const homeEst=sideEstimate(homeRaw), awayEst=sideEstimate(awayRaw);
   if(!h || !a || homeEst==null || awayEst==null) return false;
 
   const periods=Array.isArray(ui.quarters) && ui.quarters.length ? Math.max(4,ui.quarters.length) : 4;
@@ -63,10 +62,10 @@ function patchUiPrecision(ui:any){
   ui.formulaCatalog=ui.formulaCatalog||{};
   ui.formulaCatalog.version=VERSION;
   ui.formulaCatalog.box_score={...(ui.formulaCatalog.box_score||{}),
-    possessions:"TeamEst = FGA + 0.4 × FTA - 1.07 × (ORB / (ORB + Opp DRB)) × (FGA - FGM) + TOV; each team remains separate",
+    possessions:"Team Possessions = FGA - ORB + TOV + 0.44 × FTA",
     ortg:"Team PTS / Team Possessions × 100",
     drtg:"Opponent PTS / Opponent Possessions × 100",
-    pace:"[(Home TeamEst + Away TeamEst) / 2] × 40 / Game Minutes"};
+    pace:"[(Home Team Possessions + Away Team Possessions) / 2] × 40 / Game Minutes"};
 
   patchRow(ui.metrics,"Estimated Possessions",homePoss,awayPoss,v=>Number(v).toFixed(2));
   patchRow(ui.metrics,"Possessions",homePoss,awayPoss,v=>Number(v).toFixed(2));
@@ -133,10 +132,10 @@ async function patchResponsePrecision(response:Response){
     await persist(body);
     const headers=new Headers(response.headers);
     headers.set("Content-Type","application/json");
-    headers.set("X-CourtIQ-Possession-Precision","2dp");
+    headers.set("X-CourtIQ-Possession-Formula","v7");
     return new Response(JSON.stringify(body),{status:response.status,statusText:response.statusText,headers});
   }catch(error){
-    console.warn("[CourtIQ] possession precision response skipped:",error);
+    console.warn("[CourtIQ] unified possession response skipped:",error);
     return response;
   }
 }
