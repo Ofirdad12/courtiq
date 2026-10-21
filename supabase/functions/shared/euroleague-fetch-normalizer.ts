@@ -1,5 +1,10 @@
 // Preserve the production EuroLeague v2 team-total normalization before the
 // legacy importer consumes the official stats response.
+//
+// EuroLeague's v2 feed can expose aggregate statistics under total.stats while
+// the legacy CourtIQ parser reads aggregate fields directly from total. Always
+// surface nested stats on total itself so verified games are not rejected with
+// a false zero-FGA validation error.
 
 const upstreamFetch = globalThis.fetch.bind(globalThis);
 
@@ -40,10 +45,19 @@ function fgaOf(o: any): number {
       + statNum(o, "fieldGoalsAttempted3", "threePointersAttempted");
 }
 
+function exposeTotalStats(side: any, stats: any): any {
+  const total = side?.total && typeof side.total === "object" ? side.total : {};
+  return {...side, total: {...total, ...stats}};
+}
+
 function normalizeEuroleagueSide(side: any): any {
   if (!side || typeof side !== "object") return side;
   const existingTotal = side?.total?.stats || side?.total || {};
-  if (fgaOf(existingTotal) > 0) return side;
+
+  // Even when the official feed already has valid aggregate stats, flatten
+  // total.stats onto total because the downstream production parser expects
+  // fieldGoalsAttempted*, points, rebounds, etc. directly on total.
+  if (fgaOf(existingTotal) > 0) return exposeTotalStats(side, existingTotal);
 
   const teamStatsCandidates = [side?.team?.stats, side?.team].filter(Boolean);
   const teamStats = teamStatsCandidates.find((candidate: any) => fgaOf(candidate) > 0) || null;
@@ -85,7 +99,7 @@ function normalizeEuroleagueSide(side: any): any {
   const fg3a = statNum(normalizedTotal, "fieldGoalsAttempted3");
   normalizedTotal.fieldGoalsMadeTotal = statNum(existingTotal, "fieldGoalsMadeTotal", "fieldGoalsMade") || fg2m + fg3m;
   normalizedTotal.fieldGoalsAttemptedTotal = statNum(existingTotal, "fieldGoalsAttemptedTotal", "fieldGoalsAttempted") || fg2a + fg3a;
-  return {...side, total: normalizedTotal};
+  return exposeTotalStats(side, normalizedTotal);
 }
 
 async function normalizeEuroleagueResponse(res: Response): Promise<Response> {
