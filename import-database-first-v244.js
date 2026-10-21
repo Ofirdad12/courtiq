@@ -4,7 +4,8 @@
 const SUPABASE_URL='https://lgzfmoioecixmnivtqan.supabase.co';
 const PUBLISHABLE_KEY='sb_publishable_LTCc5iEgOzrH7t8bxvxwOA_aWsHoY8l';
 const SESSION_KEY='courtiq_supabase_session';
-const CLIENT_TIMEOUT_MS=20000;
+const DEFAULT_CLIENT_TIMEOUT_MS=20000;
+const FIBA_CLIENT_TIMEOUT_MS=45000;
 
 function readSession(){
   try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}
@@ -46,6 +47,10 @@ function identityFromUrl(raw){
     }
   }catch(_){}
   return null;
+}
+
+function clientTimeoutForUrl(raw){
+  return identityFromUrl(raw)?.provider==='FIBA'?FIBA_CLIENT_TIMEOUT_MS:DEFAULT_CLIENT_TIMEOUT_MS;
 }
 
 function importerFunctionForUrl(raw){
@@ -110,8 +115,9 @@ async function invokeImport(url,clubId=null,retry=true){
   if(!chosen)throw new Error('Select a club before importing a game.');
 
   const importer=importerFunctionForUrl(url);
+  const timeoutMs=clientTimeoutForUrl(url);
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),CLIENT_TIMEOUT_MS);
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
   let res;
   try{
     res=await fetch(SUPABASE_URL+'/functions/v1/'+importer,{
@@ -126,7 +132,7 @@ async function invokeImport(url,clubId=null,retry=true){
     });
   }catch(error){
     if(error?.name==='AbortError'){
-      throw new Error('The official source did not respond in time. CourtIQ stopped the import after 20 seconds instead of leaving it stuck.');
+      throw new Error(`The official source did not respond in time. CourtIQ stopped the import after ${Math.round(timeoutMs/1000)} seconds instead of leaving it stuck.`);
     }
     throw new Error(error?.message||'Network error while contacting the CourtIQ importer.');
   }finally{
@@ -193,5 +199,5 @@ setTimeout(install,0);
 setTimeout(install,250);
 setTimeout(install,1000);
 window.addEventListener('load',install,{once:true});
-window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,invokeImport,resolveClubId,importerFunctionForUrl};
+window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,clientTimeoutForUrl,invokeImport,resolveClubId,importerFunctionForUrl};
 })();
