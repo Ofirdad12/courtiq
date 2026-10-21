@@ -1,14 +1,14 @@
-/* CourtIQ Team Possessions v254
- * Separate full box-score possession estimates and ratings per team.
- * Team possessions keep two-decimal precision so distinct team estimates are
- * never collapsed by display rounding. Pace remains one shared game metric.
- * Exact play-by-play possessions remain owned by possession-engine.js.
+/* CourtIQ Team Possessions v255
+ * One possession formula across CourtIQ:
+ * Team Possessions = FGA - ORB + TOV + 0.44 * FTA.
+ * Each team is calculated independently at 2dp.
+ * Pace is one shared game metric: average team possessions normalized to 40 minutes.
  */
 (()=>{
 'use strict';
 
-const METHOD='TEAM_FULL_BOX_SCORE';
-const VERSION='254';
+const METHOD='TEAM_BOX_SCORE_ESTIMATE';
+const VERSION='255';
 const round1=value=>Math.round(value*10)/10;
 const round2=value=>Math.round(value*100)/100;
 const pct=(a,b)=>b>0?Math.round((a/b*100)*10)/10:null;
@@ -26,20 +26,16 @@ function readTeam(team){
   return {fgm,fga,fta,oreb,dreb,tov,points};
 }
 
-function estimateSide(team,opponent){
-  const t=readTeam(team),o=readTeam(opponent);
-  if(!t||!o)return null;
-  const reboundDenominator=t.oreb+o.dreb;
-  if(reboundDenominator<=0)return null;
-  const missedFieldGoals=t.fga-t.fgm;
-  const offensiveReboundAdjustment=1.07*(t.oreb/reboundDenominator)*missedFieldGoals;
-  const estimate=t.fga+(0.4*t.fta)-offensiveReboundAdjustment+t.tov;
+function estimateSide(team){
+  const t=readTeam(team);
+  if(!t)return null;
+  const estimate=t.fga-t.oreb+t.tov+(0.44*t.fta);
   return Number.isFinite(estimate)&&estimate>0?estimate:null;
 }
 
 function calculate(team,opponent,periodCount=4){
   const t=readTeam(team),o=readTeam(opponent);
-  const teamEstimate=estimateSide(team,opponent),opponentEstimate=estimateSide(opponent,team);
+  const teamEstimate=estimateSide(team),opponentEstimate=estimateSide(opponent);
   if(!t||!o||teamEstimate==null||opponentEstimate==null)return null;
   const possessions=teamEstimate;
   const periods=Math.max(4,Number.isFinite(Number(periodCount))?Number(periodCount):4);
@@ -103,6 +99,15 @@ function applyToGame(game){
   game.calculated.away={...(game.calculated.away||{}),possessions:awayPossessions,pace:awayPace,ortg:awayOrtg,drtg:homeOrtg,net_rating:awayNet,possession_method:METHOD,possession_formula_version:VERSION,team_possession_estimate:round2(away.teamEstimate),opponent_possession_estimate:round2(away.opponentEstimate),game_possessions:gamePossessions};
   game.possessionMethod=METHOD;
   game.possessionFormulaVersion=VERSION;
+  game.gamePace=gamePace;
+
+  game.formulaCatalog=game.formulaCatalog||{};
+  game.formulaCatalog.version=VERSION;
+  game.formulaCatalog.box_score={...(game.formulaCatalog.box_score||{}),
+    possessions:'Team Possessions = FGA - ORB + TOV + 0.44 × FTA',
+    ortg:'Team PTS / Team Possessions × 100',
+    drtg:'Opponent PTS / Opponent Possessions × 100',
+    pace:'[(Home Team Possessions + Away Team Possessions) / 2] × 40 / Game Minutes'};
 
   patchRow(game.metrics,'Offensive Rating',homeOrtg,awayOrtg,v=>v.toFixed(1));
   patchRow(game.metrics,'Defensive Rating',awayOrtg,homeOrtg,v=>v.toFixed(1));
@@ -136,14 +141,14 @@ function refreshCurrentView(){
 
 function wrapHydrator(){
   try{
-    if(typeof hydrateOfficialDemoGame!=='function'||hydrateOfficialDemoGame.__teamPossessionsV248)return;
+    if(typeof hydrateOfficialDemoGame!=='function'||hydrateOfficialDemoGame.__teamPossessionsV255)return;
     const original=hydrateOfficialDemoGame;
     const wrapped=function(game,rows){
       const result=original(game,rows);
       applyToGame(game);
       return result;
     };
-    wrapped.__teamPossessionsV248=true;
+    wrapped.__teamPossessionsV255=true;
     hydrateOfficialDemoGame=wrapped;
   }catch(_){}
 }
@@ -151,13 +156,13 @@ function wrapHydrator(){
 function wrapImporter(){
   const data=window.CourtIQData;
   const current=data?.importOfficialGame;
-  if(typeof current!=='function'||current.__teamPossessionsV248)return;
+  if(typeof current!=='function'||current.__teamPossessionsV255)return;
   const wrapped=async function(...args){
     const body=await current.apply(this,args);
     if(body?.ui)applyToGame(body.ui);
     return body;
   };
-  wrapped.__teamPossessionsV248=true;
+  wrapped.__teamPossessionsV255=true;
   wrapped.__wrappedImporter=current;
   data.importOfficialGame=wrapped;
 }
