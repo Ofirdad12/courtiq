@@ -159,6 +159,14 @@ async function invokeImport(url,clubId=null,retry=true){
   }
 
   if(!res.ok){
+    const upstreamMessage=String(body?.error||body?.message||raw||'');
+    const ibbaBlocked=identityFromUrl(url)?.provider==='IBBA'&&(
+      res.status===504||
+      /HTTP\s*(?:403|504)|blocking the server fetch|Just a moment|Cloudflare/i.test(upstreamMessage)
+    );
+    if(ibbaBlocked){
+      throw new Error('IBBA is blocking automatic server access via Cloudflare. CourtIQ is online; this IBBA game cannot be imported automatically right now. Verified games already saved in CourtIQ still load normally.');
+    }
     if(res.status===422){
       throw new Error(body?.error||body?.message||'CourtIQ reached the official source, but the game could not be parsed.');
     }
