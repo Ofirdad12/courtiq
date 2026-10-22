@@ -1,18 +1,25 @@
-"""CourtIQ pilot API: URL -> verified game -> saved library -> comparison."""
+"""CourtIQ pilot API: URL -> verified game -> saved library -> comparison.
+
+Also exposes a private IBBA source endpoint intended for a dedicated static-egress
+service. The endpoint is deliberately narrow: it accepts only official IBBA
+match URLs and requires an internal token supplied by the CourtIQ backend.
+"""
 import json
 import os
+import secrets
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 
 from api.compare import compare_teams
+from api.ibba import fetch_html as fetch_ibba_html
 from api.ibba import import_ibba_url
 from api.plk import import_plk_url
 
-app = FastAPI(title="CourtIQ Pilot API", version="0.7")
+app = FastAPI(title="CourtIQ Pilot API", version="0.8")
 origins = [
     x.strip()
     for x in os.getenv("COURTIQ_ORIGINS", "https://ofirdad12.github.io").split(",")
@@ -26,6 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 STORE = Path(os.getenv("COURTIQ_STORE", "data/pilot_games.json"))
+MAX_SOURCE_BYTES = 5_000_000
 
 
 class ImportRequest(BaseModel):
@@ -57,14 +65,54 @@ def _importer_for(url: str):
     raise ValueError("Unsupported official source. Currently supported: IBBA and PLK official game URLs.")
 
 
+def _require_proxy_token(value: str | None):
+    configured = os.getenv("COURTIQ_PROXY_TOKEN", "").strip()
+    if not configured:
+        raise HTTPException(status_code=503, detail="IBBA static-egress proxy is not configured.")
+    supplied = (value or "").strip()
+    if not supplied or not secrets.compare_digest(supplied, configured):
+        raise HTTPException(status_code=401, detail="Invalid CourtIQ proxy token.")
+
+
 @app.get("/api/health")
 def health():
     return {
         "status": "ok",
         "service": "courtiq-pilot",
-        "version": "0.7",
+        "version": "0.8",
         "official_sources": ["IBBA", "PLK"],
+        "ibba_static_egress_ready": bool(os.getenv("COURTIQ_PROXY_TOKEN", "").strip()),
     }
+
+
+@app.post("/api/ibba-source")
+def ibba_source(req: ImportRequest, x_courtiq_proxy_token: str | None = Header(default=None)):
+    """Fetch one official IBBA match page through the service's outbound IP.
+
+    This endpoint is meant to be called only by CourtIQ's backend after the
+    hosting provider has been assigned a static outbound IP and IBBA has
+    explicitly allowlisted that IP. It cannot be used as a general proxy.
+    """
+    _require_proxy_token(x_courtiq_proxy_token)
+    try:
+        url = str(req.url)
+        html = fetch_ibba_html(url)
+        size = len(html.encode("utf-8"))
+        if size > MAX_SOURCE_BYTES:
+            raise ValueError("IBBA source page exceeded the CourtIQ size limit.")
+        return Response(
+            content=html,
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-store",
+                "X-CourtIQ-Source": "IBBA-OFFICIAL",
+                "X-CourtIQ-Source-Bytes": str(size),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"IBBA source fetch failed: {e}")
 
 
 @app.get("/api/games")
