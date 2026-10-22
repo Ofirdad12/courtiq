@@ -9,7 +9,7 @@ def test_four_factors_known_inputs():
     assert result["ORB%"] == 28.9
     assert result["FTr"] == 33.3
 
-def test_courtiq_formula_set_v4_uses_team_specific_possessions():
+def test_courtiq_formula_set_uses_team_specific_possessions_and_shared_pace():
     home = {"points":101,"fgm":35,"fga":72,"two_pm":25,"two_pa":45,"three_pm":10,"three_pa":27,"ftm":21,"fta":24,"oreb":11,"dreb":30,"tov":7,"ast":20}
     away = {"points":83,"fgm":30,"fga":61,"two_pm":18,"two_pa":31,"three_pm":12,"three_pa":30,"ftm":11,"fta":15,"oreb":9,"dreb":27,"tov":17,"ast":18}
     result = compute_team_analytics(home, away)
@@ -21,7 +21,8 @@ def test_courtiq_formula_set_v4_uses_team_specific_possessions():
     assert result["Poss"] == 77.14
     assert result["Poss Team Estimate"] == 77.14
     assert result["Poss Opp Estimate"] == 76.35
-    assert result["Pace"] == 77.1
+    assert result["Game Possession Estimate"] == 76.75
+    assert result["Pace"] == 76.7
     assert result["ORtg"] == 130.9
     assert result["DRtg"] == 108.7
     assert result["Net Rating"] == 22.2
@@ -30,15 +31,15 @@ def test_courtiq_formula_set_v4_uses_team_specific_possessions():
     assert result["Assisted FG%"] == 57.1
     assert result["+/-"] == 18
 
-def test_cbf_546833_team_estimates_are_not_averaged():
+def test_cbf_546833_team_estimates_are_separate_but_pace_is_shared():
     trutnov = {"points":83,"fgm":28,"fga":63,"two_pm":21,"two_pa":40,"three_pm":7,"three_pa":23,"ftm":20,"fta":28,"oreb":12,"dreb":38,"tov":17,"ast":16}
     brandys = {"points":75,"fgm":26,"fga":75,"two_pm":19,"two_pa":46,"three_pm":7,"three_pa":29,"ftm":16,"fta":19,"oreb":12,"dreb":28,"tov":11,"ast":17}
     home = compute_team_analytics(trutnov, brandys)
     away = compute_team_analytics(brandys, trutnov)
     assert home["Poss"] == 79.97
     assert away["Poss"] == 81.02
-    assert home["Pace"] == 80.0
-    assert away["Pace"] == 81.0
+    assert home["Pace"] == 80.5
+    assert away["Pace"] == 80.5
     assert home["ORtg"] == 103.8
     assert home["DRtg"] == 92.6
     assert away["ORtg"] == 92.6
