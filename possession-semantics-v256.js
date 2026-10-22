@@ -1,13 +1,14 @@
-/* CourtIQ possession semantics v256
+/* CourtIQ possession semantics v258
  * Fractional box-score estimates are never presented as exact possessions.
+ * Estimated possessions use the full team box-score formula.
  * When official play-by-play is present, the existing event-level possession
  * engine is used to publish integer actual possession counts.
  */
 (()=>{
 'use strict';
 
-const VERSION='256';
-const EST_METHOD='TEAM_BOX_SCORE_ESTIMATE';
+const VERSION='258';
+const EST_METHOD='FULL_TEAM_BOX_SCORE_ESTIMATE';
 const ACTUAL_METHOD='OFFICIAL_PBP_RECONSTRUCTION';
 
 function rowByLabel(rows,label){
@@ -60,6 +61,9 @@ function countActual(game){
 function apply(game){
   if(!game||typeof game!=='object')return game;
 
+  // Ensure the deterministic full-formula patch runs before labels are changed.
+  window.CourtIQTeamPossessions?.applyToGame?.(game);
+
   renameRow(game.stats,'Possessions','Estimated Possessions');
   renameRow(game.metrics,'Possessions','Estimated Possessions');
   renameRow(game.stats,'Pace','Estimated Pace');
@@ -78,7 +82,8 @@ function apply(game){
   game.formulaCatalog=game.formulaCatalog||{};
   game.formulaCatalog.possession_semantics={
     version:VERSION,
-    estimated:'FGA - ORB + TOV + 0.44 × FTA',
+    estimated:'FGA + 0.4 × FTA - 1.07 × [ORB / (ORB + OppDRB)] × (FGA - FGM) + TOV',
+    pace:'[(Home Estimated Possessions + Away Estimated Possessions) / 2] × 40 / Game Minutes',
     actual:'Integer possession count reconstructed from official play-by-play events.'
   };
 
@@ -95,6 +100,8 @@ function apply(game){
   }
   if(actual){
     game.actualPossessions={home:actual.home,away:actual.away,method:ACTUAL_METHOD,engine_version:actual.engineVersion};
+  }else{
+    delete game.actualPossessions;
   }
   return game;
 }
@@ -125,14 +132,14 @@ function patchReport(report,game){
 function wrapImporter(){
   const data=window.CourtIQData;
   const current=data?.importOfficialGame;
-  if(typeof current!=='function'||current.__possessionSemanticsV256)return;
+  if(typeof current!=='function'||current.__possessionSemanticsV258)return;
   const wrapped=async function(...args){
     const body=await current.apply(this,args);
     if(body?.ui)apply(body.ui);
     if(body?.report)patchReport(body.report,body.ui);
     return body;
   };
-  wrapped.__possessionSemanticsV256=true;
+  wrapped.__possessionSemanticsV258=true;
   wrapped.__wrappedImporter=current;
   data.importOfficialGame=wrapped;
 }
