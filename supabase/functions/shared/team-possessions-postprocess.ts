@@ -1,17 +1,21 @@
 // CourtIQ shared box-score possession correction for Supabase Edge Functions.
 // Installs before the legacy importer registers Deno.serve, then patches the
-// successful response and persisted game/report payloads to formula v5.
+// successful response and persisted game/report payloads to formula v6.
+// v6 preserves two-decimal possession estimates internally while keeping
+// coach-facing display values readable at one decimal. Pace remains one shared
+// game value for both teams and is normalized to 40 minutes for overtime games.
 // Also resolves Czech Basketball Federation (CBF) game pages to their linked
 // official FIBA LiveStats / Genius Sports feed before the legacy importer runs.
 
 const nativeServe = Deno.serve.bind(Deno);
 const nativeHttpFetch = globalThis.fetch.bind(globalThis);
 const METHOD = "TEAM_FULL_BOX_SCORE";
-const VERSION = "courtiq-formulas-v5";
+const VERSION = "courtiq-formulas-v6";
 const POSSESSION_FORMULA = "TeamEst = FGA + 0.4 × FTA - 1.07 × (ORB / (ORB + Opp DRB)) × (FGA - FGM) + TOV; keep TeamEst separate for each team; Game Pace = average(Home TeamEst, Away TeamEst) × 40 / Game Minutes";
 const CBF_HOST = "cbf.cz.basketball";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
+const r2 = (n: number) => Math.round(n * 100) / 100;
 const pct = (a: number, b: number) => b > 0 ? Math.round(a / b * 1000) / 10 : 0;
 const finite = (v: unknown) => {
   const n = Number(v);
@@ -79,18 +83,23 @@ export function patchUi(ui: any) {
   const gamePossessions = (homeEst + awayEst) / 2;
   const gamePace = gamePossessions * 40 / gameMinutes;
   const homeOrtg = 100 * h.points / homeEst, awayOrtg = 100 * a.points / awayEst;
-  const homePoss1 = r1(homeEst), awayPoss1 = r1(awayEst);
-  const gamePoss1 = r1(gamePossessions), gamePace1 = r1(gamePace);
+
+  // Preserve precision in the data model. UI rows stay at one decimal so the
+  // dashboard is readable, while exports/calculations can use the exact v6 values.
+  const homePoss2 = r2(homeEst), awayPoss2 = r2(awayEst), gamePoss2 = r2(gamePossessions);
+  const homePoss1 = r1(homeEst), awayPoss1 = r1(awayEst), gamePace1 = r1(gamePace);
   const homePace1 = gamePace1, awayPace1 = gamePace1;
   const hOrtg1 = r1(homeOrtg), aOrtg1 = r1(awayOrtg);
   const hNet = r1(hOrtg1 - aOrtg1), aNet = r1(aOrtg1 - hOrtg1);
 
   ui.calculated = ui.calculated || {};
-  ui.calculated.home = {...(ui.calculated.home || {}), possessions:homePoss1, pace:homePace1, ortg:hOrtg1, drtg:aOrtg1, net_rating:hNet,
-    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:homePoss1, opponent_possession_estimate:awayPoss1, game_possessions:gamePoss1};
-  ui.calculated.away = {...(ui.calculated.away || {}), possessions:awayPoss1, pace:awayPace1, ortg:aOrtg1, drtg:hOrtg1, net_rating:aNet,
-    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:awayPoss1, opponent_possession_estimate:homePoss1, game_possessions:gamePoss1};
+  ui.calculated.home = {...(ui.calculated.home || {}), possessions:homePoss2, pace:homePace1, ortg:hOrtg1, drtg:aOrtg1, net_rating:hNet,
+    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:homePoss2, opponent_possession_estimate:awayPoss2, game_possessions:gamePoss2};
+  ui.calculated.away = {...(ui.calculated.away || {}), possessions:awayPoss2, pace:awayPace1, ortg:aOrtg1, drtg:hOrtg1, net_rating:aNet,
+    possession_method:METHOD, possession_formula_version:VERSION, team_possession_estimate:awayPoss2, opponent_possession_estimate:homePoss2, game_possessions:gamePoss2};
   ui.gamePace = gamePace1;
+  ui.gamePossessions = gamePoss2;
+  ui.gameMinutes = gameMinutes;
   ui.possessionMethod = METHOD;
   ui.possessionFormulaVersion = VERSION;
   ui.formulaCatalog = patchFormulaCatalog(ui.formulaCatalog);
@@ -108,7 +117,7 @@ export function patchUi(ui: any) {
   patchRow(ui.stats,"Net Rating",hNet,aNet);
   patchPlayerShares(ui,"home",homeEst);
   patchPlayerShares(ui,"away",awayEst);
-  return {homePossessions:homePoss1, awayPossessions:awayPoss1, gamePossessions:gamePoss1, gamePace:gamePace1, homePace:homePace1, awayPace:awayPace1};
+  return {homePossessions:homePoss2, awayPossessions:awayPoss2, gamePossessions:gamePoss2, gamePace:gamePace1, homePace:homePace1, awayPace:awayPace1, gameMinutes};
 }
 
 function patchReport(report: any, ui: any) {
@@ -119,6 +128,9 @@ function patchReport(report: any, ui: any) {
   report.formula_catalog = patchFormulaCatalog(report.formula_catalog || ui.formulaCatalog);
   report.possession_method = METHOD;
   report.possession_formula_version = VERSION;
+  report.game_possessions = ui.gamePossessions;
+  report.game_pace = ui.gamePace;
+  report.game_minutes = ui.gameMinutes;
   return report;
 }
 
@@ -237,7 +249,7 @@ async function patchResponse(response: Response, source?: {cbfSource:string|null
     await persistCorrection(body);
     const headers = new Headers(response.headers);
     headers.set("Content-Type","application/json");
-    headers.set("X-CourtIQ-Possessions","TEAM_FULL_BOX_SCORE");
+    headers.set("X-CourtIQ-Possessions","TEAM_FULL_BOX_SCORE_V6");
     if (source?.cbfSource) headers.set("X-CourtIQ-Source-Bridge","CBF_TO_GENIUS");
     return new Response(JSON.stringify(body), {status:response.status,statusText:response.statusText,headers});
   } catch (error) {
