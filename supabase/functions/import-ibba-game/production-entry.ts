@@ -1,11 +1,18 @@
 // CourtIQ production importer bootstrap.
 // Hardens IBBA fetching and normalizes IBBA placeholder cells before the
 // parser sees them. Other providers pass through to the official importer.
+//
+// IBBA currently blocks many cloud-server requests. For that provider only,
+// CourtIQ can also accept source_html from a browser-saved copy of the same
+// official game page. The HTML still goes through the exact same parser,
+// validation and database persistence pipeline as a normal URL import.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 const DIRECT_TIMEOUT_MS = 4200;
 const ALIAS_TIMEOUT_MS = 2500;
 const PROXY_TIMEOUT_MS = 6500;
+const MAX_IBBA_SOURCE_HTML = 5_000_000;
+const injectedIbbaHtml = new Map<string, string>();
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -23,6 +30,18 @@ function isIbbaPublicPage(raw: string): boolean {
     return /^(?:www\.)?ibasketball\.co\.il$/i.test(u.hostname) && /^\/match\/[a-z0-9-]+\/?$/i.test(u.pathname);
   } catch (_) {
     return false;
+  }
+}
+
+function ibbaKey(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (!/^(?:www\.)?ibasketball\.co\.il$/i.test(u.hostname)) return null;
+    const path = u.pathname.replace(/\/+$/, "").toLowerCase();
+    if (!/^\/match\/[a-z0-9-]+$/i.test(path)) return null;
+    return `ibasketball.co.il${path}`;
+  } catch (_) {
+    return null;
   }
 }
 
@@ -63,6 +82,29 @@ function normalizeIbbaPlaceholders(html: string): string {
   return html.replace(/(<(?:td|th)\b[^>]*>)([\s\u00a0]*[-–—][\s\u00a0]*)(<\/(?:td|th)>)/gi, "$10$3")
     .replace(/(<(?:td|th)\b[^>]*\bdata-key=["'](?:fgs|threeps|fts)["'][^>]*>)([\s\u00a0]*0[\s\u00a0]*)(<\/(?:td|th)>)/gi, "$10-0$3");
 }
+
+// Capture a browser-supplied copy of the official IBBA page without touching
+// the core importer. The imported handler calls req.json(); after that it
+// performs fetch(url). We keep the verified HTML keyed by the official URL and
+// serve it only to that one IBBA fetch.
+const nativeRequestJson = Request.prototype.json;
+Object.defineProperty(Request.prototype, "json", {
+  configurable: true,
+  writable: true,
+  value: async function(this: Request) {
+    const data = await nativeRequestJson.call(this);
+    try {
+      const url = String(data?.url || "");
+      const sourceHtml = typeof data?.source_html === "string" ? data.source_html : "";
+      const key = ibbaKey(url);
+      if (key && sourceHtml && sourceHtml.length <= MAX_IBBA_SOURCE_HTML && looksLikeIbbaHtml(sourceHtml)) {
+        injectedIbbaHtml.set(key, normalizeIbbaPlaceholders(sourceHtml));
+        console.log(`[CourtIQ] Accepted browser-supplied official IBBA HTML for ${key}; ${sourceHtml.length} bytes`);
+      }
+    } catch (_) {}
+    return data;
+  }
+});
 
 function abortControllerFor(timeoutMs: number, upstream?: AbortSignal | null) {
   const controller = new AbortController();
@@ -121,6 +163,21 @@ async function fetchIbba(input: RequestInfo | URL, init?: RequestInit): Promise<
   const url = requestUrl(input);
   const method = requestMethod(input, init);
   if (method !== "GET" || !isIbbaPublicPage(url)) return nativeFetch(input, init);
+
+  const key = ibbaKey(url);
+  if (key && injectedIbbaHtml.has(key)) {
+    const html = injectedIbbaHtml.get(key)!;
+    injectedIbbaHtml.delete(key);
+    console.log(`[CourtIQ] IBBA fetch satisfied by browser-supplied official HTML for ${key}`);
+    return new Response(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-CourtIQ-Fetch-Route": "browser-official-html",
+        "X-CourtIQ-IBBA-Normalized": "1"
+      }
+    });
+  }
 
   const statuses: string[] = [];
   const direct = await attempt("direct", url, DIRECT_TIMEOUT_MS, statuses, {
