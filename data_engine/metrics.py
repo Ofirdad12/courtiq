@@ -29,8 +29,8 @@ def estimate_possessions(team: dict, opponent: dict) -> float:
     Formula:
       FGA + 0.4*FTA - 1.07*(ORB/(ORB + OppDRB))*(FGA - FGM) + TOV
 
-    CourtIQ intentionally keeps each team's estimate separate. The two team
-    estimates are not averaged into a shared possession count.
+    Each team's estimate remains separate. CourtIQ only averages the two
+    estimates when calculating the shared game Pace.
     """
     fga = team["fga"]
     fgm = team["fgm"]
@@ -48,11 +48,11 @@ def estimate_possessions(team: dict, opponent: dict) -> float:
     )
 
 def compute_team_analytics(team: dict, opponent: dict, game_minutes: float = 40) -> dict:
-    """CourtIQ formula set v4 from verified box-score totals.
+    """CourtIQ deterministic team analytics from verified box-score totals.
 
-    Possessions, Pace and ORtg use this team's possession estimate. DRtg uses
-    the opponent's possession estimate. This preserves the real per-team pace
-    signal instead of forcing both teams to the same averaged number.
+    Possessions and ORtg use the team's own full possession estimate. DRtg uses
+    the opponent's estimate. Pace is a shared game metric based on the average
+    of both possession estimates, normalized to 40 minutes (including OT).
     """
     team_poss_est = estimate_possessions(team, opponent)
     opp_poss_est = estimate_possessions(opponent, team)
@@ -65,7 +65,8 @@ def compute_team_analytics(team: dict, opponent: dict, game_minutes: float = 40)
     opp_trb = opponent["oreb"] + opponent["dreb"]
     ortg = round(team["points"] / team_poss_est * 100, 1) if team_poss_est else 0.0
     drtg = round(opponent["points"] / opp_poss_est * 100, 1) if opp_poss_est else 0.0
-    pace = round(team_poss_est / game_minutes * 40, 1) if team_poss_est and game_minutes else 0.0
+    game_poss_est = (team_poss_est + opp_poss_est) / 2 if team_poss_est and opp_poss_est else 0.0
+    pace = round(game_poss_est / game_minutes * 40, 1) if game_poss_est and game_minutes else 0.0
     return {
         "FG%": _pct(fgm, fga), "2P%": _pct(two_pm, two_pa), "3P%": _pct(three_pm, three_pa), "FT%": _pct(ftm, fta),
         "eFG%": _pct(fgm + 0.5 * three_pm, fga),
@@ -73,6 +74,7 @@ def compute_team_analytics(team: dict, opponent: dict, game_minutes: float = 40)
         "PPS": round(team["points"] / fga, 2) if fga else 0.0,
         "3PA Rate": _pct(three_pa, fga), "Poss": poss,
         "Poss Team Estimate": team_poss_est, "Poss Opp Estimate": opp_poss_est,
+        "Game Possession Estimate": round(game_poss_est, 2),
         "ORtg": ortg, "DRtg": drtg, "Net Rating": round(ortg - drtg, 1),
         "TOV%": _pct(team["tov"], fga + 0.44 * fta + team["tov"]),
         "ORB%": _pct(team["oreb"], team["oreb"] + opponent["dreb"]),
