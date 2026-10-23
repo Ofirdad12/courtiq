@@ -5,7 +5,10 @@ const SUPABASE_URL='https://lgzfmoioecixmnivtqan.supabase.co';
 const PUBLISHABLE_KEY='sb_publishable_LTCc5iEgOzrH7t8bxvxwOA_aWsHoY8l';
 const SESSION_KEY='courtiq_supabase_session';
 const DEFAULT_CLIENT_TIMEOUT_MS=20000;
+const WINNER_CLIENT_TIMEOUT_MS=40000;
 const FIBA_CLIENT_TIMEOUT_MS=45000;
+const CACHE_LOOKUP_TIMEOUT_MS=1800;
+const CLUB_FALLBACK_TIMEOUT_MS=1800;
 
 function readSession(){
   try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}
@@ -50,7 +53,10 @@ function identityFromUrl(raw){
 }
 
 function clientTimeoutForUrl(raw){
-  return identityFromUrl(raw)?.provider==='FIBA'?FIBA_CLIENT_TIMEOUT_MS:DEFAULT_CLIENT_TIMEOUT_MS;
+  const provider=identityFromUrl(raw)?.provider;
+  if(provider==='FIBA')return FIBA_CLIENT_TIMEOUT_MS;
+  if(provider==='WINNER_LEAGUE')return WINNER_CLIENT_TIMEOUT_MS;
+  return DEFAULT_CLIENT_TIMEOUT_MS;
 }
 
 function importerFunctionForUrl(raw){
@@ -67,11 +73,26 @@ function uiHasPbp(ui){
   return candidates.some(v=>Array.isArray(v)&&v.length>0);
 }
 
+function timebox(promise,timeoutMs,fallback=null){
+  let timer=null;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise(resolve=>{timer=setTimeout(()=>resolve(fallback),timeoutMs);})
+  ]).finally(()=>{if(timer)clearTimeout(timer);});
+}
+
 async function savedGame(url){
   const identity=identityFromUrl(url);
   const d=window.CourtIQData;
   if(!identity||!d?.workspace)return null;
-  const w=await d.workspace();
+
+  // Winner League pages are often updated around game completion. Always go
+  // straight to the official source instead of making the user wait on a
+  // potentially slow workspace/cache scan before an import can even start.
+  if(identity.provider==='WINNER_LEAGUE')return null;
+
+  const w=await timebox(d.workspace(),CACHE_LOOKUP_TIMEOUT_MS,null);
+  if(!w)return null;
   const matches=id=>id&&id.provider===identity.provider&&String(id.externalId)===String(identity.externalId);
   const row=(w?.games||[]).find(g=>{
     const p=g?.payload;
@@ -109,7 +130,8 @@ async function resolveClubId(clubId=null){
   const active=Number(d?.activeClubId?.()||0);
   if(Number.isFinite(active)&&active>0)return active;
   try{
-    const w=await d?.workspace?.();
+    const workspacePromise=d?.workspace?.();
+    const w=workspacePromise?await timebox(workspacePromise,CLUB_FALLBACK_TIMEOUT_MS,null):null;
     const fromWorkspace=Number(w?.club?.id||0);
     if(Number.isFinite(fromWorkspace)&&fromWorkspace>0)return fromWorkspace;
   }catch(_){}
@@ -160,12 +182,16 @@ async function invokeImport(url,clubId=null,retry=true){
 
   if(!res.ok){
     const upstreamMessage=String(body?.error||body?.message||raw||'');
-    const ibbaBlocked=identityFromUrl(url)?.provider==='IBBA'&&(
+    const provider=identityFromUrl(url)?.provider;
+    const ibbaBlocked=provider==='IBBA'&&(
       res.status===504||
       /HTTP\s*(?:403|504)|blocking the server fetch|Just a moment|Cloudflare/i.test(upstreamMessage)
     );
     if(ibbaBlocked){
       throw new Error('IBBA is blocking automatic server access via Cloudflare. CourtIQ is online; this IBBA game cannot be imported automatically right now. Verified games already saved in CourtIQ still load normally.');
+    }
+    if(provider==='WINNER_LEAGUE'&&res.status===504){
+      throw new Error('Winner League did not return the official box score in time. CourtIQ stopped safely instead of hanging; retry the same link.');
     }
     if(res.status===422){
       throw new Error(body?.error||body?.message||'CourtIQ reached the official source, but the game could not be parsed.');
@@ -205,10 +231,12 @@ function install(){
   wrapper.__courtiqDatabaseFirstV244=true;
   wrapper.__courtiqHttpResilience=true;
   wrapper.__courtiqIbbaV2=true;
+  wrapper.__courtiqWinnerResilience=true;
   d.importOfficialGame=wrapper;
   d.__importDatabaseFirstV244=true;
   d.__importHttpResilience=true;
   d.__importIbbaV2=true;
+  d.__importWinnerResilience=true;
   return true;
 }
 
@@ -217,5 +245,5 @@ setTimeout(install,0);
 setTimeout(install,250);
 setTimeout(install,1000);
 window.addEventListener('load',install,{once:true});
-window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,clientTimeoutForUrl,invokeImport,resolveClubId,importerFunctionForUrl};
+window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,clientTimeoutForUrl,invokeImport,resolveClubId,importerFunctionForUrl,timebox};
 })();
