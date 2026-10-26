@@ -7,6 +7,7 @@ const SESSION_KEY='courtiq_supabase_session';
 const DEFAULT_CLIENT_TIMEOUT_MS=20000;
 const WINNER_CLIENT_TIMEOUT_MS=40000;
 const FIBA_CLIENT_TIMEOUT_MS=45000;
+const GSA_CLIENT_TIMEOUT_MS=60000;
 const CACHE_LOOKUP_TIMEOUT_MS=1800;
 const CLUB_FALLBACK_TIMEOUT_MS=1800;
 
@@ -48,6 +49,10 @@ function identityFromUrl(raw){
       const id=u.searchParams.get('Game')||u.searchParams.get('game');
       return id?{provider:'EUROBASKET_POLAND',externalId:String(id).slice(0,120)}:null;
     }
+    if(host==='globalsportsarchive.com'){
+      const m=u.pathname.match(/^\/match\/basketball\/\d{4}-\d{2}-\d{2}\/[a-z0-9-]+\/(\d+)\/?$/i);
+      return m?{provider:'GSA',externalId:m[1]}:null;
+    }
   }catch(_){}
   return null;
 }
@@ -56,6 +61,7 @@ function clientTimeoutForUrl(raw){
   const provider=identityFromUrl(raw)?.provider;
   if(provider==='FIBA')return FIBA_CLIENT_TIMEOUT_MS;
   if(provider==='WINNER_LEAGUE')return WINNER_CLIENT_TIMEOUT_MS;
+  if(provider==='GSA')return GSA_CLIENT_TIMEOUT_MS;
   return DEFAULT_CLIENT_TIMEOUT_MS;
 }
 
@@ -86,9 +92,6 @@ async function savedGame(url){
   const d=window.CourtIQData;
   if(!identity||!d?.workspace)return null;
 
-  // Winner League pages are often updated around game completion. Always go
-  // straight to the official source instead of making the user wait on a
-  // potentially slow workspace/cache scan before an import can even start.
   if(identity.provider==='WINNER_LEAGUE')return null;
 
   const w=await timebox(d.workspace(),CACHE_LOOKUP_TIMEOUT_MS,null);
@@ -105,9 +108,6 @@ async function savedGame(url){
   const verified=row.payload.verified===true||row.payload.quality?.status==='VERIFIED';
   if(!verified)return null;
 
-  // A verified FIBA box score without official play-by-play is not considered
-  // complete for possession analysis. Force a fresh import so the RSC adapter
-  // can attach the official event stream instead of reusing the stale cache.
   if(identity.provider==='FIBA'&&!uiHasPbp(row.payload.ui))return null;
 
   return {
@@ -164,6 +164,12 @@ async function invokeImport(url,clubId=null,retry=true){
     });
   }catch(error){
     if(error?.name==='AbortError'){
+      if(identityFromUrl(url)?.provider==='GSA'){
+        try{
+          const completed=await savedGame(url);
+          if(completed)return completed;
+        }catch(_){}
+      }
       throw new Error(`The official source did not respond in time. CourtIQ stopped the import after ${Math.round(timeoutMs/1000)} seconds instead of leaving it stuck.`);
     }
     throw new Error(error?.message||'Network error while contacting the CourtIQ importer.');
@@ -192,6 +198,9 @@ async function invokeImport(url,clubId=null,retry=true){
     }
     if(provider==='WINNER_LEAGUE'&&res.status===504){
       throw new Error('Winner League did not return the official box score in time. CourtIQ stopped safely instead of hanging; retry the same link.');
+    }
+    if(provider==='GSA'&&res.status===504){
+      throw new Error('Global Sports Archive did not return the box score in time. CourtIQ stopped safely; retry the same link.');
     }
     if(res.status===422){
       throw new Error(body?.error||body?.message||'CourtIQ reached the official source, but the game could not be parsed.');
@@ -232,11 +241,13 @@ function install(){
   wrapper.__courtiqHttpResilience=true;
   wrapper.__courtiqIbbaV2=true;
   wrapper.__courtiqWinnerResilience=true;
+  wrapper.__courtiqGsa=true;
   d.importOfficialGame=wrapper;
   d.__importDatabaseFirstV244=true;
   d.__importHttpResilience=true;
   d.__importIbbaV2=true;
   d.__importWinnerResilience=true;
+  d.__importGsa=true;
   return true;
 }
 
