@@ -93,6 +93,9 @@ function minutesValue(value:string){
 }
 function ibbaMinutesValue(value:string){
   const s=clean(value||"");
+  // New IBBA feeds use HH:MM:SS; retain the legacy decimal MM:hh format.
+  const clock=s.match(/^(\d+):([0-5]\d):([0-5]\d)$/);
+  if(clock) return r1(Number(clock[1])*60+Number(clock[2])+Number(clock[3])/60);
   const decimal=s.match(/^(\d+):(\d{2})$/);
   if(decimal) return r1(Number(decimal[1])+Number(decimal[2])/100);
   return minutesValue(s);
@@ -134,7 +137,7 @@ function ibbaPlayerData($:cheerio.CheerioAPI, table:any){
     return {id:String($(tr).attr("data-player-id")||""),number:num($(tr).find(".data-number").text()),name:clean($(tr).find(".data-name").text()),
       starter:$(tr).hasClass("lineup"),minutes:ibbaMinutesValue(value("min")),points:num(value("pts")),two_pm,two_pa,three_pm,three_pa,ftm,fta,
       dreb:num(value("def")),oreb:num(value("off")),steals:num(value("stl")),tov:num(value("to")),ast:num(value("ast")),blocks:num(value("blk")),
-      value:num(value("rate")),plus_minus:num(value("pm"))};
+      value:num(value("rate")),plus_minus:/^(?:[-–—]|)$/.test(value("pm"))?null:num(value("pm"))};
   });
   if(!players.length) throw new Error("IBBA player rows were not found.");
   return {total:teamTotal($,table),players};

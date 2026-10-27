@@ -255,4 +255,4 @@ Object.defineProperty(Deno,"serve",{
 });
 
 // Keep the currently verified production importer and IBBA hardening intact.
-await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/f7c4dd2c54466c50328aa8827ac78223d236e14b/supabase/functions/import-ibba-game/production-entry.ts");
+await import("./production-entry.ts");

@@ -188,4 +188,4 @@ Object.defineProperty(globalThis, "fetch", {
   writable: true
 });
 
-await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/da7b0eed8222d5fd426f9e4adf64ed9ea1e36092/supabase/functions/import-ibba-game/index.ts");
+await import("./index.ts");
