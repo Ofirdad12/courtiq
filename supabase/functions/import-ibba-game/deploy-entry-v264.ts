@@ -12,6 +12,6 @@ await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/c6d4e3e7c6c686
 // Global Sports Archive basketball match pages: verified box-score importer.
 await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/6382c28828abfc08be2eda73a3049509e420a935/supabase/functions/import-ibba-game/gsa-production-entry.ts");
 // Basketball Champions League uses the FIBA digital platform; map BCL links into the verified FIBA parser.
-await import("./bcl-production-entry.ts");
-// FIBA RSC importer with official play-by-play preservation.
-await import("./fiba-rsc-production-entry.ts");
+await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/4b6bd65881219c96553b24c2dd59ed445e17e1d4/supabase/functions/import-ibba-game/bcl-production-entry.ts");
+// FIBA RSC importer with official play-by-play preservation. The relative imports in this pinned module resolve to the same verified commit.
+await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/4b6bd65881219c96553b24c2dd59ed445e17e1d4/supabase/functions/import-ibba-game/fiba-rsc-production-entry.ts");
