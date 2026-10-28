@@ -11,5 +11,7 @@ await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/6bac0a0f4236c3
 await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/c6d4e3e7c6c686c1fd93e9f6a5bf0885a69e24b7/supabase/functions/shared/euroleague-fetch-normalizer.ts");
 // Global Sports Archive basketball match pages: verified box-score importer.
 await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/6382c28828abfc08be2eda73a3049509e420a935/supabase/functions/import-ibba-game/gsa-production-entry.ts");
+// Basketball Champions League uses the FIBA digital platform; map BCL links into the verified FIBA parser.
+await import("./bcl-production-entry.ts");
 // FIBA RSC importer with official play-by-play preservation.
 await import("./fiba-rsc-production-entry.ts");
