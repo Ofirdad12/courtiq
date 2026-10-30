@@ -5,6 +5,7 @@ const SUPABASE_URL='https://lgzfmoioecixmnivtqan.supabase.co';
 const PUBLISHABLE_KEY='sb_publishable_LTCc5iEgOzrH7t8bxvxwOA_aWsHoY8l';
 const SESSION_KEY='courtiq_supabase_session';
 const DEFAULT_CLIENT_TIMEOUT_MS=20000;
+const IBBA_CLIENT_TIMEOUT_MS=45000;
 const WINNER_CLIENT_TIMEOUT_MS=40000;
 const FIBA_CLIENT_TIMEOUT_MS=45000;
 const GSA_CLIENT_TIMEOUT_MS=60000;
@@ -59,6 +60,7 @@ function identityFromUrl(raw){
 
 function clientTimeoutForUrl(raw){
   const provider=identityFromUrl(raw)?.provider;
+  if(provider==='IBBA')return IBBA_CLIENT_TIMEOUT_MS;
   if(provider==='FIBA')return FIBA_CLIENT_TIMEOUT_MS;
   if(provider==='WINNER_LEAGUE')return WINNER_CLIENT_TIMEOUT_MS;
   if(provider==='GSA')return GSA_CLIENT_TIMEOUT_MS;
@@ -164,10 +166,16 @@ async function invokeImport(url,clubId=null,retry=true){
     });
   }catch(error){
     if(error?.name==='AbortError'){
-      if(identityFromUrl(url)?.provider==='GSA'){
+      const provider=identityFromUrl(url)?.provider;
+      if(provider==='GSA'||provider==='IBBA'){
         try{
-          const completed=await savedGame(url);
+          let completed=await savedGame(url);
           if(completed)return completed;
+          if(provider==='IBBA'){
+            await new Promise(resolve=>setTimeout(resolve,1200));
+            completed=await savedGame(url);
+            if(completed)return completed;
+          }
         }catch(_){}
       }
       throw new Error(`The official source did not respond in time. CourtIQ stopped the import after ${Math.round(timeoutMs/1000)} seconds instead of leaving it stuck.`);
@@ -240,12 +248,14 @@ function install(){
   wrapper.__courtiqDatabaseFirstV244=true;
   wrapper.__courtiqHttpResilience=true;
   wrapper.__courtiqIbbaV2=true;
+  wrapper.__courtiqIbbaTimeout45=true;
   wrapper.__courtiqWinnerResilience=true;
   wrapper.__courtiqGsa=true;
   d.importOfficialGame=wrapper;
   d.__importDatabaseFirstV244=true;
   d.__importHttpResilience=true;
   d.__importIbbaV2=true;
+  d.__importIbbaTimeout45=true;
   d.__importWinnerResilience=true;
   d.__importGsa=true;
   return true;
