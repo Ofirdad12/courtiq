@@ -1,13 +1,22 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 // Production bootstrap for the CourtIQ official-game importer.
 //
 // IBBA can block datacenter IPs with HTTP 403. Keep the official IBBA URL as
 // the source of truth, but use tightly bounded fallback fetches so an import
-// never sits on slow proxy routes for tens of seconds.
+// never sits on slow proxy routes for tens of seconds. When the browser sends
+// an official saved IBBA HTML page, keep that HTML request-scoped and serve it
+// to the existing verified parser instead of fetching IBBA again.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
+const nativeServe: any = Deno.serve.bind(Deno);
 const DIRECT_TIMEOUT_MS = 4500;
 const ALIAS_TIMEOUT_MS = 2500;
 const PROXY_TIMEOUT_MS = 5500;
+const MAX_SOURCE_HTML_CHARS = 5_000_000;
+
+type ImportRequestContext = { sourceHtml: string };
+const importRequestContext = new AsyncLocalStorage<ImportRequestContext>();
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -53,7 +62,7 @@ function officialVariants(raw: string): string[] {
 }
 
 function looksLikeIbbaHtml(html: string): boolean {
-  if (!html || html.length < 1000) return false;
+  if (!html || html.length < 1000 || html.length > MAX_SOURCE_HTML_CHARS) return false;
   const hasDoc = /<(?:html|body|table|tbody|tr)\b/i.test(html);
   const hasBasketballShape = /data-key=["'](?:fgs|threeps|fts|pts|ast|to)["']/i.test(html)
     || /data-player-id=/i.test(html)
@@ -123,6 +132,28 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
 
   if (method !== "GET" || !isIbbaPublicPage(url)) return nativeFetch(input, init);
 
+  const uploadedHtml = importRequestContext.getStore()?.sourceHtml || "";
+  if (uploadedHtml) {
+    if (!looksLikeIbbaHtml(uploadedHtml)) {
+      console.warn("[CourtIQ] Rejected uploaded IBBA source HTML because it did not match the official box-score structure.");
+      return new Response("The selected file is not a readable official IBBA game HTML page.", {
+        status: 422,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "X-CourtIQ-Fetch-Route": "browser-upload-invalid"
+        }
+      });
+    }
+    console.log("[CourtIQ] IBBA fetch satisfied by uploaded official HTML.");
+    return new Response(uploadedHtml, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-CourtIQ-Fetch-Route": "browser-upload"
+      }
+    });
+  }
+
   let direct: Response | null = null;
   try {
     direct = await timedFetch(input, init, DIRECT_TIMEOUT_MS);
@@ -181,6 +212,37 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
     }
   });
 }
+
+// The production parser owns Deno.serve. Wrap its handler registration before
+// importing it so source_html remains isolated to the request that supplied it.
+// This avoids shared global state when multiple clubs import at the same time.
+const patchedServe = (...args: any[]) => {
+  const handlerIndex = typeof args[0] === "function" ? 0 : 1;
+  const handler = args[handlerIndex];
+  if (typeof handler !== "function") return nativeServe(...args);
+
+  const wrappedHandler = async (req: Request, info: unknown) => {
+    let sourceHtml = "";
+    if (req.method === "POST") {
+      try {
+        const body: any = await req.clone().json();
+        const candidate = typeof body?.source_html === "string" ? body.source_html : "";
+        if (candidate && candidate.length <= MAX_SOURCE_HTML_CHARS) sourceHtml = candidate;
+      } catch (_) {}
+    }
+    return await importRequestContext.run({sourceHtml}, () => handler(req, info));
+  };
+
+  const nextArgs = args.slice();
+  nextArgs[handlerIndex] = wrappedHandler;
+  return nativeServe(...nextArgs);
+};
+
+Object.defineProperty(Deno, "serve", {
+  value: patchedServe,
+  configurable: true,
+  writable: true
+});
 
 Object.defineProperty(globalThis, "fetch", {
   value: fetchWithIbbaFallback,
