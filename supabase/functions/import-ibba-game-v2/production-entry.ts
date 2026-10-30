@@ -2,12 +2,17 @@
 //
 // IBBA can block datacenter IPs with HTTP 403. Keep the official IBBA URL as
 // the source of truth, but use tightly bounded fallback fetches so an import
-// never sits on slow proxy routes for tens of seconds.
+// never sits on slow proxy routes for tens of seconds. When the browser sends
+// a saved official IBBA HTML page, use that HTML for this request instead of
+// going back to the network.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
+const nativeServe: any = Deno.serve.bind(Deno);
 const DIRECT_TIMEOUT_MS = 4500;
 const ALIAS_TIMEOUT_MS = 2500;
 const PROXY_TIMEOUT_MS = 5500;
+const MAX_SOURCE_HTML_CHARS = 5_000_000;
+const uploadedIbbaHtml = new Map<string, string>();
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -17,6 +22,14 @@ function requestUrl(input: RequestInfo | URL): string {
 
 function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
   return String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+}
+
+function normalizeUrl(raw: string): string {
+  try {
+    return new URL(String(raw || "").trim()).toString();
+  } catch (_) {
+    return String(raw || "").trim();
+  }
 }
 
 function isIbbaPublicPage(raw: string): boolean {
@@ -53,7 +66,7 @@ function officialVariants(raw: string): string[] {
 }
 
 function looksLikeIbbaHtml(html: string): boolean {
-  if (!html || html.length < 1000) return false;
+  if (!html || html.length < 1000 || html.length > MAX_SOURCE_HTML_CHARS) return false;
   const hasDoc = /<(?:html|body|table|tbody|tr)\b/i.test(html);
   const hasBasketballShape = /data-key=["'](?:fgs|threeps|fts|pts|ast|to)["']/i.test(html)
     || /data-player-id=/i.test(html)
@@ -123,6 +136,18 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
 
   if (method !== "GET" || !isIbbaPublicPage(url)) return nativeFetch(input, init);
 
+  const uploaded = uploadedIbbaHtml.get(normalizeUrl(url));
+  if (uploaded) {
+    console.log("[CourtIQ] IBBA fetch satisfied by uploaded official HTML.");
+    return new Response(uploaded, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-CourtIQ-Fetch-Route": "browser-upload"
+      }
+    });
+  }
+
   let direct: Response | null = null;
   try {
     direct = await timedFetch(input, init, DIRECT_TIMEOUT_MS);
@@ -181,6 +206,47 @@ async function fetchWithIbbaFallback(input: RequestInfo | URL, init?: RequestIni
     }
   });
 }
+
+// The parser owns Deno.serve. Wrap only the request entrypoint so a selected
+// browser file can be attached to the matching IBBA URL for the lifetime of
+// that request. This keeps the normal URL importer on the same fast path.
+const patchedServe = (...args: any[]) => {
+  const handlerIndex = typeof args[0] === "function" ? 0 : 1;
+  const handler = args[handlerIndex];
+  if (typeof handler !== "function") return nativeServe(...args);
+
+  const wrappedHandler = async (req: Request, info: unknown) => {
+    let uploadKey = "";
+    if (req.method === "POST") {
+      try {
+        const body: any = await req.clone().json();
+        const candidate = typeof body?.source_html === "string" ? body.source_html : "";
+        const candidateUrl = normalizeUrl(String(body?.url || ""));
+        if (candidate && isIbbaPublicPage(candidateUrl) && looksLikeIbbaHtml(candidate)) {
+          uploadKey = candidateUrl;
+          uploadedIbbaHtml.set(uploadKey, candidate);
+          console.log("[CourtIQ] IBBA uploaded HTML attached to request.");
+        }
+      } catch (_) {}
+    }
+
+    try {
+      return await handler(req, info);
+    } finally {
+      if (uploadKey) uploadedIbbaHtml.delete(uploadKey);
+    }
+  };
+
+  const nextArgs = args.slice();
+  nextArgs[handlerIndex] = wrappedHandler;
+  return nativeServe(...nextArgs);
+};
+
+Object.defineProperty(Deno, "serve", {
+  value: patchedServe,
+  configurable: true,
+  writable: true
+});
 
 Object.defineProperty(globalThis, "fetch", {
   value: fetchWithIbbaFallback,
