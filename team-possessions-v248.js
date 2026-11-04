@@ -66,14 +66,15 @@ function estimateSide(team,opponent){
   return Number.isFinite(estimate)&&estimate>0?estimate:null;
 }
 
-function calculate(team,opponent,periodCount=4){
+function calculate(team,opponent,periodCount=4,regulationMinutes=40){
   const t=readTeam(team),o=readTeam(opponent);
   const teamEstimate=estimateSide(team,opponent),opponentEstimate=estimateSide(opponent,team);
   if(!t||!o||teamEstimate==null||opponentEstimate==null)return null;
   const periods=Math.max(4,Number.isFinite(Number(periodCount))?Number(periodCount):4);
-  const gameMinutes=40+Math.max(0,periods-4)*5;
+  const baseMinutes=regulationMinutes===48?48:40;
+  const gameMinutes=baseMinutes+Math.max(0,periods-4)*5;
   const gamePossessions=(teamEstimate+opponentEstimate)/2;
-  const pace=gamePossessions*(40/gameMinutes);
+  const pace=gamePossessions*(baseMinutes/gameMinutes);
   const ortg=100*t.points/teamEstimate;
   const drtg=100*o.points/opponentEstimate;
   return {
@@ -116,7 +117,8 @@ function applyToGame(game){
   const homeRaw=sideRaw(game,'home'),awayRaw=sideRaw(game,'away');
   if(!homeRaw||!awayRaw)return null;
   const periods=Array.isArray(game.quarters)&&game.quarters.length?game.quarters.length:4;
-  const home=calculate(homeRaw,awayRaw,periods),away=calculate(awayRaw,homeRaw,periods);
+  const baseMinutes=game.provider==='NBA'||game.regulationMinutes===48?48:40;
+  const home=calculate(homeRaw,awayRaw,periods,baseMinutes),away=calculate(awayRaw,homeRaw,periods,baseMinutes);
   if(!home||!away)return null;
 
   const homePossessions=round2(home.possessions),awayPossessions=round2(away.possessions);
@@ -139,7 +141,7 @@ function applyToGame(game){
     possessions:'FGA + 0.4 × FTA - 1.07 × [ORB / (ORB + OppDRB)] × (FGA - FGM) + TOV',
     ortg:'Team PTS / Team Possessions × 100',
     drtg:'Opponent PTS / Opponent Possessions × 100',
-    pace:'[(Home Team Possessions + Away Team Possessions) / 2] × 40 / Game Minutes'};
+    pace:`[(Home Team Possessions + Away Team Possessions) / 2] × ${baseMinutes} / Game Minutes`};
 
   patchRow(game.metrics,'Offensive Rating',homeOrtg,awayOrtg,v=>v.toFixed(1));
   patchRow(game.metrics,'Defensive Rating',homeDrtg,awayDrtg,v=>v.toFixed(1));
@@ -210,3 +212,4 @@ setTimeout(()=>{applyKnownGames();wrapImporter();},500);
 setTimeout(()=>{applyKnownGames();wrapImporter();},1500);
 window.addEventListener('load',()=>{applyKnownGames();wrapImporter();},{once:true});
 })();
+

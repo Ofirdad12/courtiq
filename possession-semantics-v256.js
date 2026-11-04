@@ -83,7 +83,7 @@ function apply(game){
   game.formulaCatalog.possession_semantics={
     version:VERSION,
     estimated:'FGA + 0.4 × FTA - 1.07 × [ORB / (ORB + OppDRB)] × (FGA - FGM) + TOV',
-    pace:'[(Home Estimated Possessions + Away Estimated Possessions) / 2] × 40 / Game Minutes',
+    pace:`[(Home Estimated Possessions + Away Estimated Possessions) / 2] × ${game.provider==='NBA'||game.regulationMinutes===48?48:40} / Game Minutes`,
     actual:'Integer possession count reconstructed from official play-by-play events.'
   };
 
@@ -152,3 +152,4 @@ setTimeout(()=>{applyKnownGames();wrapImporter();},500);
 setTimeout(()=>{applyKnownGames();wrapImporter();try{if(typeof render==='function')render();}catch(_){}},1700);
 window.addEventListener('load',()=>{applyKnownGames();wrapImporter();},{once:true});
 })();
+
