@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const vm=require('node:vm');
+const fs=require('node:fs');
+const source=fs.readFileSync('app.js','utf8');
+const line=source.split('\n').find(line=>line.includes('modal.querySelector("#runUrl").onclick=async'));
+let removed=false,rendered=false,refreshCalls=0;
+const button={},status={};
+const modal={querySelector:s=>s==='#runUrl'?button:s==='#urlStatus'?status:{value:'https://www.fiba.basketball/en/events/eurocup-women-26-27/games/135264-ASHD-BJK'},remove(){removed=true}};
+const context={modal,window:{CourtIQData:{importOfficialGame:async()=>({game_id:121,ui:{hs:60,as:70}})},scrollTo(){}},games:{},active:null,setBusy(){},syncProductData(){refreshCalls++;return new Promise(()=>{})},render(){rendered=true}};
+vm.runInNewContext(line,context);
+(async()=>{await button.onclick();assert.equal(removed,true);assert.equal(rendered,true);assert.equal(context.active,'db_121');assert.equal(refreshCalls,0);console.log('PASS: imported game displayed without waiting for workspace or player refresh');})().catch(e=>{console.error(e);process.exitCode=1});

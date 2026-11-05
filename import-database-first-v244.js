@@ -89,15 +89,42 @@ function timebox(promise,timeoutMs,fallback=null){
   ]).finally(()=>{if(timer)clearTimeout(timer);});
 }
 
-async function savedGame(url){
+async function directSavedFiba(url,clubId=null){
+  const identity=identityFromUrl(url);
+  if(identity?.provider!=='FIBA')return null;
+  const session=readSession();
+  const chosen=Number(clubId||window.CourtIQData?.activeClubId?.()||0);
+  if(!session?.access_token||!Number.isFinite(chosen)||chosen<=0)return null;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),8000);
+  try{
+    const query=new URLSearchParams({select:'id,payload,club_id',provider:'eq.FIBA',external_id:'eq.'+identity.externalId,club_id:'eq.'+chosen,limit:'1'});
+    const response=await fetch(SUPABASE_URL+'/rest/v1/games?'+query,{
+      headers:{apikey:PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token},signal:controller.signal
+    });
+    if(!response.ok)return null;
+    const rows=await response.json();
+    const row=Array.isArray(rows)?rows[0]:null,p=row?.payload;
+    if(!p?.ui||!(p.verified===true||p.quality?.status==='VERIFIED'))return null;
+    return {game_id:row.id,ui:p.ui,validation:p.validation||null,report:p.report||null,saved:true,reused_existing:true,cache_hit:true,club_id:chosen,source:'courtiq_verified_database'};
+  }catch(_){return null;}finally{clearTimeout(timer);}
+}
+
+async function savedGame(url,clubId=null){
   const identity=identityFromUrl(url);
   const d=window.CourtIQData;
-  if(!identity||!d?.workspace)return null;
+  if(!identity)return null;
+  if(identity.provider==='FIBA'){
+    const direct=await directSavedFiba(url,clubId);
+    if(direct)return direct;
+  }
+  if(!d?.workspace)return null;
 
   if(identity.provider==='WINNER_LEAGUE')return null;
 
   const w=await timebox(d.workspace(),CACHE_LOOKUP_TIMEOUT_MS,null);
   if(!w)return null;
+  if(clubId&&Number(w.club?.id)!==Number(clubId))return null;
   const matches=id=>id&&id.provider===identity.provider&&String(id.externalId)===String(identity.externalId);
   const row=(w?.games||[]).find(g=>{
     const p=g?.payload;
@@ -171,11 +198,11 @@ async function invokeImport(url,clubId=null,retry=true){
       const provider=identityFromUrl(url)?.provider;
       if(provider==='GSA'||provider==='IBBA'||provider==='FIBA'){
         try{
-          let completed=await savedGame(url);
+          let completed=await savedGame(url,chosen);
           if(completed)return completed;
           if(provider==='IBBA'){
             await new Promise(resolve=>setTimeout(resolve,1200));
-            completed=await savedGame(url);
+            completed=await savedGame(url,chosen);
             if(completed)return completed;
           }
         }catch(_){}
@@ -240,7 +267,7 @@ function install(){
   if(wrapper&&d.importOfficialGame===wrapper)return true;
   wrapper=async function(url,clubId=null){
     let cached=null;
-    try{cached=await savedGame(url);}catch(_){}
+    try{cached=await savedGame(url,clubId);}catch(_){}
     if(cached){
       window.CourtIQTeamPossessions?.applyToGame?.(cached.ui);
       return cached;
@@ -268,5 +295,5 @@ setTimeout(install,0);
 setTimeout(install,250);
 setTimeout(install,1000);
 window.addEventListener('load',install,{once:true});
-window.CourtIQImportDatabaseFirstV244={install,savedGame,identityFromUrl,clientTimeoutForUrl,invokeImport,resolveClubId,importerFunctionForUrl,timebox};
+window.CourtIQImportDatabaseFirstV244={install,directSavedFiba,savedGame,identityFromUrl,clientTimeoutForUrl,invokeImport,resolveClubId,importerFunctionForUrl,timebox};
 })();
