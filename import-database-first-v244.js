@@ -81,11 +81,6 @@ function importerFunctionForUrl(raw){
   }
 }
 
-function uiHasPbp(ui){
-  const candidates=[ui?.play_by_play,ui?.playByPlay,ui?.pbp];
-  return candidates.some(v=>Array.isArray(v)&&v.length>0);
-}
-
 function timebox(promise,timeoutMs,fallback=null){
   let timer=null;
   return Promise.race([
@@ -115,7 +110,8 @@ async function savedGame(url){
   const verified=row.payload.verified===true||row.payload.quality?.status==='VERIFIED';
   if(!verified)return null;
 
-  if(identity.provider==='FIBA'&&!uiHasPbp(row.payload.ui))return null;
+  // A verified box score is usable even when the official feed has no play-by-play.
+  // Keep its existing availability status; never synthesize possession events.
 
   return {
     game_id:row.id,
@@ -173,7 +169,7 @@ async function invokeImport(url,clubId=null,retry=true){
   }catch(error){
     if(error?.name==='AbortError'){
       const provider=identityFromUrl(url)?.provider;
-      if(provider==='GSA'||provider==='IBBA'){
+      if(provider==='GSA'||provider==='IBBA'||provider==='FIBA'){
         try{
           let completed=await savedGame(url);
           if(completed)return completed;

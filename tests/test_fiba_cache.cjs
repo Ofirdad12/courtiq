@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const url = 'https://www.fiba.basketball/en/events/eurocup-women-26-27/games/135264-ASHD-BJK';
+const row = {id:121,provider:'FIBA',external_id:'135264',payload:{verified:true,ui:{hs:60,as:70,playByPlay:[]}}};
+let rows = [row], fetches = 0;
+const window = {addEventListener(){},CourtIQData:{workspace:async()=>({club:{id:1},games:rows}),importOfficialGame(){},activeClubId:()=>1}};
+const context = {window,URL,AbortController,localStorage:{getItem:()=>JSON.stringify({access_token:'test'})},setTimeout:(fn,ms)=>ms<1100?0:setTimeout(fn,ms),clearTimeout,fetch:async()=>{fetches++;throw Object.assign(new Error('timed out'),{name:'AbortError'});}};
+vm.runInNewContext(fs.readFileSync('import-database-first-v244.js','utf8'),context);
+(async()=>{
+ const result=await window.CourtIQData.importOfficialGame(url);
+ assert.equal(result.game_id,121);assert.equal(result.cache_hit,true);assert.equal(fetches,0);assert.equal(result.ui.playByPlay.length,0);
+ row.payload.verified=false;
+ assert.equal(await window.CourtIQImportDatabaseFirstV244.savedGame(url),null);
+ row.payload.verified=true;rows=[];
+ assert.equal(await window.CourtIQImportDatabaseFirstV244.savedGame(url),null);
+ rows=[row];
+ const recovered=await window.CourtIQImportDatabaseFirstV244.invokeImport(url,1);
+ assert.equal(recovered.game_id,121);assert.equal(fetches,1);
+ console.log('PASS: verified FIBA box score without PBP, unverified/missing rejection, timeout recovery');
+})().catch(e=>{console.error(e);process.exitCode=1;});
