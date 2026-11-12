@@ -325,9 +325,27 @@ function apiGameToUi(x){
     ask:"This game was imported from an official IBBA box-score URL. CourtIQ calculations are deterministic; tactical causation requires PBP or video."};
 }
 
+// Tournament pages do not contain a single game box score.
+function fibaEventFromUrl(raw){
+  try{
+    const url=new URL(raw);
+    if(url.protocol!=="https:" || !/^(www\.)?fiba\.basketball$/i.test(url.hostname)) return null;
+    const match=url.pathname.match(/^\/(?:[a-z]{2}\/)?events\/([^/]+)(?:\/(?:games|teams|standings|stats))?\/?$/i);
+    if(!match) return null;
+    return {slug:match[1],gamesUrl:"https://www.fiba.basketball/en/events/"+match[1]+"/games"};
+  }catch(_){return null;}
+}
+function showFibaEvent(status,event){
+  status.textContent="זהו דף טורניר. פתח את רשימת המשחקים, בחר משחק והדבק כאן את הקישור שלו. ייבוא הנתונים זמין לאחר פרסום ה־Box Score הסופי. ";
+  const link=document.createElement("a");
+  link.href=event.gamesUrl;link.target="_blank";link.rel="noopener noreferrer";
+  link.textContent="בחירת משחק באתר FIBA ↗";
+  status.appendChild(link);
+}
+
 function openUrlImport(){
   const modal=document.createElement("div"); modal.className="modal"; const signed=window.CourtIQData?.isSignedIn();
-  modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · VERIFIED IMPORT</small><h2>Import Official Game</h2><p>Paste an official IBBA, Winner League, FIBA EuroCup Women, FIBA LiveStats / Genius Sports, EuroLeague, PLK or NBA.com game URL. CourtIQ detects the source, validates the box score and play-by-play when available, calculates team and player analytics, saves the game and creates a reusable report.</p><div class="importFields"><input id="boxUrl" placeholder="ibasketball.co.il/match/... · fibalivestats.../pbp.html · basket.co.il/... · fiba.basketball/... · euroleaguebasketball.net/... · plk.pl/mecz/... · nba.com/game/.../box-score"></div><div class="schema">${signed?"SECURE CLUB SESSION · Game will be saved to the Ashdod workspace.":"SIGN IN REQUIRED · Database imports are available only inside a club session."}</div><div id="urlStatus" class="impStatus"></div><button id="runUrl" class="runImport" ${signed?"":"disabled"}>IMPORT · VERIFY · SAVE</button></div>`;
+  modal.innerHTML=`<div class="modalCard"><button class="modalX">×</button><small class="eyebrow">COURTIQ · VERIFIED IMPORT</small><h2>Import Official Game</h2><p>Paste an official IBBA, Winner League, FIBA Women’s EuroBasket / EuroCup Women, FIBA LiveStats / Genius Sports, EuroLeague, PLK or NBA.com game URL. CourtIQ detects the source, validates the box score and play-by-play when available, calculates team and player analytics, saves the game and creates a reusable report.</p><div class="importFields"><input id="boxUrl" placeholder="ibasketball.co.il/match/... · fibalivestats.../pbp.html · basket.co.il/... · fiba.basketball/... · euroleaguebasketball.net/... · plk.pl/mecz/... · nba.com/game/.../box-score"></div><div class="schema">${signed?"SECURE CLUB SESSION · Game will be saved to the Ashdod workspace.":"SIGN IN REQUIRED · Database imports are available only inside a club session."}</div><div id="urlStatus" class="impStatus"></div><button id="runUrl" class="runImport" ${signed?"":"disabled"}>IMPORT · VERIFY · SAVE</button></div>`;
   document.body.appendChild(modal); modal.querySelector(".modalX").onclick=()=>modal.remove(); modal.onclick=e=>{if(e.target===modal)modal.remove()};
   const womenReady=document.createElement("button"); womenReady.type="button"; womenReady.className="importBtn secondaryAction tomorrowSource"; womenReady.textContent="23/09 · Maccabi Haifa vs Bnei Yehuda";
   womenReady.onclick=()=>{modal.querySelector("#boxUrl").value="https://ibasketball.co.il/match/x99002-2/";modal.querySelector("#urlStatus").textContent="Official game link selected. Import after the federation publishes the final box score.";};
@@ -335,7 +353,19 @@ function openUrlImport(){
   const euroCup=document.createElement("button"); euroCup.type="button"; euroCup.className="importBtn secondaryAction tomorrowSource"; euroCup.textContent="EuroCup Women 2026/27 · FIBA";
   euroCup.onclick=()=>{modal.querySelector("#boxUrl").value="https://www.fiba.basketball/en/events/eurocup-women-26-27/games/135266-ASHD-DSK";modal.querySelector("#urlStatus").textContent="EuroCup Women selected. The official FIBA Boxscore can be imported after the game is final.";};
   womenReady.insertAdjacentElement("afterend",euroCup);
-  modal.querySelector("#runUrl").onclick=async()=>{const status=modal.querySelector("#urlStatus"),url=modal.querySelector("#boxUrl").value.trim(),btn=modal.querySelector("#runUrl");try{if(!url)throw new Error("Paste an official IBBA, FIBA LiveStats / Genius Sports, basket.co.il, FIBA, EuroLeague, PLK or NBA.com game URL.");setBusy(btn,true,"IMPORTING…");status.textContent="Fetching official source → validating totals → calculating → saving…";const body=await window.CourtIQData.importOfficialGame(url);const key="db_"+body.game_id;games[key]={...body.ui,_dbId:body.game_id};active=key;modal.remove();render();window.scrollTo(0,0);}catch(e){status.textContent=e.message;setBusy(btn,false);}};
+  const euroBasket=document.createElement("button");euroBasket.type="button";euroBasket.className="importBtn secondaryAction tomorrowSource";
+  euroBasket.textContent="מוקדמות יורובאסקט נשים 2027 · FIBA Women’s EuroBasket Qualifiers";
+  euroBasket.onclick=()=>{
+    const url="https://www.fiba.basketball/en/events/fiba-womens-eurobasket-2027-qualifiers";
+    modal.querySelector("#boxUrl").value=url;
+    showFibaEvent(modal.querySelector("#urlStatus"),fibaEventFromUrl(url));
+  };
+  euroCup.insertAdjacentElement("afterend",euroBasket);
+  modal.querySelector("#boxUrl").addEventListener("input",()=>{
+    const status=modal.querySelector("#urlStatus"),event=fibaEventFromUrl(modal.querySelector("#boxUrl").value.trim());
+    if(event) showFibaEvent(status,event);else status.textContent="";
+  });
+  modal.querySelector("#runUrl").onclick=async()=>{const status=modal.querySelector("#urlStatus"),url=modal.querySelector("#boxUrl").value.trim(),btn=modal.querySelector("#runUrl");try{if(!url)throw new Error("Paste an official IBBA, FIBA LiveStats / Genius Sports, basket.co.il, FIBA, EuroLeague, PLK or NBA.com game URL.");const event=fibaEventFromUrl(url);if(event){showFibaEvent(status,event);return;}setBusy(btn,true,"IMPORTING…");status.textContent="Fetching official source → validating totals → calculating → saving…";const body=await window.CourtIQData.importOfficialGame(url);const key="db_"+body.game_id;games[key]={...body.ui,_dbId:body.game_id};active=key;modal.remove();render();window.scrollTo(0,0);}catch(e){status.textContent=e.message;setBusy(btn,false);}};
 }
 
 async function openCompare(){
@@ -415,7 +445,7 @@ function openAccount(mode="signin"){
 
     if(signed){
       const ownerId="10fa3b29-4acd-4fcf-9784-1117b510332c",isOwner=data.user()?.id===ownerId;
-      const leagueOptions=["Israel Women · IBBA","EuroCup Women · FIBA","EuroLeague 2026/27","EuroCup 2026/27","Winner League","Poland · Eurobasket"];
+      const leagueOptions=["Israel Women · IBBA","EuroCup Women · FIBA","Women’s EuroBasket 2027 Qualifiers · FIBA","EuroLeague 2026/27","EuroCup 2026/27","Winner League","Poland · Eurobasket"];
       body.innerHTML=`<h2>Club Account</h2><p>Signed in as <b>${data.user()?.email||"club user"}</b>. ${isOwner?"OWNER · Full league access":"Select up to 2 leagues."}</p>
         <div class="importFields"><label>LEAGUE ACCESS</label><div id="leagueChecks">${leagueOptions.map(x=>`<label class="leagueChoice"><input type="checkbox" value="${htmlEsc(x)}" ${isOwner?"disabled":""}> ${htmlEsc(x)}</label>`).join("")}</div></div>
         <div id="leagueAccessNow" class="schema">Loading access…</div><div id="accountStatus" class="impStatus"></div>
@@ -545,7 +575,10 @@ async function openGameLibrary(){
     if(provider==="EUROBASKET_POLAND"||comp.includes("poland · eurobasket")) return {key:"poland",label:"Poland · Eurobasket"};
     if(provider==="EUROCUP"||(comp.includes("eurocup")&&!comp.includes("women"))) return {key:"eurocupmen",label:"EuroCup · Euroleague Basketball"};
     if(provider==="EUROLEAGUE"||comp.includes("euroleague")) return {key:"euroleague",label:"EuroLeague · Euroleague Basketball"};
-    if(provider==="FIBA"||comp.includes("eurocup women")) return {key:"eurocup",label:"EuroCup Women · FIBA"};
+    if((/women[’'s\s-]*eurobasket/.test(comp)&&comp.includes("qualifiers"))||/fiba-womens-eurobasket-2027-qualifiers/.test(String(g.sourceUrl||""))) return {key:"womenseurobasketqualifiers",label:"Women’s EuroBasket Qualifiers · FIBA"};
+    if(/women[’'s\s-]*eurobasket/.test(comp)||/fiba-womens-eurobasket/.test(String(g.sourceUrl||""))) return {key:"womenseurobasket",label:"Women’s EuroBasket · FIBA"};
+    if(comp.includes("eurocup women")) return {key:"eurocup",label:"EuroCup Women · FIBA"};
+    if(provider==="FIBA") return {key:"fiba",label:"FIBA · International Competitions"};
     if(provider==="IBBA"||comp.includes("athena")||comp.includes("women")) return {key:"women",label:"Israel Women · IBBA"};
     if(provider==="WINNER_LEAGUE"||comp.includes("winner")) return {key:"men",label:"Men's Competitions"};
     return {key:"other",label:"Other Games"};
@@ -558,6 +591,9 @@ async function openGameLibrary(){
   const grouped=new Map([
     ["women",{label:"Israel Women · IBBA",items:[]}],
     ["eurocup",{label:"EuroCup Women · FIBA",items:[]}],
+    ["womenseurobasketqualifiers",{label:"Women’s EuroBasket Qualifiers · FIBA",items:[]}],
+    ["womenseurobasket",{label:"Women’s EuroBasket · FIBA",items:[]}],
+    ["fiba",{label:"FIBA · International Competitions",items:[]}],
     ...(ownerAccess?[["euroleague",{label:"EuroLeague · Euroleague Basketball",items:[]}],["eurocupmen",{label:"EuroCup · Euroleague Basketball",items:[]}],["poland",{label:"Poland · Eurobasket",items:[]}],["men",{label:"Winner Cup · Men's Competitions",items:[]}]]:[]),
     ["other",{label:"Other Games",items:[]}]
   ]);
