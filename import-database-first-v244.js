@@ -181,7 +181,7 @@ async function invokeImport(url,clubId=null,retry=true){
   const timeoutMs=clientTimeoutForUrl(url);
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
-  let res;
+  let res,raw;
   try{
     res=await fetch(SUPABASE_URL+'/functions/v1/'+importer,{
       method:'POST',
@@ -193,6 +193,7 @@ async function invokeImport(url,clubId=null,retry=true){
       body:JSON.stringify({url,club_id:chosen}),
       signal:controller.signal
     });
+    raw=await res.text();
   }catch(error){
     if(error?.name==='AbortError'){
       const provider=identityFromUrl(url)?.provider;
@@ -214,13 +215,17 @@ async function invokeImport(url,clubId=null,retry=true){
     clearTimeout(timer);
   }
 
-  const raw=await res.text();
   let body=null;
   try{body=raw?JSON.parse(raw):null;}catch(_){}
 
   if(res.status===401&&retry&&d?.refreshSession){
-    const refreshed=await d.refreshSession();
-    if(refreshed)return invokeImport(url,chosen,false);
+    const refreshed=await timebox(d.refreshSession(),8000,null);
+    if(refreshed){
+      const cached=await savedGame(url,chosen);
+      if(cached)return cached;
+      return invokeImport(url,chosen,false);
+    }
+    throw new Error('Your session could not be renewed. Sign in again, then retry the game link.');
   }
 
   if(!res.ok){
