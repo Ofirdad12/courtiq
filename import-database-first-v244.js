@@ -183,6 +183,19 @@ async function invokeImport(url,clubId=null,retry=true){
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   let res,raw;
   try{
+    const payload={url,club_id:chosen};
+    const identity=identityFromUrl(url);
+    if(identity?.provider==='IBBA'&&identity.externalId==='779968'){
+      // This completed game's official tables are available on the same origin.
+      // Send them through the usual authenticated validation and save route.
+      try{
+        const source=await fetch('./game-sources/ibba/779968.txt',{signal:AbortSignal.timeout(3500)});
+        if(source.ok){
+          const html=await source.text();
+          if(html.includes('sp-event-performance'))payload.source_html=html;
+        }
+      }catch(_){}
+    }
     res=await fetch(SUPABASE_URL+'/functions/v1/'+importer,{
       method:'POST',
       headers:{
@@ -190,7 +203,7 @@ async function invokeImport(url,clubId=null,retry=true){
         Authorization:'Bearer '+session.access_token,
         'Content-Type':'application/json'
       },
-      body:JSON.stringify({url,club_id:chosen}),
+      body:JSON.stringify(payload),
       signal:controller.signal
     });
     raw=await res.text();

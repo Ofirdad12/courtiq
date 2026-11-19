@@ -117,13 +117,12 @@ async function invokeBcl(url,clubId=null,retry=true){
 }
 
 let wrapper=null;
-let wrappedBase=null;
 function install(){
   const d=window.CourtIQData;
   if(!d?.importOfficialGame)return false;
   if(wrapper&&d.importOfficialGame===wrapper)return true;
   if(d.importOfficialGame?.__courtiqBclV265)return true;
-  wrappedBase=d.importOfficialGame;
+  const wrappedBase=d.importOfficialGame.bind(d);
   wrapper=async function(url,clubId=null){
     if(!bclIdentity(url))return wrappedBase(url,clubId);
     let cached=null;
