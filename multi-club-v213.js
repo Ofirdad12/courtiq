@@ -43,10 +43,28 @@ async function setActiveClub(id){
   window.dispatchEvent(new CustomEvent('courtiq:club-changed',{detail:{club}}));
   return club;
 }
+async function loadClubGames(clubId){
+  const scope='&club_id=eq.'+Number(clubId);
+  const ids=[];
+  const pageSize=250;
+  for(let offset=0;;offset+=pageSize){
+    const page=await request('/rest/v1/games?select=id'+scope+'&order=game_date.desc.nullslast,id.desc&limit='+pageSize+'&offset='+offset);
+    ids.push(...page.map(row=>row.id));
+    if(page.length<pageSize)break;
+  }
+  const orderedIds=[...new Set(ids)];
+  const rows=new Map();
+  for(let start=0;start<orderedIds.length;start+=10){
+    const batch=orderedIds.slice(start,start+10);
+    const result=await request('/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at,club_id'+scope+'&id=in.('+batch.join(',')+')');
+    for(const row of result)rows.set(row.id,row);
+  }
+  return orderedIds.map(id=>rows.get(id)).filter(Boolean);
+}
 async function workspace(){
   const {club,clubs:available}=await resolveClub();
   const [games,clubPlayers]=await Promise.all([
-    request('/rest/v1/games?select=id,external_id,provider,competition,game_date,home_team,away_team,payload,created_at,club_id&club_id=eq.'+Number(club.id)+'&order=game_date.desc.nullslast'),
+    loadClubGames(club.id),
     request('/rest/v1/club_players?select=season,roster_status,players(id,name,position,nationality,source_url,analysis)&club_id=eq.'+Number(club.id)+'&season=eq.'+encodeURIComponent(club.season))
   ]);
   for(const row of games||[]){
