@@ -93,8 +93,13 @@ async function directSavedFiba(url,clubId=null){
   const identity=identityFromUrl(url);
   if(identity?.provider!=='FIBA')return null;
   const session=readSession();
-  const chosen=Number(clubId||window.CourtIQData?.activeClubId?.()||0);
-  if(!session?.access_token||!Number.isFinite(chosen)||chosen<=0)return null;
+  if(!session?.access_token)return null;
+  let chosen=Number(clubId||window.CourtIQData?.activeClubId?.()||0);
+  if(!chosen){
+    const selection=await timebox(window.CourtIQMultiClub?.resolveClub?.(),CLUB_FALLBACK_TIMEOUT_MS,null);
+    chosen=Number(selection?.club?.id||0);
+  }
+  if(!Number.isFinite(chosen)||chosen<=0)return null;
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),8000);
   try{
