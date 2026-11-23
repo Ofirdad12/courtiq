@@ -330,12 +330,40 @@ function fibaEventFromUrl(raw){
   try{
     const url=new URL(raw);
     if(url.protocol!=="https:" || !/^(www\.)?fiba\.basketball$/i.test(url.hostname)) return null;
+    if (/^\/(?:[a-z]{2}\/)?events\/fiba-basketball-world-cup-2027-european-qualifiers\/teams\/israel\/?$/i.test(url.pathname)) {
+      return { israelQualifiers: true };
+    }
     const match=url.pathname.match(/^\/(?:[a-z]{2}\/)?events\/([^/]+)(?:\/(?:games|teams|standings|stats))?\/?$/i);
     if(!match) return null;
     return {slug:match[1],gamesUrl:"https://www.fiba.basketball/en/events/"+match[1]+"/games"};
   }catch(_){return null;}
 }
 function showFibaEvent(status,event){
+  if (event.israelQualifiers) {
+    const games = [
+      "127038-ISR-GER", "127039-CRO-ISR", "127041-GER-ISR", "127042-CYP-ISR",
+      "127044-ISR-CYP", "127045-ISR-CRO", "127115-ISR-NED", "127118-ISR-POL",
+      "127121-LAT-ISR", "127123-NED-ISR", "127126-ISR-LAT", "127129-POL-ISR"
+    ];
+    const teams = {ISR:"ישראל", GER:"גרמניה", CRO:"קרואטיה", CYP:"קפריסין", NED:"הולנד", POL:"פולין", LAT:"לטביה"};
+    status.textContent = "בחר משחק. אפשר לייבא אותו אחרי שפיב״א מפרסמת את נתוני המשחק הסופיים. ";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label","בחירת משחק של נבחרת ישראל");
+    select.dir = "rtl";
+    select.add(new Option("בחר משחק…",""));
+    for (const game of games) {
+      const [,home,away] = game.split("-");
+      select.add(new Option(teams[home]+" מארחת את "+teams[away],game));
+    }
+    select.onchange = () => {
+      if (!select.value) return;
+      const input = status.closest(".modal").querySelector("#boxUrl");
+      input.value = "https://www.fiba.basketball/en/events/fiba-basketball-world-cup-2027-european-qualifiers/games/"+select.value;
+      status.textContent = select.selectedOptions[0].text+" · "+(window.CourtIQData?.isSignedIn() ? "לחץ על IMPORT · VERIFY · SAVE." : "התחבר כדי לייבא את המשחק.");
+    };
+    status.appendChild(select);
+    return;
+  }
   status.textContent="זהו דף טורניר. פתח את רשימת המשחקים, בחר משחק והדבק כאן את הקישור שלו. ייבוא הנתונים זמין לאחר פרסום ה־Box Score הסופי. ";
   const link=document.createElement("a");
   link.href=event.gamesUrl;link.target="_blank";link.rel="noopener noreferrer";
@@ -361,6 +389,16 @@ function openUrlImport(){
     showFibaEvent(modal.querySelector("#urlStatus"),fibaEventFromUrl(url));
   };
   euroCup.insertAdjacentElement("afterend",euroBasket);
+  const israel = document.createElement("button");
+  israel.type = "button";
+  israel.className = euroBasket.className;
+  israel.textContent = "נבחרת ישראל · מוקדמות גביע העולם 2027";
+  israel.onclick = () => {
+    const input = modal.querySelector("#boxUrl");
+    input.value = "https://www.fiba.basketball/en/events/fiba-basketball-world-cup-2027-european-qualifiers/teams/israel";
+    input.dispatchEvent(new Event("input", {bubbles:true}));
+  };
+  euroBasket.insertAdjacentElement("afterend",israel);
   modal.querySelector("#boxUrl").addEventListener("input",()=>{
     const status=modal.querySelector("#urlStatus"),event=fibaEventFromUrl(modal.querySelector("#boxUrl").value.trim());
     if(event) showFibaEvent(status,event);else status.textContent="";
