@@ -21,6 +21,10 @@ function identityFromUrl(raw){
   try{
     const u=new URL(String(raw||'').trim());
     const host=u.hostname.replace(/^www\./i,'').toLowerCase();
+    if(host==='basketlfb.com'){
+      const match=u.pathname.match(/^\/laboulangerewonderligue\/[a-z0-9-]+\/match\/(\d+)(?:-[a-z0-9-]+)?\/?$/i);
+      return match?{provider:'LBWL',externalId:match[1]}:null;
+    }
     if(host==='nba.com'){
       const m=u.pathname.match(/^\/game\/(?:[a-z0-9]+(?:-[a-z0-9]+)*-)?(00[1245]\d{7})(?:\/(?:box-score|boxscore|summary|play-by-play|game-charts|preview))?\/?$/i);
       return m?{provider:'NBA',externalId:m[1]}:null;
@@ -64,7 +68,7 @@ function identityFromUrl(raw){
 
 function clientTimeoutForUrl(raw){
   const provider=identityFromUrl(raw)?.provider;
-  if(provider==='NBA')return 45000;
+  if(provider==='NBA'||provider==='LBWL')return 45000;
   if(provider==='IBBA')return IBBA_CLIENT_TIMEOUT_MS;
   if(provider==='FIBA')return FIBA_CLIENT_TIMEOUT_MS;
   if(provider==='WINNER_LEAGUE')return WINNER_CLIENT_TIMEOUT_MS;
@@ -75,6 +79,7 @@ function clientTimeoutForUrl(raw){
 function importerFunctionForUrl(raw){
   try{
     const host=new URL(String(raw||'').trim()).hostname.replace(/^www\./i,'').toLowerCase();
+    if(host==='basketlfb.com')return 'import-lbwl-game';
     return host==='nba.com'?'import-nba-game':host==='ibasketball.co.il'?'import-ibba-game-v2':'import-ibba-game';
   }catch(_){
     return 'import-ibba-game';

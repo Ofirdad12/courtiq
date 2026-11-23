@@ -8,7 +8,7 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json"
 };
-const allowed = new Set(["ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il","fiba.basketball","www.fiba.basketball","euroleaguebasketball.net","www.euroleaguebasketball.net","eurobasket.com","www.eurobasket.com","plk.pl","www.plk.pl","fibalivestats.dcd.shared.geniussports.com","livestats.dcd.shared.geniussports.com"]);
+const allowed = new Set(["basketlfb.com","www.basketlfb.com","ibasketball.co.il","www.ibasketball.co.il","basket.co.il","www.basket.co.il","fiba.basketball","www.fiba.basketball","euroleaguebasketball.net","www.euroleaguebasketball.net","eurobasket.com","www.eurobasket.com","plk.pl","www.plk.pl","fibalivestats.dcd.shared.geniussports.com","livestats.dcd.shared.geniussports.com"]);
 const j = (body: unknown, status=200) => new Response(JSON.stringify(body), {status, headers:cors});
 const clean=(s:string)=>s.replace(/\s+/g," ").trim();
 const num=(s:string)=>{const m=clean(s).replaceAll(",","").match(/-?\d+/); if(!m) throw new Error("Expected numeric value: "+s); return Number(m[0]);};
@@ -34,6 +34,11 @@ const formulaCatalog={
 function validateUrl(raw:string){
   const u=new URL(raw);
   if(u.protocol!=="https:" || !allowed.has(u.hostname)) throw new Error("Use an official IBBA, Winner League, FIBA, EuroLeague or FIBA LiveStats / Genius Sports game URL.");
+  if (/^(?:www\.)?basketlfb\.com$/i.test(u.hostname)) {
+    if (u.port || u.username || u.password || !/^\/laboulangerewonderligue\/[a-z0-9-]+\/match\/\d+(?:-[a-z0-9-]+)?\/?$/i.test(u.pathname)) throw new Error("Paste an official LBWL match URL.");
+    u.search = ""; u.hash = "";
+    return {u, provider:"LBWL"};
+  }
   const isIbba=/^(www\.)?ibasketball\.co\.il$/.test(u.hostname);
   const isBasket=/^(www\.)?basket\.co\.il$/.test(u.hostname);
   const isFiba=/^(www\.)?fiba\.basketball$/.test(u.hostname);
@@ -50,6 +55,64 @@ function validateUrl(raw:string){
   if(isGenius && !/^\/u\/[a-z0-9_-]+\/\d+\/(?:index\.html|p\.html|pbp\.html|bs\.html)?$/i.test(u.pathname)) throw new Error("Unsupported FIBA LiveStats URL. Paste the official game page, box score or play-by-play URL.");
   return {u, provider:isGenius?"GENIUS_LIVESTATS":isPlk?"PLK":isEurobasket?"EUROBASKET_POLAND":isEuroleague?(u.pathname.toLowerCase().includes("/eurocup/")?"EUROCUP":"EUROLEAGUE"):isFiba?"FIBA":isBasket?"WINNER_LEAGUE":"IBBA"};
 }
+// Parse official LBWL tables. Totaux Équipe includes team-only rebounds and turnovers.
+function parseLbwl(tables, matchText) {
+  const normalize = value => value.normalize("NFC").trim().replace(/\s+/g, " ");
+  const integer = value => {
+    if (!/^[+-]?\d+$/.test(value)) throw new Error("Incomplete LBWL statistic: " + value);
+    return Number(value);
+  };
+  const teams = [];
+  let periods;
+  for (const rows of tables) {
+    const headerIndex = rows.findIndex(row => row.includes("Joueurs") && row.includes("2R-2T"));
+    if (headerIndex < 0) {
+      const header = rows.findIndex(row => ["1","2","3","4"].every(n => row.includes(n)));
+      if (header >= 0) periods = rows.slice(header + 1).filter(row => row[0]).slice(0, 2);
+      continue;
+    }
+    const headers = rows[headerIndex];
+    const players = [];
+    let total;
+    let teamMinutes;
+    for (const row of rows.slice(headerIndex + 1)) {
+      const isTotal = /^totaux?\s+équipe$/i.test(row[0]);
+      if (!isTotal && !/^\d+$/.test(row[0])) continue;
+      const offset = isTotal && row.length === headers.length - 1 ? 1 : 0;
+      const at = key => row[headers.indexOf(key) - offset];
+      const pair = key => {
+        const parts = /^(\d+)\s*[-–/]\s*(\d+)$/.exec(at(key));
+        if (!parts || +parts[1] > +parts[2]) throw new Error("Invalid LBWL " + key);
+        return parts.slice(1).map(Number);
+      };
+      const [two_pm,two_pa] = pair("2R-2T"), [three_pm,three_pa] = pair("3R-3T"), [ftm,fta] = pair("LFR-LFT");
+      const stats = {points:integer(at("Pts")),two_pm,two_pa,three_pm,three_pa,ftm,fta,
+        oreb:integer(at("RO")),dreb:integer(at("RD")),ast:integer(at("PD")),steals:integer(at("IN")),
+        tov:integer(at("BP")),blocks:integer(at("CT")),value:integer(at("EVA")),plus_minus:integer(at("+/-"))};
+      if (stats.points !== two_pm*2 + three_pm*3 + ftm) throw new Error("LBWL shots and points disagree.");
+      if (isTotal) { total = stats; teamMinutes = integer(at("Min")); continue; }
+      const clock = /^(\d+)(?::([0-5]\d))?$/.exec(at("Min"));
+      if (!clock || !at("Joueurs")) throw new Error("Incomplete LBWL player row.");
+      players.push({...stats, name:normalize(at("Joueurs")), number:integer(row[0]), minutes:+clock[1] + Number(clock[2] || 0)/60, has_played:true});
+    }
+    if (!players.length || !total || players.reduce((n,p) => n+p.points,0) !== total.points)
+      throw new Error("LBWL has not published a complete, reconciled box score.");
+    teams.push({players,total,teamMinutes});
+  }
+  if (teams.length !== 2 || periods?.length !== 2) throw new Error("LBWL has not published both teams and period scores.");
+  const quarters = [];
+  for (let i=1; i<periods[0].length; i++) {
+    if (/^[-–—\s]*$/.test(periods[0][i]) && /^[-–—\s]*$/.test(periods[1][i])) continue;
+    quarters.push([integer(periods[0][i]),integer(periods[1][i])]);
+  }
+  if (quarters.length < 4 || teams.some((t,i) => quarters.reduce((n,q) => n+q[i],0) !== t.total.points))
+    throw new Error("LBWL period scores do not match the final score.");
+  const date = Array.from(matchText.split(/Score par quart-temps/i)[0].matchAll(/(\d{2})\/(\d{2})\/(\d{4})\s+\d{1,2}:\d{2}/g)).pop();
+  const gameMinutes = teams[0].teamMinutes / 5;
+  if (gameMinutes < 40 || (gameMinutes-40)%5 || teams[1].teamMinutes !== teams[0].teamMinutes) throw new Error("LBWL game minutes are incomplete.");
+  return {teams, quarters, gameMinutes, names:periods.map(row=>normalize(row[0])), date:date ? [date[3],date[2],date[1]].join("-") : null};
+}
+
 function tableRows($:cheerio.CheerioAPI, table:any){
   // Cheerio's map() flattens arrays returned by the callback. Use a native
   // array map so every table row remains a distinct string array.
@@ -100,13 +163,13 @@ function ibbaMinutesValue(value:string){
   if(decimal) return r1(Number(decimal[1])+Number(decimal[2])/100);
   return minutesValue(s);
 }
-function advancedPlayer(player:any,team:any,opp:any){
+function advancedPlayer(player:any,team:any,opp:any,gameMinutes=40){
   const fgm=player.two_pm+player.three_pm, fga=player.two_pa+player.three_pa;
   const missed=fga-fgm+player.fta-player.ftm;
   const playEnds=fga+.44*player.fta+player.tov;
   const teamPoss=(team.two_pa+team.three_pa)+.44*team.fta-team.oreb+team.tov;
   const per40=(value:number)=>player.minutes?r1(value*40/player.minutes):0;
-  const teamMinutes=200;
+  const teamMinutes=5*gameMinutes;
   return {...player,fgm,fga,rebounds:player.oreb+player.dreb,
     fg_pct:pct(fgm,fga),two_pct:pct(player.two_pm,player.two_pa),three_pct:pct(player.three_pm,player.three_pa),ft_pct:pct(player.ftm,player.fta),
     efg:pct(fgm+.5*player.three_pm,fga),ts:pct(player.points,2*(fga+.44*player.fta)),pps:fga?r2(player.points/fga):0,three_pa_rate:pct(player.three_pa,fga),
@@ -617,7 +680,7 @@ function validateTeam(t:any,label:string){
   return {status:"passed",expected_points:expectedPoints,box_score_points:t.points,fga,checks:["non_negative","makes_lte_attempts","points_reconcile","fga_positive"]};
 }
 function uiGame(meta:any,home:any,away:any,quarters:any[]){
-  const gameMinutes=40+Math.max(0,quarters.length-4)*5;
+  const gameMinutes=meta.gameMinutes ?? (40+Math.max(0,quarters.length-4)*5);
   const hm=calc(home,away,gameMinutes), am=calc(away,home,gameMinutes);
   const metrics=[["Offensive Rating",hm.ortg.toFixed(1),am.ortg.toFixed(1)],["Defensive Rating",hm.drtg.toFixed(1),am.drtg.toFixed(1)],["Net Rating",hm.net_rating.toFixed(1),am.net_rating.toFixed(1)],["eFG%",hm.efg+"%",am.efg+"%"],["Pace",hm.pace.toFixed(1),am.pace.toFixed(1)]];
   const factors=[["eFG%",hm.efg,am.efg],["TOV%",hm.tov,am.tov],["ORB%",hm.orb,am.orb],["FTr",hm.ftr,am.ftr]];
@@ -639,7 +702,7 @@ function uiGame(meta:any,home:any,away:any,quarters:any[]){
     "Review the possessions that produced the largest efficiency gap before assigning tactical causation."
   ];
   return {id:meta.id,comp:meta.competition,date:meta.date_display,home:meta.home,away:meta.away,hs:home.points,as:away.points,quarters,metrics,factors,stats,findings,videos,
-    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="GENIUS_LIVESTATS"?"FIBA LIVESTATS / GENIUS SPORTS OFFICIAL DATA":meta.provider==="PLK"?"PLK OFFICIAL BOX SCORE":meta.provider==="EUROBASKET_POLAND"?"EUROBASKET POLAND BOX SCORE":meta.provider==="EUROCUP"?"EUROCUP OFFICIAL BOX SCORE":meta.provider==="EUROLEAGUE"?"EUROLEAGUE OFFICIAL BOX SCORE":meta.provider==="FIBA"?"FIBA OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
+    leaders:[],awayLeaders:[],sourceLabel:(meta.provider==="LBWL"?"LBWL OFFICIAL BOX SCORE":meta.provider==="GENIUS_LIVESTATS"?"FIBA LIVESTATS / GENIUS SPORTS OFFICIAL DATA":meta.provider==="PLK"?"PLK OFFICIAL BOX SCORE":meta.provider==="EUROBASKET_POLAND"?"EUROBASKET POLAND BOX SCORE":meta.provider==="EUROCUP"?"EUROCUP OFFICIAL BOX SCORE":meta.provider==="EUROLEAGUE"?"EUROLEAGUE OFFICIAL BOX SCORE":meta.provider==="FIBA"?"FIBA OFFICIAL BOX SCORE":meta.provider==="WINNER_LEAGUE"?"WINNER LEAGUE OFFICIAL BOX SCORE":"IBBA OFFICIAL BOX SCORE")+" · DATA CONFIRMED",confidence:"DATA CONFIRMED",
     ask:meta.home+" and "+meta.away+" are compared here using verified box-score totals. Tactical causation requires video verification.",
     raw:{home,away},calculated:{home:hm,away:am},formulaCatalog};
 }
@@ -702,7 +765,7 @@ Deno.serve(async(req:Request)=>{
       "Pragma":"no-cache"
     };
     const geniusHeaders={...browserHeaders,"Accept":"application/json, text/javascript, */*; q=0.01","X-Requested-With":"XMLHttpRequest","Referer":u.toString()};
-    const res=await fetch(fetchUrl.toString(),{headers:isEl?elHeaders:isGenius?geniusHeaders:browserHeaders});
+    const res=await fetch(fetchUrl.toString(),{headers:isEl?elHeaders:isGenius?geniusHeaders:browserHeaders,...(provider==='LBWL'?{signal:AbortSignal.timeout(14000),redirect:'error' as const}:{})});
     if(!res.ok) throw new Error("Official source returned HTTP "+res.status);
     const sourceText=await res.text();
     let euroleagueStats:any=null, euroleagueGame:any=null, geniusData:any=null;
@@ -720,7 +783,21 @@ Deno.serve(async(req:Request)=>{
 
     let homeName="",awayName="",quarters:any[]=[], splitData:any=null, extraData:any=null, parsedPlayers:any=null, playByPlay:any[]=[], fibaData:any=null;
     const playerTables:any[]=[];
-    if(provider==="GENIUS_LIVESTATS"){
+    let lbwlDate = null, lbwlMinutes;
+    if(provider==="LBWL"){
+      const tables = $("table").toArray().map(table => tableRows($,table));
+      const match = parseLbwl(tables,$("body").text());
+      [homeName,awayName] = match.names;
+      const ids = new Map<string,string>();
+      $("table a[href*='/joueur/']").each((_,a) => {
+        const id = $(a).attr("href")?.match(/\/joueur\/(\d+)(?:-|\/|$)/)?.[1];
+        if (id) ids.set(clean($(a).text()),id);
+      });
+      parsedPlayers = match.teams.map(team => ({...team, players:team.players.map(player => ({...player,id:ids.get(player.name)||""}))}));
+      quarters = match.quarters;
+      lbwlDate = match.date;
+      lbwlMinutes = match.gameMinutes;
+    }else if(provider==="GENIUS_LIVESTATS"){
       const ht=geniusData.tm["1"],at=geniusData.tm["2"];
       homeName=clean(String(ht?.name||ht?.nameInternational||ht?.shortName||""));
       awayName=clean(String(at?.name||at?.nameInternational||at?.shortName||""));
@@ -815,12 +892,12 @@ Deno.serve(async(req:Request)=>{
     }
     const home=parsedPlayers[0].total;
     const away=parsedPlayers[1].total;
-    parsedPlayers[0].players=parsedPlayers[0].players.map((p:any)=>advancedPlayer(p,home,away));
-    parsedPlayers[1].players=parsedPlayers[1].players.map((p:any)=>advancedPlayer(p,away,home));
+    parsedPlayers[0].players=parsedPlayers[0].players.map((p:any)=>advancedPlayer(p,home,away,lbwlMinutes));
+    parsedPlayers[1].players=parsedPlayers[1].players.map((p:any)=>advancedPlayer(p,away,home,lbwlMinutes));
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="GENIUS_LIVESTATS"?"genius-livestats-json-v1":provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v7",
+      parser:provider==="LBWL"?"lbwl-html-v1":provider==="GENIUS_LIVESTATS"?"genius-livestats-json-v1":provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v7",
       validated_at:new Date().toISOString()
     };
 
@@ -830,9 +907,9 @@ Deno.serve(async(req:Request)=>{
     const elDate=(provider==="EUROLEAGUE"||provider==="EUROCUP")?String(euroleagueGame?.date||euroleagueGame?.localDate||"").slice(0,10):"";
     const plkDate=provider==="PLK"?(allText.match(/(?:^|\\s)(\\d{4})-(\\d{2})-(\\d{2})(?:\\s|$)/)?.slice(1,4).join("-")||""):"";
     const geniusDate=provider==="GENIUS_LIVESTATS"?geniusGameDate(geniusData):"";
-    const gameDate=elDate||fibaDate||plkDate||geniusDate||(dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null);
+    const gameDate=provider==="LBWL"?lbwlDate:elDate||fibaDate||plkDate||geniusDate||(dm?dm[3]+"-"+dm[2]+"-"+dm[1]:null);
     const dateDisplay=gameDate?gameDate.split("-").reverse().join("/"):"Imported game";
-    const id=provider==="GENIUS_LIVESTATS"?geniusGameId:provider==="PLK"?u.pathname.split("/mecz/")[1].split("/")[0]:provider==="EUROBASKET_POLAND"?String(u.searchParams.get("Game")||u.searchParams.get("game")||"").slice(0,120):(provider==="EUROLEAGUE"||provider==="EUROCUP")?`${elSeason}-${elGameCode}`:provider==="FIBA"?u.pathname.match(/\/games\/(\d+)-/)![1]:provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
+    const id=provider==="LBWL"?u.pathname.match(/\/match\/(\d+)/)![1]:provider==="GENIUS_LIVESTATS"?geniusGameId:provider==="PLK"?u.pathname.split("/mecz/")[1].split("/")[0]:provider==="EUROBASKET_POLAND"?String(u.searchParams.get("Game")||u.searchParams.get("game")||"").slice(0,120):(provider==="EUROLEAGUE"||provider==="EUROCUP")?`${elSeason}-${elGameCode}`:provider==="FIBA"?u.pathname.match(/\/games\/(\d+)-/)![1]:provider==="WINNER_LEAGUE"?String(u.searchParams.get("GameId")):u.pathname.match(/\/match\/([^/]+)/)![1];
     auditExternalId=id;
     const eventSlug=u.pathname.match(/\/events\/([^/]+)/)?.[1]||"";
     const eventSeason=eventSlug.match(/-(\d{2})-(\d{2})$/);
@@ -840,9 +917,9 @@ Deno.serve(async(req:Request)=>{
     const fibaCompetitionBase=eventSlug.replace(/-\d{2}-\d{2}$/i,"");
     const fibaCompetitionName=({"eurocup-women":"EuroCup Women","fiba-europe-cup":"FIBA Europe Cup"} as Record<string,string>)[fibaCompetitionBase]||fibaCompetitionBase.split("-").filter(Boolean).map((x:string)=>x.toLowerCase()==="fiba"?"FIBA":x.charAt(0).toUpperCase()+x.slice(1)).join(" ");
     const fibaSeason=eventSeason?"20"+eventSeason[1]+"/"+eventSeason[2]:"";
-    const title=provider==="GENIUS_LIVESTATS"?(geniusCompetition||(geniusLeague==="IBBA"?"IBBA · FIBA LiveStats":"FIBA LiveStats · "+geniusLeague)):provider==="PLK"?"Polska Liga Koszykówki":provider==="EUROBASKET_POLAND"?"Poland · Eurobasket":provider==="EUROCUP"?`EuroCup ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="EUROLEAGUE"?`EuroLeague ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="FIBA"?clean([fibaCompetitionName,fibaSeason].filter(Boolean).join(" ")):clean($("title").text())||"IBBA";
+    const title=provider==="LBWL"?"La Boulangère Wonderligue":provider==="GENIUS_LIVESTATS"?(geniusCompetition||(geniusLeague==="IBBA"?"IBBA · FIBA LiveStats":"FIBA LiveStats · "+geniusLeague)):provider==="PLK"?"Polska Liga Koszykówki":provider==="EUROBASKET_POLAND"?"Poland · Eurobasket":provider==="EUROCUP"?`EuroCup ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="EUROLEAGUE"?`EuroLeague ${elSeason.slice(1)}/${String(Number(elSeason.slice(1))+1).slice(-2)}`:provider==="FIBA"?clean([fibaCompetitionName,fibaSeason].filter(Boolean).join(" ")):clean($("title").text())||"IBBA";
 
-    const meta={id,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
+    const meta={id,gameMinutes:lbwlMinutes,home:homeName,away:awayName,competition:title,date_display:dateDisplay,provider};
     const ui=uiGame(meta,home,away,quarters);
     ui.sourceUrl=u.toString();
     ui.playByPlay=playByPlay;
@@ -978,8 +1055,8 @@ Deno.serve(async(req:Request)=>{
       try{
         const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         await admin.from("import_runs").insert({
-          club_id:auditClubId,provider:auditUrl.includes("geniussports.com")?"GENIUS_LIVESTATS":auditUrl.includes("plk.pl")?"PLK":auditUrl.includes("eurobasket.com")?"EUROBASKET_POLAND":auditUrl.includes("/eurocup/")?"EUROCUP":auditUrl.includes("euroleaguebasketball.net")?"EUROLEAGUE":auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
-          status:"failed",error_message:message,validation:{parser:auditUrl.includes("geniussports.com")?"genius-livestats-json-v1":auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v7"}
+          club_id:auditClubId,provider:auditUrl.includes("basketlfb.com")?"LBWL":auditUrl.includes("geniussports.com")?"GENIUS_LIVESTATS":auditUrl.includes("plk.pl")?"PLK":auditUrl.includes("eurobasket.com")?"EUROBASKET_POLAND":auditUrl.includes("/eurocup/")?"EUROCUP":auditUrl.includes("euroleaguebasketball.net")?"EUROLEAGUE":auditUrl.includes("fiba.basketball")?"FIBA":auditUrl.includes("basket.co.il")?"WINNER_LEAGUE":"IBBA",source_url:auditUrl,external_id:auditExternalId,
+          status:"failed",error_message:message,validation:{parser:auditUrl.includes("basketlfb.com")?"lbwl-html-v1":auditUrl.includes("geniussports.com")?"genius-livestats-json-v1":auditUrl.includes("euroleaguebasketball.net")?"euroleague-v2-api":auditUrl.includes("fiba.basketball")?"fiba-next-v1":auditUrl.includes("basket.co.il")?"basket-v4":"ibba-v7"}
         });
       }catch(_){}
     }
