@@ -14,4 +14,4 @@ await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/6382c28828abfc
 // Basketball Champions League uses the FIBA digital platform; map BCL links into the verified FIBA parser.
 await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/4b6bd65881219c96553b24c2dd59ed445e17e1d4/supabase/functions/import-ibba-game/bcl-production-entry.ts");
 // FIBA RSC importer with official play-by-play preservation. The relative imports in this pinned module resolve to the same verified commit.
-await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/4b6bd65881219c96553b24c2dd59ed445e17e1d4/supabase/functions/import-ibba-game/fiba-rsc-production-entry.ts");
+await import("https://raw.githubusercontent.com/Ofirdad12/courtiq/499094384c4285196e9a666f0fd78a19cc166d65/supabase/functions/import-ibba-game/fiba-rsc-production-entry.ts");
