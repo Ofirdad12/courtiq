@@ -94,6 +94,16 @@ function timebox(promise,timeoutMs,fallback=null){
   ]).finally(()=>{if(timer)clearTimeout(timer);});
 }
 
+function validFibaMinutes(ui){
+  if(!ui?.players)return false;
+  const quarters=ui.quarters;
+  if(!Array.isArray(quarters)||quarters.length<4)return false;
+  const length=40+5*Math.max(0,quarters.length-4);
+  return ['home','away'].every(side=>{
+    const players=ui.players[side];
+    return Array.isArray(players)&&players.length>=5&&players.every(p=>p.minutes!=null&&Number.isFinite(Number(p.minutes))&&Number(p.minutes)>=0&&Number(p.minutes)<=length+0.01&&!(Number(p.minutes)===0&&['points','two_pa','three_pa','fta','oreb','dreb','ast','steals','blocks','tov'].some(k=>Number(p[k])>0)))&&Math.abs(players.reduce((s,p)=>s+Number(p.minutes),0)-5*length)<=1;
+  });
+}
 async function directSavedFiba(url,clubId=null){
   const identity=identityFromUrl(url);
   if(identity?.provider!=='FIBA')return null;
@@ -115,7 +125,7 @@ async function directSavedFiba(url,clubId=null){
     if(!response.ok)return null;
     const rows=await response.json();
     const row=Array.isArray(rows)?rows[0]:null,p=row?.payload;
-    if(!p?.ui||!(p.verified===true||p.quality?.status==='VERIFIED'))return null;
+    if(!p?.ui||!(p.verified===true||p.quality?.status==='VERIFIED')||!validFibaMinutes(p.ui))return null;
     return {game_id:row.id,ui:p.ui,validation:p.validation||null,report:p.report||null,saved:true,reused_existing:true,cache_hit:true,club_id:chosen,source:'courtiq_verified_database'};
   }catch(_){return null;}finally{clearTimeout(timer);}
 }
@@ -139,6 +149,7 @@ async function savedGame(url,clubId=null){
   const row=(w?.games||[]).find(g=>{
     const p=g?.payload;
     if(!p?.ui||!(p.verified===true||p.quality?.status==='VERIFIED'))return false;
+    if(identity.provider==='FIBA'&&!validFibaMinutes(p.ui))return false;
     if(matches({provider:String(g.provider||'').toUpperCase(),externalId:g.external_id}))return true;
     const aliases=Array.isArray(p.source_aliases)?p.source_aliases:[];
     return aliases.some(alias=>typeof alias==='string'&&matches(identityFromUrl(alias)));

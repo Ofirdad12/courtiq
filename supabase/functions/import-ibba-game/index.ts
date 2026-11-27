@@ -361,13 +361,41 @@ function fibaPageData($:cheerio.CheerioAPI){
   if(ready()) return merged;
   throw new Error("FIBA box score payload was not readable. The official result exists, but the Next.js game payload was not recognized.");
 }
+function fibaMinutesValue(value:any):number|null{
+  if(value===null||value===undefined||typeof value==="object")return null;
+  const s=String(value).trim();
+  if(!s)return null;
+  let seconds:number;
+  const clock=s.match(/^(?:(\d+):)?(\d+):([0-5]?\d(?:\.\d+)?)$/);
+  const iso=s.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/i);
+  if(clock){
+    if(clock[1]!==undefined&&Number(clock[2])>=60)return null;
+    seconds=Number(clock[1]||0)*3600+Number(clock[2])*60+Number(clock[3]);
+  }else if(iso&&(iso[1]||iso[2]||iso[3])){
+    seconds=Number(iso[1]||0)*3600+Number(iso[2]||0)*60+Number(iso[3]||0);
+  }else if(/^\d+(?:\.\d+)?$/.test(s))seconds=Number(s)*60;
+  else return null;
+  return Number.isFinite(seconds)&&seconds>=0?Math.round(seconds/60*10000)/10000:null;
+}
+function validateFibaMinutes(sides:any[],gameMinutes:number){
+  for(const side of sides){
+    for(const p of side.players){
+      if(p.minutes===null||!Number.isFinite(p.minutes)||p.minutes<0||p.minutes>gameMinutes+0.01||
+         (p.minutes===0&&(p.points>0||p.two_pa>0||p.three_pa>0||p.fta>0||p.oreb>0||p.dreb>0||p.ast>0||p.steals>0||p.blocks>0||p.tov>0))){
+        throw new Error("FIBA_MINUTES_INVALID: Official playing time is missing or inconsistent for "+p.name+". No unverified minutes were saved.");
+      }
+    }
+    const total=side.players.reduce((sum:number,p:any)=>sum+p.minutes,0);
+    if(Math.abs(total-5*gameMinutes)>1)throw new Error("FIBA_MINUTES_INVALID: Team minutes "+total.toFixed(2)+" do not reconcile with "+(5*gameMinutes)+". No unverified minutes were saved.");
+  }
+}
 function fibaTeamData(team:any,roster:any[]){
   const s=team?.Stats||{};
   const byId=new Map((roster||[]).map((p:any)=>[String(p.personId),p]));
   const players=(team?.Children||[]).map((row:any)=>{
     const ps=row?.Stats||{},person=byId.get(String(row?.Id||"").replace(/^P_/,""))||{};
     return {id:String(row?.Id||"").replace(/^P_/,""),number:Number(person.uniformNumber||0),name:clean([person.firstName,person.lastName].filter(Boolean).join(" "))||String(row?.Id||"Player"),position:person.position||null,
-      starter:Boolean(ps.Starter),has_played:Boolean(ps.HasPlayed),minutes:minutesValue(String(ps.TP||"0:00")),points:Number(ps.PTS||0),two_pm:Number(ps.FG2M||0),two_pa:Number(ps.FG2A||0),three_pm:Number(ps.FG3M||0),three_pa:Number(ps.FG3A||0),ftm:Number(ps.FTM||0),fta:Number(ps.FTA||0),
+      starter:Boolean(ps.Starter),has_played:Boolean(ps.HasPlayed),minutes:ps.HasPlayed===false&&ps.TP==null?0:fibaMinutesValue(ps.TP),points:Number(ps.PTS||0),two_pm:Number(ps.FG2M||0),two_pa:Number(ps.FG2A||0),three_pm:Number(ps.FG3M||0),three_pa:Number(ps.FG3A||0),ftm:Number(ps.FTM||0),fta:Number(ps.FTA||0),
       dreb:Number(ps.DR||0),oreb:Number(ps.OR||0),steals:Number(ps.ST||0),tov:Number(ps.TO||0),ast:Number(ps.AS||0),blocks:Number(ps.BS||0),value:Number(ps.EFF||0),plus_minus:Number(ps.PM||0)};
   });
   return {total:{points:Number(s.PTS??team?.Score??0),two_pm:Number(s.FG2M||0),two_pa:Number(s.FG2A||0),three_pm:Number(s.FG3M||0),three_pa:Number(s.FG3A||0),ftm:Number(s.FTM||0),fta:Number(s.FTA||0),oreb:Number(s.OR||0),dreb:Number(s.DR||0),tov:Number(s.TO||0),ast:Number(s.AS||0)},players};
@@ -892,12 +920,17 @@ Deno.serve(async(req:Request)=>{
     }
     const home=parsedPlayers[0].total;
     const away=parsedPlayers[1].total;
+    if(provider==="FIBA"){
+      if(quarters.length<4)throw new Error("FIBA_MINUTES_INVALID: Official final periods are incomplete.");
+      lbwlMinutes=40+Math.max(0,quarters.length-4)*5;
+      validateFibaMinutes(parsedPlayers,lbwlMinutes);
+    }
     parsedPlayers[0].players=parsedPlayers[0].players.map((p:any)=>advancedPlayer(p,home,away,lbwlMinutes));
     parsedPlayers[1].players=parsedPlayers[1].players.map((p:any)=>advancedPlayer(p,away,home,lbwlMinutes));
     const validation={
       home:validateTeam(home,homeName),
       away:validateTeam(away,awayName),
-      parser:provider==="LBWL"?"lbwl-html-v1":provider==="GENIUS_LIVESTATS"?"genius-livestats-json-v1":provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v1":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v7",
+      parser:provider==="LBWL"?"lbwl-html-v1":provider==="GENIUS_LIVESTATS"?"genius-livestats-json-v1":provider==="PLK"?"plk-html-v1":provider==="EUROBASKET_POLAND"?"eurobasket-html-v1":(provider==="EUROLEAGUE"||provider==="EUROCUP")?"euroleague-v2-api":provider==="FIBA"?"fiba-next-v2-minutes":provider==="WINNER_LEAGUE"?"basket-v4":"ibba-v7",
       validated_at:new Date().toISOString()
     };
 

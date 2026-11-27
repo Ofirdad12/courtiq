@@ -125,6 +125,28 @@ function resolveFlight(value: any, roots: Record<string, any>, depth = 0): any {
   return resolveFlight(target, roots, depth + 1);
 }
 
+// Resolve simple scalar Flight chunks used for repeated official playing times.
+function resolveFibaTimeChunks(teams:any[],sources:string[]){
+  const chunks=new Map<string,any>();
+  for(const source of sources){
+    for(const line of source.split(/\r?\n/)){
+      const m=line.match(/^([0-9a-f]+):(".*")$/i);
+      if(!m)continue;
+      try{chunks.set(m[1].toLowerCase(),JSON.parse(m[2]));}catch(_){}
+    }
+  }
+  for(const team of teams)for(const row of team?.Children||[]){
+    const stats=row?.Stats;
+    if(!stats)continue;
+    const seen=new Set<string>();
+    while(typeof stats.TP==="string"){
+      const ref=stats.TP.match(/^\$([0-9a-f]+)$/i);
+      const key=ref?.[1]?.toLowerCase();
+      if(!key||seen.has(key)||!chunks.has(key))break;
+      seen.add(key);stats.TP=chunks.get(key);
+    }
+  }
+}
 function extractFibaRsc(text: string, gameId: number) {
   const keys = ["game", "playByPlay", "gameDetails", "playersTeamA", "playersTeamB"];
   const raw: Record<string, any> = {};
@@ -143,6 +165,7 @@ function extractFibaRsc(text: string, gameId: number) {
   const resolved = resolveFlight(raw, raw);
   const teams = resolved?.gameDetails?.c || resolved?.gameData?.c || resolved?.gameData?.gameDetails?.c;
   if (!Array.isArray(teams) || teams.length < 2) throw new Error("FIBA_BOX_SCORE_PENDING:teams");
+  resolveFibaTimeChunks(teams,sources);
   if (!Array.isArray(resolved.playersTeamA) || !Array.isArray(resolved.playersTeamB)) throw new Error("FIBA_BOX_SCORE_PENDING:players");
   return resolved;
 }
